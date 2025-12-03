@@ -9,6 +9,11 @@ export default function RoundedAnimatedSlider5({ images = [] }) {
   const mouseInsideRef = useRef(false);
   const highlightVisibleRef = useRef(false);
   const isTouchDevice = useRef(false);
+  
+  // Nuevas refs para detectar scroll vs toque estático
+  const touchStartY = useRef(0);
+  const touchStartX = useRef(0);
+  const isScrolling = useRef(false);
 
   // Detectar si es dispositivo táctil
   useEffect(() => {
@@ -108,7 +113,6 @@ export default function RoundedAnimatedSlider5({ images = [] }) {
     if (headerFooter) {
       headerFooter.addEventListener("mouseenter", disableHighlight);
       headerFooter.addEventListener("mouseleave", enableHighlight);
-      // También para touch
       headerFooter.addEventListener("touchstart", disableHighlight);
     }
 
@@ -239,25 +243,46 @@ export default function RoundedAnimatedSlider5({ images = [] }) {
       handleReveal(e.clientX, e.clientY);
     };
 
-    // Handler para touch
-    const handleTouchMove = (e) => {
-      e.preventDefault(); // Prevenir scroll mientras se arrastra
+    // Handler para touch - NUEVO: detecta si es scroll
+    const handleTouchStart = (e) => {
+      mouseInsideRef.current = true;
+      isScrolling.current = false;
+      
       if (e.touches.length > 0) {
         const touch = e.touches[0];
+        touchStartY.current = touch.clientY;
+        touchStartX.current = touch.clientX;
         handleReveal(touch.clientX, touch.clientY);
       }
     };
 
-    const handleTouchStart = (e) => {
-      mouseInsideRef.current = true;
+    const handleTouchMove = (e) => {
       if (e.touches.length > 0) {
         const touch = e.touches[0];
-        handleReveal(touch.clientX, touch.clientY);
+        const deltaY = Math.abs(touch.clientY - touchStartY.current);
+        const deltaX = Math.abs(touch.clientX - touchStartX.current);
+        
+        // Si el movimiento vertical es mayor que el horizontal (umbral de 10px)
+        // consideramos que es un scroll y NO bloqueamos el evento
+        if (deltaY > 10 && deltaY > deltaX) {
+          isScrolling.current = true;
+        }
+        
+        // Solo prevenir el scroll si NO está scrolleando
+        if (!isScrolling.current) {
+          e.preventDefault();
+          handleReveal(touch.clientX, touch.clientY);
+        }
+        // Si está scrolleando, ocultamos las imágenes pero permitimos el scroll
+        else {
+          handleContainerLeave();
+        }
       }
     };
 
     const handleTouchEnd = () => {
       handleContainerLeave();
+      isScrolling.current = false;
     };
 
     // Event listeners
@@ -267,11 +292,11 @@ export default function RoundedAnimatedSlider5({ images = [] }) {
     // Eventos de mouse
     window.addEventListener("mousemove", handleMouseMove);
     
-    // Eventos táctiles
-    container.addEventListener("touchstart", handleTouchStart, { passive: false });
+    // Eventos táctiles - passive: false solo en touchmove cuando sea necesario
+    container.addEventListener("touchstart", handleTouchStart, { passive: true });
     container.addEventListener("touchmove", handleTouchMove, { passive: false });
-    container.addEventListener("touchend", handleTouchEnd);
-    container.addEventListener("touchcancel", handleTouchEnd);
+    container.addEventListener("touchend", handleTouchEnd, { passive: true });
+    container.addEventListener("touchcancel", handleTouchEnd, { passive: true });
 
     // Cleanup
     return () => {
@@ -308,7 +333,7 @@ export default function RoundedAnimatedSlider5({ images = [] }) {
   return (
     <div
       ref={containerRef}
-      className="relative w-screen h-screen flex items-center justify-center overflow-hidden bg-white touch-none"
+      className="relative w-screen h-screen flex items-center justify-center overflow-hidden bg-white"
     >
       {images.map((src, i) => (
         <img
