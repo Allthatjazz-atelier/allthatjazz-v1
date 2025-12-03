@@ -129,7 +129,7 @@ export default function HeaderFooter6({ children }) {
         <div className="flex" onClick={() => setIsAboutOpen(!isAboutOpen)}>
           <h1
             ref={h1Ref}
-            className="text-[4rem] tracking-[-0.04em] text-white select-none"
+            className="text-[4rem] tracking-[-0.04em] text-white select-none whitespace-nowrap"
           >
             allthatjazz
           </h1>
