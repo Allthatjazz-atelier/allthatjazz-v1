@@ -1,6 +1,5 @@
 "use client";
 import { useEffect, useRef, useState } from "react";
-import { gsap } from "gsap";
 
 export default function RoundedAnimatedSlider3({ images = [] }) {
   const containerRef = useRef(null);
@@ -25,23 +24,7 @@ export default function RoundedAnimatedSlider3({ images = [] }) {
     if (!container) return;
 
     const imgs = container.querySelectorAll(".photo");
-    const ctx = gsap.context(() => {}, container);
-
-    // Variables CSS para la elipse dinámica
-    container.style.setProperty("--ellipseX", "1.4");
-    container.style.setProperty("--ellipseY", "0.8");
-
-    // Animación de "respiración" elíptica con will-change para GPU
-    const breathAnimation = gsap.to(container, {
-      "--ellipseX": 1.6,
-      "--ellipseY": 0.7,
-      duration: 6,
-      repeat: -1,
-      yoyo: true,
-      ease: "sine.inOut",
-    });
-
-    animationsRef.current.push(breathAnimation);
+    const isMobile = window.innerWidth < 768;
 
     // Posiciona cada imagen en una elipse dinámica
     imgs.forEach((img, i) => {
@@ -50,59 +33,97 @@ export default function RoundedAnimatedSlider3({ images = [] }) {
       const y = Math.sin(angle) * radius * 0.8;
 
       // Optimización GPU: usar transform y opacity
-      gsap.set(img, {
-        position: "absolute",
-        top: "50%",
-        left: "50%",
-        xPercent: -50,
-        yPercent: -50,
-        x,
-        y,
-        transformOrigin: "center center",
-        scale: 0.6,
-        opacity: 0,
-        zIndex: 1,
-        force3D: true, // Fuerza aceleración 3D
-        willChange: "transform, opacity", // Optimización GPU
-      });
+      img.style.position = "absolute";
+      img.style.top = "50%";
+      img.style.left = "50%";
+      img.style.transform = `translate(-50%, -50%) translate(${x}px, ${y}px) scale(0.6)`;
+      img.style.transformOrigin = "center center";
+      img.style.opacity = "0";
+      img.style.zIndex = "1";
+      img.style.transition = "all 0.45s cubic-bezier(0.19, 1, 0.22, 1)";
     });
 
     const maxVisible = 200;
-    let highlightEnabled = true;
 
-    const headerFooter = document.querySelector(".HeaderFooter");
+    // LÓGICA PARA MÓVIL: Animación automática con focos aleatorios
+    if (isMobile) {
+      const animateMobileClusters = () => {
+        // Generar 2-3 puntos focales aleatorios en la pantalla
+        const numFoci = Math.floor(Math.random() * 2) + 2; // 2 o 3 focos
+        const foci = [];
+        
+        for (let i = 0; i < numFoci; i++) {
+          foci.push({
+            x: Math.random() * window.innerWidth,
+            y: Math.random() * window.innerHeight,
+          });
+        }
 
-    const disableHighlight = () => {
-      highlightEnabled = false;
-      
-      // Ocultar TODAS las imágenes inmediatamente
-      imgs.forEach((img) => {
-        gsap.to(img, {
-          opacity: 0,
-          scale: 0.5,
-          zIndex: 0,
-          duration: 0.2,
-          ease: "expo.out",
-          force3D: true,
+        imgs.forEach((img) => {
+          const rect = img.getBoundingClientRect();
+          const imgCenterX = rect.left + rect.width / 2;
+          const imgCenterY = rect.top + rect.height / 2;
+
+          // Calcular la distancia al foco más cercano
+          let minDist = Infinity;
+          foci.forEach((focus) => {
+            const dx = imgCenterX - focus.x;
+            const dy = imgCenterY - focus.y;
+            const dist = Math.sqrt(dx * dx + dy * dy);
+            minDist = Math.min(minDist, dist);
+          });
+
+          // Revelar imágenes según proximidad al foco más cercano
+          const maxDistMobile = maxVisible * 1.5;
+          if (minDist > maxDistMobile) {
+            img.style.opacity = "0";
+            img.style.transform = `translate(-50%, -50%) translate(${
+              parseFloat(img.dataset.x) || 0
+            }px, ${parseFloat(img.dataset.y) || 0}px) scale(0.5)`;
+            img.style.zIndex = "0";
+          } else {
+            const scale = Math.max(
+              0.6,
+              1.6 - (minDist / maxDistMobile) * 1.0
+            );
+            const opacity = Math.max(
+              0.3,
+              1 - (minDist / maxDistMobile) * 0.7
+            );
+            const zIndex = Math.max(
+              1,
+              Math.round(10 - (minDist / maxDistMobile) * 9)
+            );
+
+            // Guardar posición para mantener la transformación
+            const angle = (Array.from(imgs).indexOf(img) / imgs.length) * Math.PI * 2;
+            const x = Math.cos(angle) * radius * 1.4;
+            const y = Math.sin(angle) * radius * 0.8;
+            img.dataset.x = x;
+            img.dataset.y = y;
+
+            img.style.opacity = opacity.toString();
+            img.style.transform = `translate(-50%, -50%) translate(${x}px, ${y}px) scale(${scale})`;
+            img.style.zIndex = zIndex.toString();
+          }
         });
-      });
-      
-      if (highlightVisibleRef.current) {
-        window.dispatchEvent(new CustomEvent("cursor:hideHighlight"));
-        highlightVisibleRef.current = false;
-      }
-    };
+      };
 
-    const enableHighlight = () => {
-      highlightEnabled = true;
-    };
+      // Ejecutar la animación cada 2-4 segundos
+      const mobileInterval = setInterval(() => {
+        animateMobileClusters();
+      }, 2500 + Math.random() * 1500);
 
-    if (headerFooter) {
-      headerFooter.addEventListener("mouseenter", disableHighlight);
-      headerFooter.addEventListener("mouseleave", enableHighlight);
+      // Primera ejecución
+      setTimeout(animateMobileClusters, 500);
+
+      // Cleanup para móvil
+      return () => {
+        clearInterval(mobileInterval);
+      };
     }
 
-    // Detectar si el mouse está dentro del contenedor
+    // LÓGICA PARA DESKTOP: Interacción con mouse
     const handleContainerEnter = () => {
       mouseInsideRef.current = true;
     };
@@ -112,14 +133,11 @@ export default function RoundedAnimatedSlider3({ images = [] }) {
       
       // Ocultar todas las imágenes cuando el mouse sale
       imgs.forEach((img) => {
-        gsap.to(img, {
-          opacity: 0,
-          scale: 0.5,
-          zIndex: 0,
-          duration: 0.35,
-          ease: "expo.out",
-          force3D: true,
-        });
+        img.style.opacity = "0";
+        img.style.transform = `translate(-50%, -50%) translate(${
+          parseFloat(img.dataset.x) || 0
+        }px, ${parseFloat(img.dataset.y) || 0}px) scale(0.5)`;
+        img.style.zIndex = "0";
       });
 
       // Ocultar highlight
@@ -130,44 +148,8 @@ export default function RoundedAnimatedSlider3({ images = [] }) {
     };
 
     const handleMove = (e) => {
-      // No procesar si no está habilitado
-      if (!highlightEnabled) {
-        // Si highlight está deshabilitado, forzar ocultar todas las imágenes
-        imgs.forEach((img) => {
-          gsap.to(img, {
-            opacity: 0,
-            scale: 0.5,
-            zIndex: 0,
-            duration: 0.2,
-            ease: "expo.out",
-            force3D: true,
-          });
-        });
-        
-        if (highlightVisibleRef.current) {
-          window.dispatchEvent(new CustomEvent("cursor:hideHighlight"));
-          highlightVisibleRef.current = false;
-        }
-        return;
-      }
-
       // No procesar si el mouse no está dentro del contenedor
       if (!mouseInsideRef.current) {
-        imgs.forEach((img) => {
-          gsap.to(img, {
-            opacity: 0,
-            scale: 0.5,
-            zIndex: 0,
-            duration: 0.2,
-            ease: "expo.out",
-            force3D: true,
-          });
-        });
-        
-        if (highlightVisibleRef.current) {
-          window.dispatchEvent(new CustomEvent("cursor:hideHighlight"));
-          highlightVisibleRef.current = false;
-        }
         return;
       }
 
@@ -179,30 +161,25 @@ export default function RoundedAnimatedSlider3({ images = [] }) {
         const dy = rect.top + rect.height / 2 - e.clientY;
         const dist = Math.sqrt(dx * dx + dy * dy);
 
+        // Guardar posición para mantener la transformación
+        const angle = (Array.from(imgs).indexOf(img) / imgs.length) * Math.PI * 2;
+        const x = Math.cos(angle) * radius * 1.4;
+        const y = Math.sin(angle) * radius * 0.8;
+        img.dataset.x = x;
+        img.dataset.y = y;
+
         if (dist > maxVisible) {
-          gsap.to(img, {
-            opacity: 0,
-            scale: 0.5,
-            zIndex: 0,
-            duration: 0.35,
-            ease: "expo.out",
-            force3D: true,
-          });
+          img.style.opacity = "0";
+          img.style.transform = `translate(-50%, -50%) translate(${x}px, ${y}px) scale(0.5)`;
+          img.style.zIndex = "0";
         } else {
           anyVisible = true;
-          const scale = gsap.utils.mapRange(0, maxVisible, 1.6, 0.7, dist);
-          const zIndex = Math.round(
-            gsap.utils.mapRange(0, maxVisible, 10, 1, dist)
-          );
+          const scale = Math.max(0.7, 1.6 - (dist / maxVisible) * 0.9);
+          const zIndex = Math.max(1, Math.round(10 - (dist / maxVisible) * 9));
 
-          gsap.to(img, {
-            opacity: 1,
-            scale,
-            zIndex,
-            duration: 0.45,
-            ease: "expo.out",
-            force3D: true,
-          });
+          img.style.opacity = "1";
+          img.style.transform = `translate(-50%, -50%) translate(${x}px, ${y}px) scale(${scale})`;
+          img.style.zIndex = zIndex.toString();
         }
       });
 
@@ -221,35 +198,20 @@ export default function RoundedAnimatedSlider3({ images = [] }) {
       }
     };
 
-    // Event listeners
-    container.addEventListener("mouseenter", handleContainerEnter);
-    container.addEventListener("mouseleave", handleContainerLeave);
-    window.addEventListener("mousemove", handleMove);
+    if (!isMobile) {
+      // Event listeners solo para desktop
+      container.addEventListener("mouseenter", handleContainerEnter);
+      container.addEventListener("mouseleave", handleContainerLeave);
+      window.addEventListener("mousemove", handleMove);
 
-    // Cleanup
-    return () => {
-      container.removeEventListener("mouseenter", handleContainerEnter);
-      container.removeEventListener("mouseleave", handleContainerLeave);
-      window.removeEventListener("mousemove", handleMove);
-      
-      // Limpiar animaciones GSAP
-      animationsRef.current.forEach((anim) => anim.kill());
-      animationsRef.current = [];
-      ctx.revert();
-      
-      // Limpiar highlight
-      window.dispatchEvent(new CustomEvent("cursor:hideHighlight"));
-      
-      if (headerFooter) {
-        headerFooter.removeEventListener("mouseenter", disableHighlight);
-        headerFooter.removeEventListener("mouseleave", enableHighlight);
-      }
-
-      // Remover will-change para liberar recursos
-      imgs.forEach((img) => {
-        img.style.willChange = "auto";
-      });
-    };
+      // Cleanup
+      return () => {
+        container.removeEventListener("mouseenter", handleContainerEnter);
+        container.removeEventListener("mouseleave", handleContainerLeave);
+        window.removeEventListener("mousemove", handleMove);
+        window.dispatchEvent(new CustomEvent("cursor:hideHighlight"));
+      };
+    }
   }, [images, radius]);
 
   return (
