@@ -36,7 +36,7 @@ export default function Home() {
   return (
     <div className="h-full w-full overflow-hidden">
       <HeaderFooter6>
-        <RoundedAnimatedSlider3 images={images} />
+        <RoundedAnimatedSlider5 images={images} />
         <Hero6Motion />
         <Hero5Motion />
       </HeaderFooter6>
