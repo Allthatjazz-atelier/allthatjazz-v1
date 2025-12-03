@@ -48,8 +48,8 @@ export default function RoundedAnimatedSlider3({ images = [] }) {
     // LÓGICA PARA MÓVIL: Animación automática con focos aleatorios
     if (isMobile) {
       const animateMobileClusters = () => {
-        // Generar 2-3 puntos focales aleatorios en la pantalla
-        const numFoci = Math.floor(Math.random() * 2) + 2; // 2 o 3 focos
+        // Generar 1-2 puntos focales aleatorios en la pantalla
+        const numFoci = Math.floor(Math.random() * 2) + 1; // 1 o 2 focos
         const foci = [];
         
         for (let i = 0; i < numFoci; i++) {
@@ -74,7 +74,8 @@ export default function RoundedAnimatedSlider3({ images = [] }) {
           });
 
           // Revelar imágenes según proximidad al foco más cercano
-          const maxDistMobile = maxVisible * 1.5;
+          // Usar el mismo radio que desktop para mantener consistencia
+          const maxDistMobile = maxVisible;
           if (minDist > maxDistMobile) {
             img.style.opacity = "0";
             img.style.transform = `translate(-50%, -50%) translate(${
@@ -85,10 +86,6 @@ export default function RoundedAnimatedSlider3({ images = [] }) {
             const scale = Math.max(
               0.6,
               1.6 - (minDist / maxDistMobile) * 1.0
-            );
-            const opacity = Math.max(
-              0.3,
-              1 - (minDist / maxDistMobile) * 0.7
             );
             const zIndex = Math.max(
               1,
@@ -102,7 +99,8 @@ export default function RoundedAnimatedSlider3({ images = [] }) {
             img.dataset.x = x;
             img.dataset.y = y;
 
-            img.style.opacity = opacity.toString();
+            // Opacidad completa para móvil
+            img.style.opacity = "1";
             img.style.transform = `translate(-50%, -50%) translate(${x}px, ${y}px) scale(${scale})`;
             img.style.zIndex = zIndex.toString();
           }
