@@ -1,26 +1,75 @@
 @import "tailwindcss";
 
-:root {
-  --background: #ffffff;
-  --foreground: #171717;
+@font-face {
+  font-family: 'MyFont';
+  src: url('/fonts/my-font/SuisseIntl-SemiBold-WebXL.woff2') format('woff2'), 
+       url('/fonts/my-font/SuisseIntl-SemiBold-WebXL.woff') format('woff');
+
+  font-weight: medium;
+  font-style: medium;
+  font-display: swap;
 }
 
-@theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
+* {
+  cursor: none !important
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
+html, body {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+  font-family: 'MyFont', sans-serif;
 }
 
-body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+#page-content {
+  opacity: 0; /* empieza invisible hasta que termine la animación */
+  transition: opacity 0.5s ease-out;
 }
+
+#header-footer-wrapper {
+  opacity: 0;
+  transition: opacity 0.5s;
+}
+
+
+
+/* Text Animation */
+
+.line {
+  transform: translateY(100%);
+  will-change: transform;
+  display: inline-block;
+}
+
+.line-line2 {
+  display: block;
+  overflow: hidden;     
+  line-height: 1.0;     
+  padding-bottom: 0.10em;
+}
+
+.line-line2 > * {
+  display: inline-block; /* asegura que las palabras no se solapen */
+}
+
+/* RevealImage animation 1 */
+
+.reveal-img {
+  will-change: transform;
+}
+
+.reveal-img img {
+  backface-visibility: hidden;
+  transform: translateZ(0);
+}
+
+/* Grid Reveal Animation */
+
+.mask {
+  will-change: clip-path, opacity, transform;
+  backface-visibility: hidden;
+  transform: translate3d(0,0,0);
+}
+
+
+

@@ -1,0 +1,130 @@
+/* Contenedor principal */
+.maincontainer-preloder {
+  width: 100%;
+  height: 100%;
+  overflow: hidden; /* evita scroll durante la animación */
+}
+
+/* Textos preloader */
+.preloader h1,
+.split-overlay h1 {
+  font-size: 6rem;
+  line-height: 1;
+  /* text-transform: uppercase; */
+  color: white;
+  margin: 0;
+}
+
+/* Preloader y split overlay */
+.preloader,
+.split-overlay {
+  position: fixed;
+  width: 100vw;
+  height: 100svh;
+  top: 0;
+  left: 0;
+  opacity: 0;
+}
+
+.preloader {
+  background-color: black;
+  z-index: 3; /* encima de split-overlay */
+}
+
+.split-overlay {
+  background-color: black;
+  z-index: 2;
+  overflow: hidden;
+  clip-path: polygon(0 50%, 100% 50%, 100% 50%, 0 50%); /* línea inicial visible */
+}
+
+/* Posiciones de textos */
+.intro-title,
+.outro-title,
+.sub-title {
+  position: absolute;
+  width: 100%;
+  text-align: center;
+}
+
+.intro-title {
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+}
+
+.outro-title {
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+}
+
+.sub-title {
+  top: calc(50% + 1.5rem);
+  left: 50%;
+  transform: translateX(-50%);
+  opacity: 0; /* inicialmente invisible */
+}
+
+/* Animación caracteres preloader */
+.intro-title .char,
+.outro-title .char,
+.sub-title .char {
+  position: relative;
+  display: inline-block;
+  overflow: hidden;
+  margin-top: 0.75rem;
+}
+
+.intro-title .char span,
+.outro-title .char span,
+.sub-title .char span {
+  display: inline-block;
+  transform: translateY(-105%);
+  will-change: transform;
+  
+}
+
+/* Subtítulo más pequeño */
+.sub-title h1 {
+  font-size: 1rem;
+}
+
+/* Primer carácter de intro */
+.intro-title .first-char {
+  transform-origin: top left;
+}
+
+/* Contenedor real del contenido */
+.container {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  min-height: 100svh;
+  background: white; /* tu contenido o fondo */
+  z-index: 1;
+  clip-path: polygon(0 50%, 100% 50%, 100% 50%, 0 50%); /* línea inicial */
+  transition: clip-path 0.5s ease-out;
+}
+
+/* Media queries para responsive */
+@media (max-width: 1000px) {
+  .preloader h1,
+  .split-overlay h1 {
+    font-size: 2rem;
+  }
+
+  .intro-title .char,
+  .outro-title .char,
+  .sub-title .char {
+    margin-top: 0.5rem;
+  }
+
+  .sub-title {
+    top: calc(50% + 0.5rem);
+  }
+
+  .sub-title h1 {
+    font-size: 0.6rem;
+  }
+}
