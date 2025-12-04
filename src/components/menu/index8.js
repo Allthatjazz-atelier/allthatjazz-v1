@@ -2,6 +2,7 @@
 import { useState, useEffect, useRef } from "react";
 import AboutSection from "../about";
 import AboutSection3 from "../about/index3";
+import AboutSection4 from "../about/index4";
 
 export default function HeaderFooter8({ children }) {
   const [isAboutOpen, setIsAboutOpen] = useState(false);
@@ -60,7 +61,7 @@ export default function HeaderFooter8({ children }) {
   return (
     <>
       {/* Contenedor fijo siempre visible */}
-      <div className="fixed bottom-0 left-0 w-full flex flex-col justify-center items-center pb-2 -space-y-5 mix-blend-difference z-[9999] HeaderFooter select-none pointer-events-auto">
+      <div className="fixed bottom-0 left-0 w-full flex flex-col justify-center items-center pb-2 leading-[2.75rem] mix-blend-difference z-[9999] HeaderFooter select-none pointer-events-auto">
         {/* H1 Scramble y Footer */}
         <div className="flex" onClick={() => setIsAboutOpen(!isAboutOpen)}>
           <h1
@@ -72,7 +73,7 @@ export default function HeaderFooter8({ children }) {
         </div>
 
         {/* Tagline siempre visible */}
-          <p className="flex text-[1.35rem] text-white MyFont2 tracking-[-0.05em] pointer-none">
+          <p className="flex text-[1.35rem] text-white MyFont2 tracking-[-0.02em] pointer-none">
             Atelier de création graphique et digitale.
           </p>
           
@@ -84,7 +85,7 @@ export default function HeaderFooter8({ children }) {
       {/* About modal */}
       {isAboutOpen && (
         <div className="fixed inset-0 z-200 bg-black text-white overflow-y-auto">
-          <AboutSection3 />
+          <AboutSection4 />
         </div>
       )}
     </>
