@@ -1,5 +1,5 @@
+import Content from "@/components/content";
 import Hero3 from "@/components/hero/index3";
-import HeaderFooter7 from "@/components/menu/index7";
 import HeaderFooter8 from "@/components/menu/index8";
 import Preloader from "@/components/preloader";
 import Preloader2 from "@/components/preloader/index2";
@@ -16,8 +16,10 @@ export default function About() {
 
 
   return (
-    <div className="min-h-screen w-full flex items-center justify-center bg-white">
-      <HeaderFooter8 />
+    <div className="min-h-screen w-full">
+      <HeaderFooter8>
+        <Content />
+      </HeaderFooter8>
     </div>
   );
 }

@@ -1,4 +1,5 @@
 
+import Content from "@/components/content";
 import Hero5Motion from "@/components/hero/index5";
 import Hero6Motion from "@/components/hero/index6";
 import HeaderFooter5 from "@/components/menu/index5";
@@ -40,8 +41,7 @@ export default function Home() {
     <div className="h-full w-full overflow-hidden">
       <HeaderFooter8>
         <RoundedAnimatedSlider6 images={images} />
-        <Hero6Motion />
-        <Hero5Motion />
+        <Content />
       </HeaderFooter8>
     </div>
   );
