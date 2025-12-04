@@ -2,6 +2,7 @@
 import Content from "@/components/content";
 import Content2 from "@/components/content/index2";
 import Content3 from "@/components/content/index3";
+import Content4 from "@/components/content/index4";
 import Hero5Motion from "@/components/hero/index5";
 import Hero6Motion from "@/components/hero/index6";
 import HeaderFooter5 from "@/components/menu/index5";
@@ -43,7 +44,7 @@ export default function Home() {
     <div className="h-full w-full overflow-hidden">
       <HeaderFooter8>
         <RoundedAnimatedSlider6 images={images} />
-        <Content3 />
+        <Content4 />
       </HeaderFooter8>
     </div>
   );

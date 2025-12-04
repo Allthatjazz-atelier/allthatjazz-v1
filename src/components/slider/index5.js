@@ -47,7 +47,7 @@ const Slider5 = () => {
     <div className="w-full h-screen flex flex-col items-center justify-start pt-12 bg-white">
       <div
         ref={sliderRef}
-        className="relative w-11/12 aspect-[3/4]"
+        className="relative w-3/12 aspect-[3/4]"
       >
         {/* Primera imagen con reveal */}
         <div className="slide absolute top-1/2 left-1/2 w-[100%] px-4 transform -translate-x-1/2 -translate-y-1/2 z-[2]">
@@ -84,7 +84,7 @@ const Slider5 = () => {
           <img src="/assets/img84.jpeg" className="w-full h-full object-contain" alt="img98" />
         </div>
       </div>
-      <div className="w-11/12 mt-1">
+      <div className="w-3/12 mt-1">
         <p className="text-[0.875rem] text-left">Explorations visuelles 2004-2025</p>
       </div>
     </div>
