@@ -1,4 +1,6 @@
 import Hero3 from "@/components/hero/index3";
+import HeaderFooter7 from "@/components/menu/index7";
+import HeaderFooter8 from "@/components/menu/index8";
 import Preloader from "@/components/preloader";
 import Preloader2 from "@/components/preloader/index2";
 import Preloader3 from "@/components/preloader/index3";
@@ -12,24 +14,10 @@ import SpinSlider from "@/components/spinslider";
 
 export default function About() {
 
-  const images = [
-    "/assets/img31.jpeg",
-    "/assets/img41.jpeg",
-    "/assets/img89.jpeg",
-    "/assets/img25.jpeg",
-    "/assets/img2.jpeg",
-    "/assets/img85.jpeg",
-    "/assets/img84.jpeg",
-    "/assets/img89.jpeg",
-    "/assets/img16.jpeg",
-    "/assets/img95.jpeg",
-    "/assets/img98.jpeg",
-    "/assets/img20.jpeg",
-  ];
 
   return (
-    <div className="min-h-screen w-full flex items-center justify-center">
-      <RoundedAnimatedSlider images={images} />
+    <div className="min-h-screen w-full flex items-center justify-center bg-white">
+      <HeaderFooter8 />
     </div>
   );
 }

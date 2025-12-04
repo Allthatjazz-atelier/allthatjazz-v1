@@ -4,6 +4,7 @@ import Hero6Motion from "@/components/hero/index6";
 import HeaderFooter5 from "@/components/menu/index5";
 import HeaderFooter6 from "@/components/menu/index6";
 import HeaderFooter7 from "@/components/menu/index7";
+import HeaderFooter8 from "@/components/menu/index8";
 import RoundedAnimatedSlider from "@/components/roundedanimatedslider";
 import RoundedAnimatedSlider2 from "@/components/roundedanimatedslider/index2";
 import RoundedAnimatedSlider3 from "@/components/roundedanimatedslider/index3";
@@ -37,11 +38,11 @@ export default function Home() {
 
   return (
     <div className="h-full w-full overflow-hidden">
-      <HeaderFooter7>
+      <HeaderFooter8>
         <RoundedAnimatedSlider6 images={images} />
         <Hero6Motion />
         <Hero5Motion />
-      </HeaderFooter7>
+      </HeaderFooter8>
     </div>
   );
 }

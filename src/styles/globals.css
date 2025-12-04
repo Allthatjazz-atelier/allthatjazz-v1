@@ -10,6 +10,16 @@
   font-display: swap;
 }
 
+@font-face {
+  font-family: 'MyFont2';
+  src: url('/fonts/my-font/PPEditorialNew-Regular.woff2') format('woff2'), 
+       url('/fonts/my-font/PPEditorialNew-Regular.woff') format('woff');
+
+  font-weight: medium;
+  font-style: medium;
+  font-display: swap;
+}
+
 * {
   cursor: none !important
 }
@@ -19,6 +29,10 @@ html, body {
   padding: 0;
   box-sizing: border-box;
   font-family: 'MyFont', sans-serif;
+}
+
+.MyFont2 {
+  font-family: 'MyFont2', sans-serif;
 }
 
 #page-content {
