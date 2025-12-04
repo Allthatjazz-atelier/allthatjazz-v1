@@ -3,11 +3,13 @@ import Hero5Motion from "@/components/hero/index5";
 import Hero6Motion from "@/components/hero/index6";
 import HeaderFooter5 from "@/components/menu/index5";
 import HeaderFooter6 from "@/components/menu/index6";
+import HeaderFooter7 from "@/components/menu/index7";
 import RoundedAnimatedSlider from "@/components/roundedanimatedslider";
 import RoundedAnimatedSlider2 from "@/components/roundedanimatedslider/index2";
 import RoundedAnimatedSlider3 from "@/components/roundedanimatedslider/index3";
 import FullFieldImageSlider from "@/components/roundedanimatedslider/index4";
 import RoundedAnimatedSlider5 from "@/components/roundedanimatedslider/index5";
+import RoundedAnimatedSlider6 from "@/components/roundedanimatedslider/index6";
 
 export default function Home() {
 
@@ -35,11 +37,11 @@ export default function Home() {
 
   return (
     <div className="h-full w-full overflow-hidden">
-      <HeaderFooter6>
-        <RoundedAnimatedSlider3 images={images} />
+      <HeaderFooter7>
+        <RoundedAnimatedSlider6 images={images} />
         <Hero6Motion />
         <Hero5Motion />
-      </HeaderFooter6>
+      </HeaderFooter7>
     </div>
   );
 }
