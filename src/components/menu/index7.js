@@ -86,7 +86,7 @@ export default function HeaderFooter7({ children }) {
 
       {/* About modal */}
       {isAboutOpen && (
-        <div className="fixed inset-0 z-40 bg-black text-white overflow-y-auto">
+        <div className="fixed inset-0 z-200 bg-black text-white overflow-y-auto">
           <AboutSection />
         </div>
       )}
