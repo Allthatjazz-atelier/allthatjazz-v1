@@ -1,14 +1,35 @@
 "use client";
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 import gsap from "gsap";
 
 export default function CustomCursor() {
   const dotRef = useRef(null);
   const labelRef = useRef(null);
+  const [isDesktop, setIsDesktop] = useState(false);
 
   useEffect(() => {
-    // Detectamos si es dispositivo táctil (en móviles no ocultamos cursor nativo)
-    const isTouch = typeof window !== "undefined" && "ontouchstart" in window;
+    // Detectar si es desktop (768px = breakpoint md de Tailwind)
+    const checkDesktop = () => {
+      const desktop = window.innerWidth >= 768;
+      setIsDesktop(desktop);
+      
+      // Solo ocultar cursor nativo en desktop
+      if (desktop) {
+        document.documentElement.style.cursor = "none";
+      } else {
+        document.documentElement.style.cursor = "";
+      }
+    };
+    
+    checkDesktop();
+    window.addEventListener("resize", checkDesktop);
+
+    // Si no es desktop, no hacemos nada más
+    if (!isDesktop) {
+      return () => {
+        window.removeEventListener("resize", checkDesktop);
+      };
+    }
 
     const dot = dotRef.current;
     const label = labelRef.current;
@@ -16,11 +37,6 @@ export default function CustomCursor() {
     // Inicial
     gsap.set(dot, { x: 0, y: 0, scale: 1, opacity: 1, transformOrigin: "center center" });
     gsap.set(label, { x: 0, y: 0, opacity: 0, scale: 0.95, transformOrigin: "center center" });
-
-    // Hacemos que el navegador oculte cursor nativo solo si NO es touch
-    if (!isTouch) {
-      document.documentElement.style.cursor = "none";
-    }
 
     // Seguir ratón (suavizado con gsap)
     const onMove = (e) => {
@@ -50,17 +66,20 @@ export default function CustomCursor() {
     window.addEventListener("cursor:hideHighlight", hide);
 
     return () => {
+      window.removeEventListener("resize", checkDesktop);
       window.removeEventListener("mousemove", onMove);
       window.removeEventListener("cursor:showHighlight", show);
       window.removeEventListener("cursor:hideHighlight", hide);
-      // restaurar cursor nativo si tocábamos el DOM
-      if (!isTouch) {
-        document.documentElement.style.cursor = "";
-      }
+      // restaurar cursor nativo
+      document.documentElement.style.cursor = "";
     };
-  }, []);
+  }, [isDesktop]);
 
-  // Estilos inline mínimos; cámbialos a clases tailwind si prefieres
+  // Si no es desktop, no renderizamos nada
+  if (!isDesktop) {
+    return null;
+  }
+
   return (
     <>
       {/* Dot (cursor por defecto) */}

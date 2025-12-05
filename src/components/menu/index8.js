@@ -3,6 +3,7 @@ import { useState, useEffect, useRef } from "react";
 import AboutSection from "../about";
 import AboutSection3 from "../about/index3";
 import AboutSection4 from "../about/index4";
+import AboutSection5 from "../about/index5";
 
 export default function HeaderFooter8({ children }) {
   const [isAboutOpen, setIsAboutOpen] = useState(false);
@@ -85,7 +86,7 @@ export default function HeaderFooter8({ children }) {
       {/* About modal */}
       {isAboutOpen && (
         <div className="fixed inset-0 z-200 bg-black text-white overflow-y-auto">
-          <AboutSection4 />
+          <AboutSection5 />
         </div>
       )}
     </>
