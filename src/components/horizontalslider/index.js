@@ -13,33 +13,40 @@ export default function HorizontalSlider() {
     target: 0,
     current: 0,
     ease: 0.075,
-    slideWidth: 0,
-    totalWidth: 0
+    maxScroll: 0,
+    slideWidth: 0
   });
 
   useEffect(() => {
+    // Solo ejecutar en el cliente
     if (typeof window === 'undefined') return;
 
     const data = dataRef.current;
     const sliderWrapper = sliderWrapperRef.current;
     const slides = slidesRef.current;
 
-    // Calcular dimensiones
+    // Calcular dimensiones para el loop infinito
     const calculateDimensions = () => {
-      if (slides.length > 0 && slides[0]) {
-        const slideRect = slides[0].getBoundingClientRect();
-        data.slideWidth = slideRect.width + 100; // slide + gap
-        // Ancho total de UN set (19 imágenes)
-        data.totalWidth = data.slideWidth * 19;
+      if (sliderWrapper && slides.length > 0) {
+        // Ancho de un slide + gap
+        const firstSlide = slides[0];
+        if (firstSlide) {
+          const slideRect = firstSlide.getBoundingClientRect();
+          data.slideWidth = slideRect.width + 100; // 100px es el gap
+          // El maxScroll es el ancho total de UN SET de imágenes (19 imágenes)
+          data.maxScroll = data.slideWidth * 19;
+        }
       }
     };
 
     calculateDimensions();
 
+    // Función lerp
     const lerp = (start, end, factor) => {
       return start + (end - start) * factor;
     };
 
+    // Actualizar escala y posición de los slides
     const updateScaleAndPosition = () => {
       slides.forEach((slide) => {
         if (!slide) return;
@@ -61,19 +68,14 @@ export default function HorizontalSlider() {
       });
     };
 
+    // Loop de animación
     const update = () => {
       data.current = lerp(data.current, data.target, data.ease);
 
-      // Loop infinito suave: reposicionar cuando sea necesario
-      // Si nos movemos hacia adelante y pasamos el segundo set
-      if (data.current > data.totalWidth * 2) {
-        data.current -= data.totalWidth;
-        data.target -= data.totalWidth;
-      }
-      // Si nos movemos hacia atrás y pasamos el primer set
-      else if (data.current < data.totalWidth) {
-        data.current += data.totalWidth;
-        data.target += data.totalWidth;
+      // Loop infinito: cuando llegamos al final, reiniciamos sin que se note
+      if (data.current >= data.maxScroll) {
+        data.current = 0;
+        data.target = 0;
       }
 
       gsap.set(sliderWrapper, {
@@ -85,23 +87,24 @@ export default function HorizontalSlider() {
       animationRef.current = requestAnimationFrame(update);
     };
 
-    // Inicializar en el set del medio para permitir scroll en ambas direcciones
-    data.current = data.totalWidth;
-    data.target = data.totalWidth;
-
+    // Event listeners
     const handleResize = () => {
       calculateDimensions();
     };
 
     const handleWheel = (e) => {
       data.target += e.deltaY;
+      // No limitamos el target, dejamos que fluya infinitamente
+      // El loop se maneja en la función update
     };
 
     window.addEventListener('resize', handleResize);
     window.addEventListener('wheel', handleWheel);
 
+    // Iniciar animación
     update();
 
+    // Cleanup
     return () => {
       window.removeEventListener('resize', handleResize);
       window.removeEventListener('wheel', handleWheel);
@@ -115,7 +118,7 @@ export default function HorizontalSlider() {
     <div className="slider-container">
       <div ref={sliderRef} className="slider">
         <div ref={sliderWrapperRef} className="slider-wrapper">
-          {/* Set 1 - Para scroll hacia atrás */}
+          {/* Primer set de imágenes */}
           {[...Array(19)].map((_, index) => (
             <div
               key={`set1-${index}`}
@@ -131,26 +134,11 @@ export default function HorizontalSlider() {
               />
             </div>
           ))}
-          {/* Set 2 - Set central (inicio visible) */}
+          {/* Segundo set de imágenes (para el loop infinito) */}
           {[...Array(19)].map((_, index) => (
             <div
               key={`set2-${index}`}
               ref={(el) => (slidesRef.current[19 + index] = el)}
-              className="slide"
-            >
-              <Image
-                src={`/hero/img${index + 1}.png`}
-                alt={`Slide ${index + 1}`}
-                fill
-                style={{ objectFit: 'contain' }}
-              />
-            </div>
-          ))}
-          {/* Set 3 - Para scroll hacia adelante */}
-          {[...Array(19)].map((_, index) => (
-            <div
-              key={`set3-${index}`}
-              ref={(el) => (slidesRef.current[38 + index] = el)}
               className="slide"
             >
               <Image
@@ -181,7 +169,7 @@ export default function HorizontalSlider() {
         .slider-wrapper {
           position: absolute;
           top: 0;
-          width: 24000px;
+          width: 16000px;
           padding: 0 600px;
           height: 100%;
           display: flex;
