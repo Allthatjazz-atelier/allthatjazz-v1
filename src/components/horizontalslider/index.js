@@ -13,8 +13,7 @@ export default function HorizontalSlider() {
     target: 0,
     current: 0,
     ease: 0.075,
-    maxScroll: 0,
-    slideWidth: 0
+    maxScroll: 0
   });
 
   useEffect(() => {
@@ -25,21 +24,14 @@ export default function HorizontalSlider() {
     const sliderWrapper = sliderWrapperRef.current;
     const slides = slidesRef.current;
 
-    // Calcular dimensiones para el loop infinito
-    const calculateDimensions = () => {
-      if (sliderWrapper && slides.length > 0) {
-        // Ancho de un slide + gap
-        const firstSlide = slides[0];
-        if (firstSlide) {
-          const slideRect = firstSlide.getBoundingClientRect();
-          data.slideWidth = slideRect.width + 100; // 100px es el gap
-          // El maxScroll es el ancho total de UN SET de imágenes (19 imágenes)
-          data.maxScroll = data.slideWidth * 19;
-        }
+    // Calcular maxScroll inicial
+    const calculateMaxScroll = () => {
+      if (sliderWrapper) {
+        data.maxScroll = sliderWrapper.offsetWidth - window.innerWidth;
       }
     };
 
-    calculateDimensions();
+    calculateMaxScroll();
 
     // Función lerp
     const lerp = (start, end, factor) => {
@@ -72,12 +64,6 @@ export default function HorizontalSlider() {
     const update = () => {
       data.current = lerp(data.current, data.target, data.ease);
 
-      // Loop infinito: cuando llegamos al final, reiniciamos sin que se note
-      if (data.current >= data.maxScroll) {
-        data.current = 0;
-        data.target = 0;
-      }
-
       gsap.set(sliderWrapper, {
         x: -data.current,
       });
@@ -89,13 +75,13 @@ export default function HorizontalSlider() {
 
     // Event listeners
     const handleResize = () => {
-      calculateDimensions();
+      calculateMaxScroll();
     };
 
     const handleWheel = (e) => {
       data.target += e.deltaY;
-      // No limitamos el target, dejamos que fluya infinitamente
-      // El loop se maneja en la función update
+      data.target = Math.max(0, data.target);
+      data.target = Math.min(data.maxScroll, data.target);
     };
 
     window.addEventListener('resize', handleResize);
@@ -118,10 +104,9 @@ export default function HorizontalSlider() {
     <div className="slider-container">
       <div ref={sliderRef} className="slider">
         <div ref={sliderWrapperRef} className="slider-wrapper">
-          {/* Primer set de imágenes */}
           {[...Array(19)].map((_, index) => (
             <div
-              key={`set1-${index}`}
+              key={index}
               ref={(el) => (slidesRef.current[index] = el)}
               className="slide"
             >
@@ -131,21 +116,6 @@ export default function HorizontalSlider() {
                 fill
                 style={{ objectFit: 'contain' }}
                 priority={index < 3}
-              />
-            </div>
-          ))}
-          {/* Segundo set de imágenes (para el loop infinito) */}
-          {[...Array(19)].map((_, index) => (
-            <div
-              key={`set2-${index}`}
-              ref={(el) => (slidesRef.current[19 + index] = el)}
-              className="slide"
-            >
-              <Image
-                src={`/hero/img${index + 1}.png`}
-                alt={`Slide ${index + 1}`}
-                fill
-                style={{ objectFit: 'contain' }}
               />
             </div>
           ))}
@@ -169,7 +139,7 @@ export default function HorizontalSlider() {
         .slider-wrapper {
           position: absolute;
           top: 0;
-          width: 16000px;
+          width: 11000px;
           padding: 0 600px;
           height: 100%;
           display: flex;
