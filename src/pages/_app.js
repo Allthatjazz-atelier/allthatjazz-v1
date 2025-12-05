@@ -5,7 +5,8 @@ import "@/styles/spincubestep.css";
 // import "@/styles/spinslider.css"
 import HeaderFooter from "@/components/menu";
 import { useEffect } from "react";
-import Lenis from "@studio-freight/lenis";
+// import Lenis from "@studio-freight/lenis";
+import Lenis from "lenis";
 import gsap from "gsap";
 import { ScrollTrigger } from "gsap/dist/ScrollTrigger";
 import HeaderFooter2 from "@/components/menu/index2";
