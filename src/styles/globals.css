@@ -97,8 +97,8 @@ html, body {
 
 .trail-img {
   position: absolute;
-  width: 200px; 
-  height: 200px;    /* <-- solo definimos el ancho */  /* <-- la altura se ajusta sola por el ratio */
+  width: 500px; 
+  height: 500px;
   pointer-events: none;
 }
 
@@ -117,7 +117,7 @@ html, body {
   left: 0;
   width: 100%;
   height: 100%;
-  background-size: contain;   /* <-- mantiene el aspecto real */
+  background-size: contain;
   background-repeat: no-repeat;
   background-position: center;
 }
