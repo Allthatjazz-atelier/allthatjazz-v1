@@ -85,5 +85,43 @@ html, body {
   transform: translate3d(0,0,0);
 }
 
+/* Animated Cursor */
+
+.trail-container {
+  position: absolute;
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+  z-index: 2;
+}
+
+.trail-img {
+  position: absolute;
+  width: 200px; 
+  height: 200px;    /* <-- solo definimos el ancho */  /* <-- la altura se ajusta sola por el ratio */
+  pointer-events: none;
+}
+
+.trail-img .mask-layer {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  will-change: clip-path;
+}
+
+.trail-img .mask-layer .image-layer {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background-size: contain;   /* <-- mantiene el aspecto real */
+  background-repeat: no-repeat;
+  background-position: center;
+}
+
+
 
 

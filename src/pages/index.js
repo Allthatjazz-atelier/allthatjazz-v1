@@ -1,4 +1,6 @@
 
+import AnimatedCursor from "@/components/animatedcursor";
+import TrailWrapper from "@/components/animatedcursor/wrapper";
 import Content from "@/components/content";
 import Content2 from "@/components/content/index2";
 import Content3 from "@/components/content/index3";
@@ -43,8 +45,10 @@ export default function Home() {
   return (
     <div className="h-full w-full overflow-hidden">
       <HeaderFooter8>
-        <RoundedAnimatedSlider6 images={images} />
-        <Content4 />
+        {/* <RoundedAnimatedSlider6 images={images} /> */}
+        {/* <AnimatedCursor /> */}
+        <TrailWrapper />
+        {/* <Content4 /> */}
       </HeaderFooter8>
     </div>
   );
