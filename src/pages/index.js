@@ -8,6 +8,7 @@ import Content4 from "@/components/content/index4";
 import Hero5Motion from "@/components/hero/index5";
 import Hero6Motion from "@/components/hero/index6";
 import HorizontalSlider from "@/components/horizontalslider";
+import HorizontalSliderWrapper from "@/components/horizontalslider/horizontalwrapper";
 import HeaderFooter5 from "@/components/menu/index5";
 import HeaderFooter6 from "@/components/menu/index6";
 import HeaderFooter7 from "@/components/menu/index7";
@@ -49,7 +50,8 @@ export default function Home() {
         {/* <RoundedAnimatedSlider6 images={images} /> */}
         {/* <AnimatedCursor /> */}
         {/* <TrailWrapper /> */}
-        <HorizontalSlider />
+        {/* <HorizontalSlider /> */}
+        <HorizontalSliderWrapper />
         {/* <Content4 /> */}
       </HeaderFooter8>
     </div>
