@@ -9,16 +9,10 @@ export default function HorizontalSliderMobile() {
   const sliderWrapperRef = useRef(null);
   const slidesRef = useRef([]);
   const animationRef = useRef(null);
-  const touchRef = useRef({
-    startX: 0,
-    lastX: 0,
-    isDragging: false,
-    velocity: 0
-  });
   const dataRef = useRef({
     target: 0,
     current: 0,
-    ease: 0.075,
+    ease: 0.12, // Más suave
     maxScroll: 0
   });
 
@@ -27,7 +21,6 @@ export default function HorizontalSliderMobile() {
     if (typeof window === 'undefined') return;
 
     const data = dataRef.current;
-    const touch = touchRef.current;
     const sliderWrapper = sliderWrapperRef.current;
     const slides = slidesRef.current;
 
@@ -87,40 +80,35 @@ export default function HorizontalSliderMobile() {
       calculateMaxScroll();
     };
 
-    const handleTouchStart = (e) => {
-      touch.isDragging = true;
-      touch.startX = e.touches[0].clientX;
-      touch.lastX = touch.startX;
-      touch.velocity = 0;
-    };
-
-    const handleTouchMove = (e) => {
-      if (!touch.isDragging) return;
-      
-      const currentX = e.touches[0].clientX;
-      const deltaX = touch.lastX - currentX;
-      
-      touch.velocity = deltaX;
-      touch.lastX = currentX;
-      
-      data.target += deltaX;
+    // SCROLL VERTICAL para controlar el slider horizontal
+    const handleWheel = (e) => {
+      // Usar deltaY (scroll vertical) para mover horizontalmente
+      data.target += e.deltaY * 1.5; // Multiplicador para más sensibilidad
       data.target = Math.max(0, data.target);
       data.target = Math.min(data.maxScroll, data.target);
     };
 
-    const handleTouchEnd = () => {
-      touch.isDragging = false;
+    // Touch events para móvil (también vertical)
+    let touchStartY = 0;
+    let touchStartTarget = 0;
+
+    const handleTouchStart = (e) => {
+      touchStartY = e.touches[0].clientY;
+      touchStartTarget = data.target;
+    };
+
+    const handleTouchMove = (e) => {
+      const deltaY = touchStartY - e.touches[0].clientY;
       
-      // Aplicar inercia basada en la velocidad
-      data.target += touch.velocity * 5;
+      data.target = touchStartTarget + deltaY * 2; // Multiplicador para sensibilidad
       data.target = Math.max(0, data.target);
       data.target = Math.min(data.maxScroll, data.target);
     };
 
     window.addEventListener('resize', handleResize);
-    sliderWrapper.addEventListener('touchstart', handleTouchStart, { passive: true });
-    sliderWrapper.addEventListener('touchmove', handleTouchMove, { passive: true });
-    sliderWrapper.addEventListener('touchend', handleTouchEnd);
+    window.addEventListener('wheel', handleWheel, { passive: true });
+    window.addEventListener('touchstart', handleTouchStart, { passive: true });
+    window.addEventListener('touchmove', handleTouchMove, { passive: true });
 
     // Iniciar animación
     update();
@@ -128,11 +116,9 @@ export default function HorizontalSliderMobile() {
     // Cleanup
     return () => {
       window.removeEventListener('resize', handleResize);
-      if (sliderWrapper) {
-        sliderWrapper.removeEventListener('touchstart', handleTouchStart);
-        sliderWrapper.removeEventListener('touchmove', handleTouchMove);
-        sliderWrapper.removeEventListener('touchend', handleTouchEnd);
-      }
+      window.removeEventListener('wheel', handleWheel);
+      window.removeEventListener('touchstart', handleTouchStart);
+      window.removeEventListener('touchmove', handleTouchMove);
       if (animationRef.current) {
         cancelAnimationFrame(animationRef.current);
       }
@@ -184,19 +170,23 @@ export default function HorizontalSliderMobile() {
           height: 100%;
           display: flex;
           align-items: center;
-          gap: 100px;
+          gap: 40px;
           padding: 0 50vw;
-          touch-action: pan-y;
-          user-select: none;
-          -webkit-user-select: none;
+          will-change: transform;
         }
 
         .slide {
-          width: 400px;
-          height: 500px;
+          width: 280px;
+          height: 380px;
           position: relative;
           flex-shrink: 0;
           pointer-events: none;
+        }
+
+        .slide img {
+          user-select: none;
+          -webkit-user-select: none;
+          -webkit-user-drag: none;
         }
       `}</style>
     </div>
