@@ -9,10 +9,15 @@ export default function HorizontalSliderMobile() {
   const sliderWrapperRef = useRef(null);
   const slidesRef = useRef([]);
   const animationRef = useRef(null);
+  const touchRef = useRef({
+    lastY: 0,
+    lastTime: 0,
+    velocity: 0
+  });
   const dataRef = useRef({
     target: 0,
     current: 0,
-    ease: 0.12, // Más suave
+    ease: 0.075, // Igual que desktop
     maxScroll: 0
   });
 
@@ -21,6 +26,7 @@ export default function HorizontalSliderMobile() {
     if (typeof window === 'undefined') return;
 
     const data = dataRef.current;
+    const touch = touchRef.current;
     const sliderWrapper = sliderWrapperRef.current;
     const slides = slidesRef.current;
 
@@ -80,27 +86,44 @@ export default function HorizontalSliderMobile() {
       calculateMaxScroll();
     };
 
-    // SCROLL VERTICAL para controlar el slider horizontal
+    // Wheel event (igual que desktop, usando deltaY)
     const handleWheel = (e) => {
-      // Usar deltaY (scroll vertical) para mover horizontalmente
-      data.target += e.deltaY * 1.5; // Multiplicador para más sensibilidad
+      data.target += e.deltaY;
       data.target = Math.max(0, data.target);
       data.target = Math.min(data.maxScroll, data.target);
     };
 
-    // Touch events para móvil (también vertical)
-    let touchStartY = 0;
-    let touchStartTarget = 0;
-
+    // Touch events - simulando el comportamiento del wheel
     const handleTouchStart = (e) => {
-      touchStartY = e.touches[0].clientY;
-      touchStartTarget = data.target;
+      touch.lastY = e.touches[0].clientY;
+      touch.lastTime = Date.now();
+      touch.velocity = 0;
     };
 
     const handleTouchMove = (e) => {
-      const deltaY = touchStartY - e.touches[0].clientY;
+      const currentY = e.touches[0].clientY;
+      const currentTime = Date.now();
+      const deltaY = touch.lastY - currentY;
+      const deltaTime = currentTime - touch.lastTime;
       
-      data.target = touchStartTarget + deltaY * 2; // Multiplicador para sensibilidad
+      // Calcular velocidad
+      if (deltaTime > 0) {
+        touch.velocity = deltaY / deltaTime;
+      }
+      
+      // Aplicar el delta directamente, como en desktop
+      data.target += deltaY;
+      data.target = Math.max(0, data.target);
+      data.target = Math.min(data.maxScroll, data.target);
+      
+      touch.lastY = currentY;
+      touch.lastTime = currentTime;
+    };
+
+    const handleTouchEnd = () => {
+      // Aplicar inercia suave basada en velocidad
+      const inertia = touch.velocity * 50;
+      data.target += inertia;
       data.target = Math.max(0, data.target);
       data.target = Math.min(data.maxScroll, data.target);
     };
@@ -109,6 +132,7 @@ export default function HorizontalSliderMobile() {
     window.addEventListener('wheel', handleWheel, { passive: true });
     window.addEventListener('touchstart', handleTouchStart, { passive: true });
     window.addEventListener('touchmove', handleTouchMove, { passive: true });
+    window.addEventListener('touchend', handleTouchEnd);
 
     // Iniciar animación
     update();
@@ -119,6 +143,7 @@ export default function HorizontalSliderMobile() {
       window.removeEventListener('wheel', handleWheel);
       window.removeEventListener('touchstart', handleTouchStart);
       window.removeEventListener('touchmove', handleTouchMove);
+      window.removeEventListener('touchend', handleTouchEnd);
       if (animationRef.current) {
         cancelAnimationFrame(animationRef.current);
       }
@@ -160,7 +185,6 @@ export default function HorizontalSliderMobile() {
           width: 100%;
           height: 100%;
           overflow: hidden;
-          position: relative;
         }
 
         .slider-wrapper {
