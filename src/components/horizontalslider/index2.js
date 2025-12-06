@@ -86,37 +86,39 @@ export default function HorizontalSliderMobile() {
       calculateMaxScroll();
     };
 
-    // Wheel event (igual que desktop, usando deltaY)
+    // Wheel event - ahora usando deltaX para scroll horizontal
     const handleWheel = (e) => {
-      data.target += e.deltaY;
+      // Usar deltaX para scroll horizontal, fallback a deltaY si no hay deltaX
+      const delta = e.deltaX !== 0 ? e.deltaX : e.deltaY;
+      data.target += delta;
       data.target = Math.max(0, data.target);
       data.target = Math.min(data.maxScroll, data.target);
     };
 
-    // Touch events - simulando el comportamiento del wheel
+    // Touch events - scroll HORIZONTAL
     const handleTouchStart = (e) => {
-      touch.lastY = e.touches[0].clientY;
+      touch.lastY = e.touches[0].clientX; // Ahora usa clientX
       touch.lastTime = Date.now();
       touch.velocity = 0;
     };
 
     const handleTouchMove = (e) => {
-      const currentY = e.touches[0].clientY;
+      const currentX = e.touches[0].clientX; // clientX para horizontal
       const currentTime = Date.now();
-      const deltaY = touch.lastY - currentY;
+      const deltaX = touch.lastY - currentX; // Delta horizontal
       const deltaTime = currentTime - touch.lastTime;
       
       // Calcular velocidad
       if (deltaTime > 0) {
-        touch.velocity = deltaY / deltaTime;
+        touch.velocity = deltaX / deltaTime;
       }
       
       // Aplicar el delta directamente, como en desktop
-      data.target += deltaY;
+      data.target += deltaX;
       data.target = Math.max(0, data.target);
       data.target = Math.min(data.maxScroll, data.target);
       
-      touch.lastY = currentY;
+      touch.lastY = currentX;
       touch.lastTime = currentTime;
     };
 
@@ -197,6 +199,7 @@ export default function HorizontalSliderMobile() {
           gap: 40px;
           padding: 0 50vw;
           will-change: transform;
+          touch-action: pan-x; /* Permite scroll horizontal */
         }
 
         .slide {
