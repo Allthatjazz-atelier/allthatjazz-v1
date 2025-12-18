@@ -5,12 +5,14 @@ import { gsap } from "gsap";
 export default function RoundedAnimatedSlider2({ images = [] }) {
   const containerRef = useRef(null);
   const [radius, setRadius] = useState(250);
+  const rotationRef = useRef(0);
+  const mousePos = useRef({ x: 0, y: 0 });
 
   // Ajusta el radio según el tamaño de la ventana
   useEffect(() => {
     const updateRadius = () => {
       const minDimension = Math.min(window.innerWidth, window.innerHeight);
-      setRadius(minDimension / 3); // 1/3 de la pantalla
+      setRadius(minDimension / 2.5);
     };
     updateRadius();
     window.addEventListener("resize", updateRadius);
@@ -20,6 +22,11 @@ export default function RoundedAnimatedSlider2({ images = [] }) {
   useEffect(() => {
     const container = containerRef.current;
     const imgs = container.querySelectorAll(".photo");
+    const centerX = window.innerWidth / 2;
+    const centerY = window.innerHeight / 2;
+
+    // Inicializa mousePos en el centro
+    mousePos.current = { x: centerX, y: centerY };
 
     // Posiciona cada imagen en círculo respecto al centro
     imgs.forEach((img, i) => {
@@ -42,33 +49,26 @@ export default function RoundedAnimatedSlider2({ images = [] }) {
       });
     });
 
-    let highlightVisible = false;
-    const maxVisible = 200;
-    let highlightEnabled = true;
+    const maxVisible = 250;
 
-    const headerFooter = document.querySelector(".HeaderFooter");
-    if (headerFooter) {
-      headerFooter.addEventListener("mouseenter", () => {
-        highlightEnabled = false;
-        if (highlightVisible) {
-          window.dispatchEvent(new CustomEvent("cursor:hideHighlight"));
-          highlightVisible = false;
-        }
-      });
-      headerFooter.addEventListener("mouseleave", () => {
-        highlightEnabled = true;
-      });
-    }
+    // 🔄 ANIMACIÓN CONTINUA: Rotación + Reveal basado en cursor
+    const animate = () => {
+      rotationRef.current += 0.3; // Velocidad reducida de 0.5 a 0.3
+      
+      imgs.forEach((img, i) => {
+        const baseAngle = (i / imgs.length) * Math.PI * 2;
+        const currentAngle = baseAngle + (rotationRef.current * Math.PI / 180);
+        const x = Math.cos(currentAngle) * radius;
+        const y = Math.sin(currentAngle) * radius;
 
-    const handleMove = (e) => {
-      if (!highlightEnabled) return;
+        // Actualiza posición (rotación)
+        gsap.set(img, { x, y });
 
-      let anyVisible = false;
-
-      imgs.forEach((img) => {
-        const rect = img.getBoundingClientRect();
-        const dx = rect.left + rect.width / 2 - e.clientX;
-        const dy = rect.top + rect.height / 2 - e.clientY;
+        // Calcula distancia al cursor para reveal
+        const imgX = centerX + x;
+        const imgY = centerY + y;
+        const dx = imgX - mousePos.current.x;
+        const dy = imgY - mousePos.current.y;
         const dist = Math.sqrt(dx * dx + dy * dy);
 
         if (dist > maxVisible) {
@@ -80,8 +80,7 @@ export default function RoundedAnimatedSlider2({ images = [] }) {
             ease: "expo.out",
           });
         } else {
-          anyVisible = true;
-          const scale = gsap.utils.mapRange(0, maxVisible, 1.6, 0.7, dist);
+          const scale = gsap.utils.mapRange(0, maxVisible, 1.8, 0.8, dist);
           const zIndex = Math.round(
             gsap.utils.mapRange(0, maxVisible, 10, 1, dist)
           );
@@ -96,29 +95,20 @@ export default function RoundedAnimatedSlider2({ images = [] }) {
         }
       });
 
-      if (anyVisible && !highlightVisible) {
-        window.dispatchEvent(
-          new CustomEvent("cursor:showHighlight", {
-            detail: { text: "highlights" },
-          })
-        );
-        highlightVisible = true;
-      }
+      requestAnimationFrame(animate);
+    };
 
-      if (!anyVisible && highlightVisible) {
-        window.dispatchEvent(new CustomEvent("cursor:hideHighlight"));
-        highlightVisible = false;
-      }
+    const animationId = requestAnimationFrame(animate);
+
+    const handleMove = (e) => {
+      mousePos.current = { x: e.clientX, y: e.clientY };
     };
 
     window.addEventListener("mousemove", handleMove);
+    
     return () => {
+      cancelAnimationFrame(animationId);
       window.removeEventListener("mousemove", handleMove);
-      window.dispatchEvent(new CustomEvent("cursor:hideHighlight"));
-      if (headerFooter) {
-        headerFooter.removeEventListener("mouseenter", () => {});
-        headerFooter.removeEventListener("mouseleave", () => {});
-      }
     };
   }, [images, radius]);
 
@@ -134,7 +124,10 @@ export default function RoundedAnimatedSlider2({ images = [] }) {
           className="photo absolute object-contain"
           alt={`photo-${i}`}
           style={{
-            width: "clamp(80px, 13vw, 180px)", // tamaño responsivo
+            width: "18vw",
+            height: "18vh",
+            maxWidth: "250px",
+            maxHeight: "250px",
           }}
         />
       ))}

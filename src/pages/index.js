@@ -5,6 +5,9 @@ import Content from "@/components/content";
 import Content2 from "@/components/content/index2";
 import Content3 from "@/components/content/index3";
 import Content4 from "@/components/content/index4";
+import DynamicGallery from "@/components/dinamiclayouthero";
+import DynamicGallery2 from "@/components/dinamiclayouthero/index2";
+import DynamicGallery3 from "@/components/dinamiclayouthero/index3";
 import Hero5Motion from "@/components/hero/index5";
 import Hero6Motion from "@/components/hero/index6";
 import HorizontalSlider from "@/components/horizontalslider";
@@ -19,6 +22,10 @@ import RoundedAnimatedSlider3 from "@/components/roundedanimatedslider/index3";
 import FullFieldImageSlider from "@/components/roundedanimatedslider/index4";
 import RoundedAnimatedSlider5 from "@/components/roundedanimatedslider/index5";
 import RoundedAnimatedSlider6 from "@/components/roundedanimatedslider/index6";
+import SliderHero from "@/components/sliderhero";
+import SliderHero5 from "@/components/sliderhero/index5";
+import VerticalSlider from "@/components/verticalslider";
+import VerticalSlider2 from "@/components/verticalslider/index2";
 
 export default function Home() {
 
@@ -47,11 +54,14 @@ export default function Home() {
   return (
     <div className="h-full w-full overflow-hidden">
       <HeaderFooter8>
-        {/* <RoundedAnimatedSlider6 images={images} /> */}
+        {/* <RoundedAnimatedSlider2 images={images} /> */}
         {/* <AnimatedCursor /> */}
         {/* <TrailWrapper /> */}
         {/* <HorizontalSlider /> */}
-        <HorizontalSliderWrapper />
+        {/* <HorizontalSliderWrapper /> */}
+        {/* <VerticalSlider2 /> */}
+        {/* <DynamicGallery3 /> */}
+        <SliderHero5 />
         {/* <Content4 /> */}
       </HeaderFooter8>
     </div>
