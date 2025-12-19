@@ -24,6 +24,7 @@ import RoundedAnimatedSlider5 from "@/components/roundedanimatedslider/index5";
 import RoundedAnimatedSlider6 from "@/components/roundedanimatedslider/index6";
 import SliderHero from "@/components/sliderhero";
 import SliderHero5 from "@/components/sliderhero/index5";
+import SliderHero6 from "@/components/sliderhero/index6";
 import VerticalSlider from "@/components/verticalslider";
 import VerticalSlider2 from "@/components/verticalslider/index2";
 
@@ -61,7 +62,7 @@ export default function Home() {
         {/* <HorizontalSliderWrapper /> */}
         {/* <VerticalSlider2 /> */}
         {/* <DynamicGallery3 /> */}
-        <SliderHero5 />
+        <SliderHero6 />
         {/* <Content4 /> */}
       </HeaderFooter8>
     </div>
