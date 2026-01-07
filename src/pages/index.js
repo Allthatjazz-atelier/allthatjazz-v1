@@ -32,6 +32,8 @@ import HeroCarousel from "@/components/threeslider/index2";
 import HeroCarousel2 from "@/components/threeslider/index3";
 import HeroCarousel3 from "@/components/threeslider/index4";
 import HeroCarousel4 from "@/components/threeslider/index5";
+import HeroCarousel5 from "@/components/threeslider/index6";
+import HeroCarousel6 from "@/components/threeslider/index7";
 import VerticalSlider from "@/components/verticalslider";
 import VerticalSlider2 from "@/components/verticalslider/index2";
 
@@ -72,7 +74,9 @@ export default function Home() {
         {/* <SliderHero6 /> */}
         {/* <ThreeSlider /> */}
         {/* <PaperWindEffect /> */}
-        <HeroCarousel4 />
+        <HeroCarousel6 />
+        {/* <HeroCarousel5 /> */}
+        {/* <HeroCarousel4 /> */}
         {/* <HeroCarousel3 /> */}
         {/* <HeroCarousel2 /> */}
         {/* <HeroCarousel /> */}
