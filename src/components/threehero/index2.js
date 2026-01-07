@@ -16,24 +16,42 @@ const PaperWindEffect = () => {
       75,
       containerRef.current.clientWidth / containerRef.current.clientHeight,
       0.1,
-      1000
+      100
     )
-    camera.position.set(0, 0, 3)
+    camera.position.set(0, 0, 4)
 
     const renderer = new THREE.WebGLRenderer({ antialias: true })
     renderer.setSize(
       containerRef.current.clientWidth,
       containerRef.current.clientHeight
     )
-    renderer.setPixelRatio(window.devicePixelRatio)
+    renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2))
     containerRef.current.appendChild(renderer.domElement)
 
-    /* ---------- IMAGES ---------- */
+    /* ---------- CONFIG ---------- */
+
+    const BASE_WIDTH = 2
+    const BASE_HEIGHT = 1.5
+    const spacing = 2
+
+    /* ---------- DATA ---------- */
 
     const loader = new THREE.TextureLoader()
     const items = []
-    const spacing = 2
     let activeItem = null
+
+    /* ---------- SCROLL STATE ---------- */
+
+    let scrollTarget = 0
+    let scrollCurrent = 0
+    let scrollVelocity = 0
+
+    let depthOffset = 0
+    let rotationOffset = 0
+
+    let touchStartY = 0
+
+    /* ---------- IMAGES ---------- */
 
     for (let i = 1; i <= 19; i++) {
       const texture = loader.load(`/hero/img${i}.png`)
@@ -74,16 +92,35 @@ const PaperWindEffect = () => {
         `
       })
 
-      const geometry = new THREE.PlaneGeometry(2, 1.5, 64, 64)
-      const mesh = new THREE.Mesh(geometry, material)
+      const geometry = new THREE.PlaneGeometry(
+        BASE_WIDTH,
+        BASE_HEIGHT,
+        64,
+        64
+      )
 
+      const mesh = new THREE.Mesh(geometry, material)
       mesh.position.y = -(i - 1) * spacing
       scene.add(mesh)
+
+      const defaultScale = new THREE.Vector3(1, 1, 1)
+      const originalScale = new THREE.Vector3(1, 1, 1)
+
+      texture.onUpdate = () => {
+        const ratio = texture.image.width / texture.image.height
+        if (ratio > 1) {
+          originalScale.set(ratio, 1, 1)
+        } else {
+          originalScale.set(1, 1 / ratio, 1)
+        }
+      }
 
       items.push({
         mesh,
         material,
-        baseScale: mesh.scale.clone(),
+        defaultScale,
+        originalScale,
+        focus: 0,
         wave: 0.15,
         isActive: false
       })
@@ -91,16 +128,37 @@ const PaperWindEffect = () => {
 
     scene.add(new THREE.AmbientLight(0xffffff, 1))
 
-    /* ---------- SCROLL ---------- */
+    /* ---------- DESKTOP SCROLL ---------- */
 
-    let scrollY = 0
     const onWheel = (e) => {
       if (activeItem) return
-      scrollY += e.deltaY * 0.001
-      camera.position.y = -scrollY
+      scrollTarget += e.deltaY * 0.001
+      scrollTarget = Math.max(
+        0,
+        Math.min(scrollTarget, (items.length - 1) * spacing)
+      )
     }
 
-    containerRef.current.addEventListener('wheel', onWheel)
+    /* ---------- MOBILE TOUCH ---------- */
+
+    const onTouchStart = (e) => {
+      touchStartY = e.touches[0].clientY
+    }
+
+    const onTouchMove = (e) => {
+      if (activeItem) return
+      const delta = touchStartY - e.touches[0].clientY
+      scrollTarget += delta * 0.003
+      scrollTarget = Math.max(
+        0,
+        Math.min(scrollTarget, (items.length - 1) * spacing)
+      )
+      touchStartY = e.touches[0].clientY
+    }
+
+    containerRef.current.addEventListener('wheel', onWheel, { passive: true })
+    containerRef.current.addEventListener('touchstart', onTouchStart, { passive: true })
+    containerRef.current.addEventListener('touchmove', onTouchMove, { passive: true })
 
     /* ---------- CLICK ---------- */
 
@@ -118,7 +176,6 @@ const PaperWindEffect = () => {
       if (!hits.length) return
 
       const item = items.find(i => i.mesh === hits[0].object)
-
       if (activeItem && activeItem !== item) return
 
       item.isActive = !item.isActive
@@ -135,24 +192,60 @@ const PaperWindEffect = () => {
       requestAnimationFrame(animate)
       const t = clock.getElapsedTime()
 
+      /* ---- scroll easing ---- */
+      scrollVelocity = scrollTarget - scrollCurrent
+      scrollCurrent += scrollVelocity * 0.08
+      camera.position.y = -scrollCurrent
+
+      /* ---- elastic depth ---- */
+      const depthTarget = THREE.MathUtils.clamp(
+        Math.abs(scrollVelocity) * 8,
+        0,
+        1
+      )
+      depthOffset += (depthTarget - depthOffset) * 0.12
+
+      /* ---- rotation from velocity ---- */
+      const rotationTarget = THREE.MathUtils.clamp(
+        scrollVelocity * 4,
+        -0.15,
+        0.15
+      )
+      rotationOffset += (rotationTarget - rotationOffset) * 0.1
+
       items.forEach(item => {
-        // animar wave strength
-        const targetWave = item.isActive ? 0.0 : 0.15
+        const target = item.isActive ? 1 : 0
+        item.focus += (target - item.focus) * 0.08
+
+        const targetWave = item.isActive ? 0 : 0.15
         item.wave += (targetWave - item.wave) * 0.08
         item.material.uniforms.uWaveStrength.value = item.wave
-
-        // animar escala
-        const targetScale = item.isActive ? 1.2 : 1.0
-        item.mesh.scale.lerp(
-          new THREE.Vector3(
-            item.baseScale.x * targetScale,
-            item.baseScale.y * targetScale,
-            1
-          ),
-          0.1
-        )
-
         item.material.uniforms.uTime.value = t
+
+        /* ---- scale ---- */
+        const sx = THREE.MathUtils.lerp(
+          item.defaultScale.x,
+          item.originalScale.x * 1.15,
+          item.focus
+        )
+        const sy = THREE.MathUtils.lerp(
+          item.defaultScale.y,
+          item.originalScale.y * 1.15,
+          item.focus
+        )
+        item.mesh.scale.set(sx, sy, 1)
+
+        /* ---- elastic depth ---- */
+        item.mesh.position.z =
+          item.isActive
+            ? 0.4
+            : -depthOffset * 0.6
+
+        /* ---- rotation Z (only if not active) ---- */
+        item.mesh.rotation.z =
+          item.isActive
+            ? 0
+            : rotationOffset * 0.3
       })
 
       renderer.render(scene, camera)
@@ -180,6 +273,8 @@ const PaperWindEffect = () => {
     return () => {
       window.removeEventListener('resize', onResize)
       containerRef.current.removeEventListener('wheel', onWheel)
+      containerRef.current.removeEventListener('touchstart', onTouchStart)
+      containerRef.current.removeEventListener('touchmove', onTouchMove)
       containerRef.current.removeEventListener('click', onClick)
       renderer.dispose()
     }
