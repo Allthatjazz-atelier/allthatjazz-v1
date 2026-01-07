@@ -26,7 +26,11 @@ import SliderHero from "@/components/sliderhero";
 import SliderHero5 from "@/components/sliderhero/index5";
 import SliderHero6 from "@/components/sliderhero/index6";
 import PaperWindEffect from "@/components/threehero/index2";
+import PaperWindEffect2 from "@/components/threehero/index3";
 import ThreeSlider from "@/components/threeslider";
+import HeroCarousel from "@/components/threeslider/index2";
+import HeroCarousel2 from "@/components/threeslider/index3";
+import HeroCarousel3 from "@/components/threeslider/index4";
 import VerticalSlider from "@/components/verticalslider";
 import VerticalSlider2 from "@/components/verticalslider/index2";
 
@@ -66,7 +70,10 @@ export default function Home() {
         {/* <DynamicGallery3 /> */}
         {/* <SliderHero6 /> */}
         {/* <ThreeSlider /> */}
-        <PaperWindEffect />
+        {/* <PaperWindEffect /> */}
+        <HeroCarousel3 />
+        {/* <HeroCarousel2 /> */}
+        {/* <HeroCarousel /> */}
         {/* <Content4 /> */}
       </HeaderFooter8>
     </div>
