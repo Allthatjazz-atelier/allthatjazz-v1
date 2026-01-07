@@ -3,7 +3,7 @@
 import { useEffect, useRef } from "react";
 import * as THREE from "three";
 
-const HeroCarousel3 = () => {
+const HeroCarousel4 = () => {
   const canvasRef = useRef(null);
 
   useEffect(() => {
@@ -25,7 +25,7 @@ const HeroCarousel3 = () => {
       0.1,
       100
     );
-    camera.position.z = 7; // un poco más lejos para que encajen las imágenes grandes
+    camera.position.z = 7;
 
     const settings = {
       wheelSensitivity: 0.01,
@@ -61,6 +61,11 @@ const HeroCarousel3 = () => {
     let peakVelocity = 0;
     let velocityHistory = [0, 0, 0, 0, 0];
 
+    let selectedSlide = null;
+    let windTime = 0;
+    const raycaster = new THREE.Raycaster();
+    const mouse = new THREE.Vector2();
+
     const correctImageColor = (texture) => {
       texture.colorSpace = THREE.SRGBColorSpace;
       return texture;
@@ -79,6 +84,10 @@ const HeroCarousel3 = () => {
       mesh.userData = {
         originalVertices: [...geometry.attributes.position.array],
         index,
+        targetScale: 1.0,
+        currentScale: 1.0,
+        originalScaleX: 1.0,
+        originalScaleY: 1.0,
       };
 
       const imageIndex = (index % imagesCount) + 1;
@@ -96,8 +105,10 @@ const HeroCarousel3 = () => {
 
           if (imgAspect > slideAspect) {
             mesh.scale.y = slideAspect / imgAspect;
+            mesh.userData.originalScaleY = slideAspect / imgAspect;
           } else {
             mesh.scale.x = imgAspect / slideAspect;
+            mesh.userData.originalScaleX = imgAspect / slideAspect;
           }
         },
         undefined,
@@ -116,14 +127,18 @@ const HeroCarousel3 = () => {
       slide.userData.currentY = slide.position.y;
     });
 
-    // --- Distorsión más amplia ---
     const updateCurve = (mesh, worldPositionY, distortionFactor) => {
       const distortionCenter = new THREE.Vector2(0, 0);
-      const distortionRadius = slideHeight * 1.5; // ahora cubre casi toda la slide
+      const distortionRadius = slideHeight * 1.5;
       const maxCurvature = settings.maxDistortion * distortionFactor;
 
       const positionAttribute = mesh.geometry.attributes.position;
       const originalVertices = mesh.userData.originalVertices;
+
+      const isSelected = selectedSlide === mesh;
+      const windStrength = isSelected ? 0.15 : 0;
+      const windFrequency = 3.0;
+      const windSpeed = 2.0;
 
       for (let i = 0; i < positionAttribute.count; i++) {
         const x = originalVertices[i * 3];
@@ -137,18 +152,52 @@ const HeroCarousel3 = () => {
 
         let distortionStrength = 1 - distFromCenter / distortionRadius;
         distortionStrength = Math.max(0, distortionStrength);
-        distortionStrength = Math.pow(distortionStrength, 0.7); // suaviza para afectar más fuera del centro
+        distortionStrength = Math.pow(distortionStrength, 0.7);
 
         const curveZ = Math.sin((distortionStrength * Math.PI) / 2) * maxCurvature;
 
-        positionAttribute.setZ(i, curveZ);
+        let windZ = 0;
+        if (isSelected) {
+          const wave1 = Math.sin(x * windFrequency + windTime * windSpeed) * windStrength;
+          const wave2 = Math.sin(y * windFrequency * 0.7 + windTime * windSpeed * 1.3) * windStrength * 0.5;
+          windZ = (wave1 + wave2) * (1 - Math.abs(x) / (slideWidth / 2));
+        }
+
+        positionAttribute.setZ(i, curveZ + windZ);
       }
 
       positionAttribute.needsUpdate = true;
       mesh.geometry.computeVertexNormals();
     };
 
-    // --- EVENTOS ---
+    const handleClick = (e) => {
+      mouse.x = (e.clientX / window.innerWidth) * 2 - 1;
+      mouse.y = -(e.clientY / window.innerHeight) * 2 + 1;
+
+      raycaster.setFromCamera(mouse, camera);
+      const intersects = raycaster.intersectObjects(slides);
+
+      if (intersects.length > 0) {
+        const clickedSlide = intersects[0].object;
+        
+        if (selectedSlide === clickedSlide) {
+          selectedSlide = null;
+          slides.forEach(slide => {
+            slide.userData.targetScale = 1.0;
+          });
+        } else {
+          selectedSlide = clickedSlide;
+          slides.forEach(slide => {
+            if (slide === selectedSlide) {
+              slide.userData.targetScale = 1.0;
+            } else {
+              slide.userData.targetScale = 0.20;
+            }
+          });
+        }
+      }
+    };
+
     const handleKeyDown = (e) => {
       if (e.key === "ArrowUp") {
         targetPosition += slideUnit;
@@ -222,18 +271,22 @@ const HeroCarousel3 = () => {
     };
 
     window.addEventListener("keydown", handleKeyDown);
+    window.addEventListener("click", handleClick);
     window.addEventListener("wheel", handleWheel, { passive: false });
     window.addEventListener("touchstart", handleTouchStart, { passive: false });
     window.addEventListener("touchmove", handleTouchMove, { passive: false });
     window.addEventListener("touchend", handleTouchEnd);
     window.addEventListener("resize", handleResize);
 
-    // --- ANIMACIÓN ---
     const animate = (time) => {
       requestAnimationFrame(animate);
 
       const deltaTime = lastTime ? (time - lastTime) / 1000 : 0.016;
       lastTime = time;
+
+      if (selectedSlide) {
+        windTime += deltaTime;
+      }
 
       const prevPos = currentPosition;
 
@@ -292,6 +345,12 @@ const HeroCarousel3 = () => {
         slide.userData.currentY +=
           (slide.userData.targetY - slide.userData.currentY) * settings.slideLerp;
 
+        slide.userData.currentScale +=
+          (slide.userData.targetScale - slide.userData.currentScale) * 0.08;
+        
+        slide.scale.x = slide.userData.originalScaleX * slide.userData.currentScale;
+        slide.scale.y = slide.userData.originalScaleY * slide.userData.currentScale;
+
         const wrapThreshold = totalHeight / 2 + slideHeight;
         if (Math.abs(slide.userData.currentY) < wrapThreshold * 1.5) {
           slide.position.y = slide.userData.currentY;
@@ -306,6 +365,7 @@ const HeroCarousel3 = () => {
 
     return () => {
       window.removeEventListener("keydown", handleKeyDown);
+      window.removeEventListener("click", handleClick);
       window.removeEventListener("wheel", handleWheel);
       window.removeEventListener("touchstart", handleTouchStart);
       window.removeEventListener("touchmove", handleTouchMove);
@@ -324,4 +384,4 @@ const HeroCarousel3 = () => {
   );
 };
 
-export default HeroCarousel3;
+export default HeroCarousel4;
