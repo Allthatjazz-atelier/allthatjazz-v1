@@ -74,11 +74,11 @@ export default function Home() {
         {/* <SliderHero6 /> */}
         {/* <ThreeSlider /> */}
         {/* <PaperWindEffect /> */}
-        <HeroCarousel6 />
+        {/* <HeroCarousel6 /> */}
         {/* <HeroCarousel5 /> */}
         {/* <HeroCarousel4 /> */}
         {/* <HeroCarousel3 /> */}
-        {/* <HeroCarousel2 /> */}
+        <HeroCarousel2 />
         {/* <HeroCarousel /> */}
         {/* <Content4 /> */}
       </HeaderFooter8>
