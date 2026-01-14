@@ -39,9 +39,9 @@ const HeroCarousel2 = () => {
       distortionSmoothing: 0.075,
     };
 
-    const slideWidth = 3.0;
-    const slideHeight = 1.5;
-    const gap = 0.1;
+    const slideWidth = 2.0;
+    const slideHeight = 2.5; // Ratio 4:5 (0.8)
+    const gap = 0.05; // Gap reducido
     const slideCount = 10;
     const imagesCount = 19;
     const totalWidth = slideCount * (slideWidth + gap);
@@ -61,7 +61,6 @@ const HeroCarousel2 = () => {
     let peakVelocity = 0;
     let velocityHistory = [0, 0, 0, 0, 0];
 
-    // --- NUEVO ESTADO DE DETALLE ---
     let selectedSlide = null;
     let detailProgress = 0;
     const detailSpeed = 0.08;
@@ -87,7 +86,7 @@ const HeroCarousel2 = () => {
       };
 
       const imageIndex = (index % imagesCount) + 1;
-      const imagePath = `/hero/img${imageIndex}.png`;
+      const imagePath = `/story/story${imageIndex}.png`;
 
       new THREE.TextureLoader().load(
         imagePath,
@@ -96,13 +95,18 @@ const HeroCarousel2 = () => {
           material.map = texture;
           material.needsUpdate = true;
 
+          // CONTAIN: La imagen mantiene su aspect ratio y se ajusta dentro del slide
           const imgAspect = texture.image.width / texture.image.height;
           const slideAspect = slideWidth / slideHeight;
 
           if (imgAspect > slideAspect) {
+            // Imagen más ancha: ajustar al ancho del slide
+            mesh.scale.x = 1;
             mesh.scale.y = slideAspect / imgAspect;
           } else {
+            // Imagen más alta: ajustar a la altura del slide
             mesh.scale.x = imgAspect / slideAspect;
+            mesh.scale.y = 1;
           }
         },
         undefined,
@@ -121,6 +125,7 @@ const HeroCarousel2 = () => {
       slide.position.x -= totalWidth / 2;
       slide.userData.targetX = slide.position.x;
       slide.userData.currentX = slide.position.x;
+      slide.userData.baseScale = { x: 1, y: 1 }; // Guardar escala base
     });
 
     const updateCurve = (mesh, worldPositionX, distortionFactor, isSelected = false) => {
@@ -156,7 +161,6 @@ const HeroCarousel2 = () => {
       mesh.geometry.computeVertexNormals();
     };
 
-    // --- RAYCAST PARA CLIC ---
     const raycaster = new THREE.Raycaster();
     const pointer = new THREE.Vector2();
 
@@ -175,7 +179,6 @@ const HeroCarousel2 = () => {
 
     window.addEventListener("click", handleClick);
 
-    // --- OTROS EVENTOS ---
     const handleKeyDown = (e) => {
       if (e.key === "ArrowLeft") {
         targetPosition += slideUnit;
@@ -255,7 +258,6 @@ const HeroCarousel2 = () => {
     window.addEventListener("touchend", handleTouchEnd);
     window.addEventListener("resize", handleResize);
 
-    // --- ANIMACIÓN ---
     const animate = (time) => {
       requestAnimationFrame(animate);
 
@@ -306,7 +308,6 @@ const HeroCarousel2 = () => {
       currentDistortionFactor +=
         (targetDistortionFactor - currentDistortionFactor) * settings.distortionSmoothing;
 
-      // --- DETALLE PROGRESO ---
       detailProgress += (selectedSlide ? 1 : 0 - detailProgress) * detailSpeed;
 
       slides.forEach((slide, i) => {
@@ -324,20 +325,29 @@ const HeroCarousel2 = () => {
 
         slide.position.x = slide.userData.currentX;
 
-        // --- EFECTOS DE DETALLE ---
-        if (slide === selectedSlide) {
-          // Subir y escalar la slide seleccionada
-          slide.position.z += (1.5 - slide.position.z) * 0.1;
-          const scale = 1 + 0.3 * detailProgress;
-          slide.scale.set(scale, scale, 1);
-        } else {
-          // Slides no seleccionadas se alejan y se hacen un poco más pequeñas
-          slide.position.z += (-0.8 - slide.position.z) * 0.1;
-          const scale = 1 - 0.15 * detailProgress;
-          slide.scale.set(scale, scale, 1);
+        // Guardar la escala base si no existe
+        if (!slide.userData.baseScale) {
+          slide.userData.baseScale = { x: slide.scale.x, y: slide.scale.y };
         }
 
-        // Opacidad de slides
+        if (slide === selectedSlide) {
+          slide.position.z += (1.5 - slide.position.z) * 0.1;
+          const scaleFactor = 1 + 0.3 * detailProgress;
+          slide.scale.set(
+            slide.userData.baseScale.x * scaleFactor,
+            slide.userData.baseScale.y * scaleFactor,
+            1
+          );
+        } else {
+          slide.position.z += (-0.8 - slide.position.z) * 0.1;
+          const scaleFactor = 1 - 0.15 * detailProgress;
+          slide.scale.set(
+            slide.userData.baseScale.x * scaleFactor,
+            slide.userData.baseScale.y * scaleFactor,
+            1
+          );
+        }
+
         if (slide.material.map) {
           slide.material.transparent = true;
           slide.material.opacity = slide === selectedSlide
@@ -354,7 +364,6 @@ const HeroCarousel2 = () => {
 
     animate();
 
-    // --- LIMPIEZA ---
     return () => {
       window.removeEventListener("keydown", handleKeyDown);
       window.removeEventListener("wheel", handleWheel);
