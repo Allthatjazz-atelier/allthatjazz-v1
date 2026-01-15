@@ -28,6 +28,8 @@ import SliderHero6 from "@/components/sliderhero/index6";
 import PaperWindEffect from "@/components/threehero/index2";
 import PaperWindEffect2 from "@/components/threehero/index3";
 import ThreeSlider from "@/components/threeslider";
+import HeroCarousel_Responsive from "@/components/threeslider/index12";
+import HeroCarousel_Responsive2 from "@/components/threeslider/index13";
 import HeroCarousel from "@/components/threeslider/index2";
 import HeroCarousel2 from "@/components/threeslider/index3";
 import HeroCarousel3 from "@/components/threeslider/index4";
@@ -78,7 +80,8 @@ export default function Home() {
         {/* <HeroCarousel5 /> */}
         {/* <HeroCarousel4 /> */}
         {/* <HeroCarousel3 /> */}
-        <HeroCarousel2 />
+        {/* <HeroCarousel2 /> */}
+        <HeroCarousel_Responsive />
         {/* <HeroCarousel /> */}
         {/* <Content4 /> */}
       </HeaderFooter8>
