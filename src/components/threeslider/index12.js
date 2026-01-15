@@ -49,9 +49,9 @@ const HeroCarousel_Responsive = () => {
     };
 
     // Configuración dinámica según orientación
-    const slideWidth = isMobile ? 3.0 : 2.0;
-    const slideHeight = isMobile ? 3.0 : 2.5;
-    const gap = isMobile ? 0.1 : 0.05;
+    const slideWidth = isMobile ? 4.0 : 2.0;
+    const slideHeight = isMobile ? 4.5 : 2.5;
+    const gap = isMobile ? 0.2 : 0.05;
     const slideCount = 10;
     const imagesCount = 19;
     
@@ -163,8 +163,8 @@ const HeroCarousel_Responsive = () => {
         const centerRadius = slideHeight * 0.6;
         const globalRadius = slideHeight * 2.5;
     
-        const centerStrength = distortionFactor * 1.8;
-        const globalStrength = distortionFactor * 0.4;
+        const centerStrength = distortionFactor * 2.8;
+        const globalStrength = distortionFactor * 1.4;
     
         for (let i = 0; i < positionAttr.count; i++) {
           const x = original[i * 3];
