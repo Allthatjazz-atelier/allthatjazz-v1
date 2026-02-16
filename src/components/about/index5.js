@@ -105,12 +105,7 @@ export default function AboutSection5() {
       {/* TEXTOS ORIGINALES */}
       <div className="flex flex-col gap-4 text-white mix-blend-difference z-10">
         <p className="flex text-justify">
-          Allthatjazz is a creative collective, based in Berlin and working world wide. 
-          Our practice is rooted in explorative and visual craft. 
-          We are specialised in shaping visual narratives and digital experiences in the fields of culture, 
-          fashion, lifestyle and multimedia. 
-          We help brands and artists to elevate their work, engagement and impact.  
-          Working 9 to 5, hustling 24/7. For work related stuff, collaborations or inquires, please reach out at:  
+          A creative collective based in Berlin, playing Worldwide. Blending digital craft with analog attitude. Exploring and shaping visual narratives and experiences that resonate through culture, music, fashion, lifestyle and multimedia. <br/> Hustling 24/7. For collaborations or inquires, please get in touch. 
         </p>
 
         <div className="flex flex-col">
@@ -133,7 +128,7 @@ export default function AboutSection5() {
         onMouseMove={handleMouseMove}
         onMouseLeave={handleMouseLeave}
       >
-        <p>Selected Projects:</p>
+        <p>Selected Work:</p>
 
         <div className="flex flex-col uppercase text-[0.75rem] tracking-[-0.02em]">
           {projects.map((project, i) => (

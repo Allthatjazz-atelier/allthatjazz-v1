@@ -30,6 +30,8 @@ import PaperWindEffect2 from "@/components/threehero/index3";
 import ThreeSlider from "@/components/threeslider";
 import HeroCarousel_Responsive from "@/components/threeslider/index12";
 import HeroCarousel_Responsive2 from "@/components/threeslider/index13";
+import HeroCarousel_Responsive3 from "@/components/threeslider/index14";
+import HeroCarousel_Responsive4 from "@/components/threeslider/index15";
 import HeroCarousel from "@/components/threeslider/index2";
 import HeroCarousel2 from "@/components/threeslider/index3";
 import HeroCarousel3 from "@/components/threeslider/index4";
@@ -81,7 +83,7 @@ export default function Home() {
         {/* <HeroCarousel4 /> */}
         {/* <HeroCarousel3 /> */}
         {/* <HeroCarousel2 /> */}
-        <HeroCarousel_Responsive />
+        <HeroCarousel_Responsive4 />
         {/* <HeroCarousel /> */}
         {/* <Content4 /> */}
       </HeaderFooter8>
