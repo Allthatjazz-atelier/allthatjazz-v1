@@ -14,14 +14,6 @@ const HeroCarousel_Responsive4 = () => {
 
     checkMobile();
     window.addEventListener("resize", checkMobile);
-    const deviceMemory = navigator.deviceMemory ?? 4;
-    const hardwareCores = navigator.hardwareConcurrency ?? 4;
-    const prefersReducedMotion = window.matchMedia(
-      "(prefers-reduced-motion: reduce)"
-    ).matches;
-    const isUltraSafeMobile =
-      isMobile &&
-      (prefersReducedMotion || deviceMemory <= 3 || hardwareCores <= 4);
 
     const canvas = canvasRef.current;
     const renderer = new THREE.WebGLRenderer({
@@ -31,9 +23,7 @@ const HeroCarousel_Responsive4 = () => {
       powerPreference: "high-performance",
     });
     renderer.setSize(window.innerWidth, window.innerHeight);
-    renderer.setPixelRatio(
-      Math.min(window.devicePixelRatio, isUltraSafeMobile ? 1 : isMobile ? 1.25 : 2)
-    );
+    renderer.setPixelRatio(Math.min(window.devicePixelRatio, isMobile ? 1.25 : 2));
 
     const scene = new THREE.Scene();
     scene.background = new THREE.Color(0xffffff);
@@ -57,10 +47,6 @@ const HeroCarousel_Responsive4 = () => {
       distortionSensitivity: 0.15,
       distortionSmoothing: 0.075,
     };
-    if (isUltraSafeMobile) {
-      settings.maxDistortion *= 0.82;
-      settings.distortionSmoothing = 0.06;
-    }
 
     const slideWidth = isMobile ? 4.0 : 2.0;
     const slideHeight = isMobile ? 4.5 : 2.5;
@@ -88,10 +74,9 @@ const HeroCarousel_Responsive4 = () => {
     const isVertical = isMobile;
     const slideUnit = isVertical ? slideHeight + gap : slideWidth + gap;
     const totalSize = slideCount * slideUnit;
-    const mobileVideoActiveRange = slideUnit * (isUltraSafeMobile ? 1.35 : 2.5);
-    const widthSegments = isMobile ? (isUltraSafeMobile ? 12 : 16) : 32;
-    const heightSegments = isMobile ? (isUltraSafeMobile ? 6 : 8) : 16;
-    const targetFrameInterval = isUltraSafeMobile ? 1000 / 45 : 0;
+    const mobileVideoActiveRange = slideUnit * 2.5;
+    const widthSegments = isMobile ? 16 : 32;
+    const heightSegments = isMobile ? 8 : 16;
 
     const slides = [];
     const videos = [];
@@ -102,7 +87,6 @@ const HeroCarousel_Responsive4 = () => {
     let isScrolling = false;
     let autoScrollSpeed = 0;
     let lastTime = 0;
-    let lastRenderTime = 0;
     let touchStart = 0;
     let touchLast = 0;
 
@@ -313,10 +297,7 @@ const HeroCarousel_Responsive4 = () => {
       if (!slide.userData.isVideo || !slide.userData.videoElement) return;
 
       const video = slide.userData.videoElement;
-      const isInRange = Math.abs(basePos) <= mobileVideoActiveRange;
-      const shouldPlay = isUltraSafeMobile
-        ? Math.abs(basePos) <= slideUnit * 0.9
-        : isInRange;
+      const shouldPlay = Math.abs(basePos) <= mobileVideoActiveRange;
 
       if (shouldPlay) {
         if (video.paused) {
@@ -425,11 +406,6 @@ const HeroCarousel_Responsive4 = () => {
 
     const animate = (time) => {
       requestAnimationFrame(animate);
-
-      if (targetFrameInterval > 0 && time - lastRenderTime < targetFrameInterval) {
-        return;
-      }
-      lastRenderTime = time;
 
       if (document.hidden) {
         return;
