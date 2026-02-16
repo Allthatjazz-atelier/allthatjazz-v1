@@ -18,11 +18,12 @@ const HeroCarousel_Responsive4 = () => {
     const canvas = canvasRef.current;
     const renderer = new THREE.WebGLRenderer({
       canvas,
-      antialias: true,
-      preserveDrawingBuffer: true,
+      antialias: !isMobile,
+      preserveDrawingBuffer: false,
+      powerPreference: "high-performance",
     });
     renderer.setSize(window.innerWidth, window.innerHeight);
-    renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+    renderer.setPixelRatio(Math.min(window.devicePixelRatio, isMobile ? 1.25 : 2));
 
     const scene = new THREE.Scene();
     scene.background = new THREE.Color(0xffffff);
@@ -73,6 +74,9 @@ const HeroCarousel_Responsive4 = () => {
     const isVertical = isMobile;
     const slideUnit = isVertical ? slideHeight + gap : slideWidth + gap;
     const totalSize = slideCount * slideUnit;
+    const mobileVideoActiveRange = slideUnit * 2.5;
+    const widthSegments = isMobile ? 16 : 32;
+    const heightSegments = isMobile ? 8 : 16;
 
     const slides = [];
     const videos = [];
@@ -122,7 +126,7 @@ const HeroCarousel_Responsive4 = () => {
       video.loop = true;
       video.playsInline = true;
       video.crossOrigin = "anonymous";
-      video.preload = "auto";
+      video.preload = isMobile ? "metadata" : "auto";
 
       const texture = new THREE.VideoTexture(video);
       setupTextureColor(texture);
@@ -138,9 +142,13 @@ const HeroCarousel_Responsive4 = () => {
       };
 
       video.addEventListener("loadedmetadata", onLoadedMetadata);
-      video.play().catch(() => {
-        // En móvil algunos navegadores retrasan autoplay hasta la interacción.
-      });
+      mesh.userData.isVideo = true;
+      mesh.userData.videoElement = video;
+      if (!isMobile) {
+        video.play().catch(() => {
+          // Evita warning en navegadores con restricciones de autoplay.
+        });
+      }
 
       mesh.userData.mediaCleanup = () => {
         video.pause();
@@ -169,10 +177,17 @@ const HeroCarousel_Responsive4 = () => {
     };
 
     const createSlide = (index) => {
-      const geometry = new THREE.PlaneGeometry(slideWidth, slideHeight, 32, 16);
+      const geometry = new THREE.PlaneGeometry(
+        slideWidth,
+        slideHeight,
+        widthSegments,
+        heightSegments
+      );
       const material = new THREE.MeshBasicMaterial({
         color: new THREE.Color(0xffffff),
         side: THREE.DoubleSide,
+        transparent: true,
+        opacity: 1,
       });
 
       const mesh = new THREE.Mesh(geometry, material);
@@ -276,7 +291,31 @@ const HeroCarousel_Responsive4 = () => {
       }
 
       positionAttr.needsUpdate = true;
-      mesh.geometry.computeVertexNormals();
+    };
+
+    const updateVideoPlaybackState = (slide, basePos) => {
+      if (!slide.userData.isVideo || !slide.userData.videoElement) return;
+
+      const video = slide.userData.videoElement;
+      const shouldPlay = Math.abs(basePos) <= mobileVideoActiveRange;
+
+      if (shouldPlay) {
+        if (video.paused) {
+          video.play().catch(() => {
+            // En algunos móviles el autoplay requiere interacción previa.
+          });
+        }
+      } else if (!video.paused) {
+        video.pause();
+      }
+    };
+
+    const handleVisibilityChange = () => {
+      if (document.hidden) {
+        videos.forEach((video) => {
+          if (!video.paused) video.pause();
+        });
+      }
     };
 
     const handleKeyDown = (e) => {
@@ -363,6 +402,7 @@ const HeroCarousel_Responsive4 = () => {
     window.addEventListener("touchmove", handleTouchMove, { passive: false });
     window.addEventListener("touchend", handleTouchEnd);
     window.addEventListener("resize", handleResize);
+    document.addEventListener("visibilitychange", handleVisibilityChange);
 
     const animate = (time) => {
       requestAnimationFrame(animate);
@@ -434,18 +474,16 @@ const HeroCarousel_Responsive4 = () => {
           slide.position.x = slide.userData.currentPos;
         }
 
+        if (isMobile) {
+          updateVideoPlaybackState(slide, basePos);
+        }
+
         if (!slide.userData.baseScale) {
           slide.userData.baseScale = { x: slide.scale.x, y: slide.scale.y };
         }
 
         slide.position.z += (-0.8 - slide.position.z) * 0.1;
         slide.scale.set(slide.userData.baseScale.x, slide.userData.baseScale.y, 1);
-
-        if (slide.material.map) {
-          slide.material.transparent = true;
-          slide.material.opacity = 1;
-          slide.material.needsUpdate = true;
-        }
 
         const worldPos = isVertical ? slide.position.y : slide.position.x;
         updateCurve(slide, worldPos, currentDistortionFactor);
@@ -463,6 +501,7 @@ const HeroCarousel_Responsive4 = () => {
       window.removeEventListener("touchmove", handleTouchMove);
       window.removeEventListener("touchend", handleTouchEnd);
       window.removeEventListener("resize", handleResize);
+      document.removeEventListener("visibilitychange", handleVisibilityChange);
       slides.forEach((slide) => {
         if (slide.userData.mediaCleanup) {
           slide.userData.mediaCleanup();

@@ -2,8 +2,6 @@
 
 import { useEffect, useRef, useState } from "react";
 import * as THREE from "three";
-import HeroCarousel_Responsive2 from "./index13";
-import HeroCarousel_Responsive from "./index12";
 
 const HeroCarousel_Responsive3 = () => {
   const canvasRef = useRef(null);
@@ -20,11 +18,12 @@ const HeroCarousel_Responsive3 = () => {
     const canvas = canvasRef.current;
     const renderer = new THREE.WebGLRenderer({
       canvas,
-      antialias: true,
-      preserveDrawingBuffer: true,
+      antialias: !isMobile,
+      preserveDrawingBuffer: false,
+      powerPreference: "high-performance",
     });
     renderer.setSize(window.innerWidth, window.innerHeight);
-    renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+    renderer.setPixelRatio(Math.min(window.devicePixelRatio, isMobile ? 1.25 : 2));
 
     const scene = new THREE.Scene();
     scene.background = new THREE.Color(0xffffff);
@@ -52,22 +51,37 @@ const HeroCarousel_Responsive3 = () => {
     const slideWidth = isMobile ? 4.0 : 2.0;
     const slideHeight = isMobile ? 4.5 : 2.5;
     const gap = isMobile ? 0.2 : 0.05;
-    const slideCount = 21; // 15 imágenes + 6 videos
-    const imagesCount = 15; // story1.png a story15.png
-    const videoSlides = {
-      15: "/motion/Allthatjazz cinematic©Feb26.mp4",
-      16: "/motion/Portfolio-Gallery-4-5.mp4",
-      17: "/motion/promojohnny.mp4",
-      18: "/motion/ATJ About Cuaderno.mp4",
-      19: "/motion/ATJ_AboutMotion 02.mp4",
-      20: "/motion/Playground_Carhartt-WIP_24012026 (1)_1.mp4",
-    };
+
+    const imageItems = Array.from({ length: 15 }, (_, idx) => ({
+      type: "image",
+      src: `/story/story${idx + 1}.png`,
+    }));
+
+    const videoItems = [
+      "/motion/Allthatjazz cinematic©Feb26.mp4",
+      "/motion/ATJ About Cuaderno.mp4",
+      "/motion/ATJ_AboutMotion 02.mp4",
+      "/motion/Playground_Carhartt-WIP_24012026 (1)_1.mp4",
+      "/motion/Portfolio-Gallery-4-5.mp4",
+    ].map((src) => ({
+      type: "video",
+      src,
+    }));
+
+    const mediaItems = [...imageItems, ...videoItems];
+    const slideCount = mediaItems.length;
 
     const isVertical = isMobile;
     const slideUnit = isVertical ? slideHeight + gap : slideWidth + gap;
     const totalSize = slideCount * slideUnit;
+    const mobileVideoActiveRange = slideUnit * 2.5;
+    const widthSegments = isMobile ? 16 : 32;
+    const heightSegments = isMobile ? 8 : 16;
 
     const slides = [];
+    const videos = [];
+    const videoTextures = [];
+
     let currentPosition = 0;
     let targetPosition = 0;
     let isScrolling = false;
@@ -81,17 +95,99 @@ const HeroCarousel_Responsive3 = () => {
     let peakVelocity = 0;
     let velocityHistory = [0, 0, 0, 0, 0];
 
-    const correctImageColor = (texture) => {
+    const setupTextureColor = (texture) => {
       texture.colorSpace = THREE.SRGBColorSpace;
       return texture;
     };
 
-    const createSlide = (index) => {
-      const geometry = new THREE.PlaneGeometry(slideWidth, slideHeight, 32, 16);
+    const applyMediaAspect = (mesh, mediaWidth, mediaHeight) => {
+      if (!mediaWidth || !mediaHeight) return;
 
+      const mediaAspect = mediaWidth / mediaHeight;
+      const slideAspect = slideWidth / slideHeight;
+
+      if (mediaAspect > slideAspect) {
+        mesh.scale.x = 1;
+        mesh.scale.y = slideAspect / mediaAspect;
+      } else {
+        mesh.scale.x = mediaAspect / slideAspect;
+        mesh.scale.y = 1;
+      }
+
+      // Guardamos la escala base real del media para que el zoom/selección
+      // nunca rompa la proporción ni fuerce recorte visual.
+      mesh.userData.baseScale = { x: mesh.scale.x, y: mesh.scale.y };
+    };
+
+    const createVideoForSlide = (mesh, material, src) => {
+      const video = document.createElement("video");
+      video.src = encodeURI(src);
+      video.muted = true;
+      video.loop = true;
+      video.playsInline = true;
+      video.crossOrigin = "anonymous";
+      video.preload = isMobile ? "metadata" : "auto";
+
+      const texture = new THREE.VideoTexture(video);
+      setupTextureColor(texture);
+      texture.minFilter = THREE.LinearFilter;
+      texture.magFilter = THREE.LinearFilter;
+      texture.generateMipmaps = false;
+
+      material.map = texture;
+      material.needsUpdate = true;
+
+      const onLoadedMetadata = () => {
+        applyMediaAspect(mesh, video.videoWidth, video.videoHeight);
+      };
+
+      video.addEventListener("loadedmetadata", onLoadedMetadata);
+      mesh.userData.isVideo = true;
+      mesh.userData.videoElement = video;
+      if (!isMobile) {
+        video.play().catch(() => {
+          // Evita warning en navegadores con restricciones de autoplay.
+        });
+      }
+
+      mesh.userData.mediaCleanup = () => {
+        video.pause();
+        video.removeEventListener("loadedmetadata", onLoadedMetadata);
+        video.src = "";
+        video.load();
+        texture.dispose();
+      };
+
+      videos.push(video);
+      videoTextures.push(texture);
+    };
+
+    const createImageForSlide = (mesh, material, src) => {
+      new THREE.TextureLoader().load(
+        encodeURI(src),
+        (texture) => {
+          setupTextureColor(texture);
+          material.map = texture;
+          material.needsUpdate = true;
+          applyMediaAspect(mesh, texture.image.width, texture.image.height);
+        },
+        undefined,
+        (err) => console.warn(`Couldn't load image ${src}`, err)
+      );
+    };
+
+    const createSlide = (index) => {
+      const geometry = new THREE.PlaneGeometry(
+        slideWidth,
+        slideHeight,
+        widthSegments,
+        heightSegments
+      );
       const material = new THREE.MeshBasicMaterial({
         color: new THREE.Color(0xffffff),
         side: THREE.DoubleSide,
+        transparent: true,
+        opacity: 1,
       });
 
       const mesh = new THREE.Mesh(geometry, material);
@@ -105,69 +201,13 @@ const HeroCarousel_Responsive3 = () => {
       mesh.userData = {
         originalVertices: [...geometry.attributes.position.array],
         index,
-        isVideo: index in videoSlides,
       };
 
-      if (index in videoSlides) {
-        // Slide de video
-        const video = document.createElement("video");
-        video.src = encodeURI(videoSlides[index]);
-        video.loop = true;
-        video.muted = true;
-        video.playsInline = true;
-        video.crossOrigin = "anonymous";
-
-        mesh.userData.videoElement = video;
-        video.play().catch(() => {});
-
-        const videoTexture = new THREE.VideoTexture(video);
-        correctImageColor(videoTexture);
-        material.map = videoTexture;
-        material.needsUpdate = true;
-
-        const applyVideoAspect = () => {
-          const vw = video.videoWidth || 16;
-          const vh = video.videoHeight || 9;
-          const videoAspect = vw / vh;
-          const slideAspect = slideWidth / slideHeight;
-
-          if (videoAspect > slideAspect) {
-            mesh.scale.x = 1;
-            mesh.scale.y = slideAspect / videoAspect;
-          } else {
-            mesh.scale.x = videoAspect / slideAspect;
-            mesh.scale.y = 1;
-          }
-        };
-
-        video.addEventListener("loadedmetadata", applyVideoAspect);
-        if (video.readyState >= 1) applyVideoAspect();
+      const mediaItem = mediaItems[index % mediaItems.length];
+      if (mediaItem.type === "video") {
+        createVideoForSlide(mesh, material, mediaItem.src);
       } else {
-        // Slide de imagen
-        const imageIndex = (index % imagesCount) + 1;
-        const imagePath = `/story/story${imageIndex}.png`;
-
-        new THREE.TextureLoader().load(
-          imagePath,
-          (texture) => {
-            correctImageColor(texture);
-            material.map = texture;
-            material.needsUpdate = true;
-
-            const imgAspect = texture.image.width / texture.image.height;
-            const slideAspect = slideWidth / slideHeight;
-
-            if (imgAspect > slideAspect) {
-              mesh.scale.x = 1;
-              mesh.scale.y = slideAspect / imgAspect;
-            } else {
-              mesh.scale.x = imgAspect / slideAspect;
-              mesh.scale.y = 1;
-            }
-          },
-          undefined,
-          (err) => console.warn(`Couldn't load image ${imagePath}`, err)
-        );
+        createImageForSlide(mesh, material, mediaItem.src);
       }
 
       scene.add(mesh);
@@ -188,7 +228,7 @@ const HeroCarousel_Responsive3 = () => {
         slide.userData.targetPos = slide.position.x;
         slide.userData.currentPos = slide.position.x;
       }
-      slide.userData.baseScale = { x: 1, y: 1 };
+      slide.userData.baseScale = null;
     });
 
     const updateCurve = (mesh, worldPosition, distortionFactor) => {
@@ -223,7 +263,8 @@ const HeroCarousel_Responsive3 = () => {
             settings.maxDistortion *
             globalStrength;
 
-          const curveZ = bulge + globalWave;
+          let curveZ = bulge + globalWave;
+
           positionAttr.setZ(i, curveZ);
         }
       } else {
@@ -243,20 +284,45 @@ const HeroCarousel_Responsive3 = () => {
           distortionStrength = Math.max(0, distortionStrength);
           distortionStrength = Math.pow(distortionStrength, 1.5);
 
-          const curveZ =
-            Math.sin((distortionStrength * Math.PI) / 2) * maxCurvature;
+          let curveZ = Math.sin((distortionStrength * Math.PI) / 2) * maxCurvature;
+
           positionAttr.setZ(i, curveZ);
         }
       }
 
       positionAttr.needsUpdate = true;
-      mesh.geometry.computeVertexNormals();
+    };
+
+    const updateVideoPlaybackState = (slide, basePos) => {
+      if (!slide.userData.isVideo || !slide.userData.videoElement) return;
+
+      const video = slide.userData.videoElement;
+      const shouldPlay = Math.abs(basePos) <= mobileVideoActiveRange;
+
+      if (shouldPlay) {
+        if (video.paused) {
+          video.play().catch(() => {
+            // En algunos móviles el autoplay requiere interacción previa.
+          });
+        }
+      } else if (!video.paused) {
+        video.pause();
+      }
+    };
+
+    const handleVisibilityChange = () => {
+      if (document.hidden) {
+        videos.forEach((video) => {
+          if (!video.paused) video.pause();
+        });
+      }
     };
 
     const handleKeyDown = (e) => {
       const isUpLeft = isVertical ? e.key === "ArrowUp" : e.key === "ArrowLeft";
-      const isDownRight =
-        isVertical ? e.key === "ArrowDown" : e.key === "ArrowRight";
+      const isDownRight = isVertical
+        ? e.key === "ArrowDown"
+        : e.key === "ArrowRight";
 
       if (isUpLeft) {
         targetPosition += slideUnit;
@@ -294,9 +360,7 @@ const HeroCarousel_Responsive3 = () => {
 
     const handleTouchMove = (e) => {
       e.preventDefault();
-      const touchCurrent = isVertical
-        ? e.touches[0].clientY
-        : e.touches[0].clientX;
+      const touchCurrent = isVertical ? e.touches[0].clientY : e.touches[0].clientX;
       const delta = touchCurrent - touchLast;
       touchLast = touchCurrent;
 
@@ -338,6 +402,7 @@ const HeroCarousel_Responsive3 = () => {
     window.addEventListener("touchmove", handleTouchMove, { passive: false });
     window.addEventListener("touchend", handleTouchEnd);
     window.addEventListener("resize", handleResize);
+    document.addEventListener("visibilitychange", handleVisibilityChange);
 
     const animate = (time) => {
       requestAnimationFrame(animate);
@@ -362,8 +427,7 @@ const HeroCarousel_Responsive3 = () => {
       velocityHistory.shift();
 
       const avgVelocity =
-        velocityHistory.reduce((sum, val) => sum + val, 0) /
-        velocityHistory.length;
+        velocityHistory.reduce((sum, val) => sum + val, 0) / velocityHistory.length;
 
       if (avgVelocity > peakVelocity) peakVelocity = avgVelocity;
 
@@ -397,14 +461,12 @@ const HeroCarousel_Responsive3 = () => {
         if (basePos > totalSize / 2) basePos -= totalSize;
 
         const threshold = isVertical ? slideHeight : slideWidth;
-        const isWrapping =
-          Math.abs(basePos - slide.userData.targetPos) > threshold * 2;
+        const isWrapping = Math.abs(basePos - slide.userData.targetPos) > threshold * 2;
         if (isWrapping) slide.userData.currentPos = basePos;
 
         slide.userData.targetPos = basePos;
         slide.userData.currentPos +=
-          (slide.userData.targetPos - slide.userData.currentPos) *
-          settings.slideLerp;
+          (slide.userData.targetPos - slide.userData.currentPos) * settings.slideLerp;
 
         if (isVertical) {
           slide.position.y = slide.userData.currentPos;
@@ -412,27 +474,16 @@ const HeroCarousel_Responsive3 = () => {
           slide.position.x = slide.userData.currentPos;
         }
 
+        if (isMobile) {
+          updateVideoPlaybackState(slide, basePos);
+        }
+
         if (!slide.userData.baseScale) {
           slide.userData.baseScale = { x: slide.scale.x, y: slide.scale.y };
         }
 
-        // Posición y escala fijas - sin efecto de click
-        slide.position.z = -0.8;
-        slide.scale.set(
-          slide.userData.baseScale.x,
-          slide.userData.baseScale.y,
-          1
-        );
-
-        if (slide.material.map) {
-          slide.material.transparent = false;
-          slide.material.opacity = 1;
-          slide.material.needsUpdate = true;
-          // Actualizar textura de video cada frame
-          if (slide.userData.isVideo) {
-            slide.material.map.needsUpdate = true;
-          }
-        }
+        slide.position.z += (-0.8 - slide.position.z) * 0.1;
+        slide.scale.set(slide.userData.baseScale.x, slide.userData.baseScale.y, 1);
 
         const worldPos = isVertical ? slide.position.y : slide.position.x;
         updateCurve(slide, worldPos, currentDistortionFactor);
@@ -444,18 +495,26 @@ const HeroCarousel_Responsive3 = () => {
     animate();
 
     return () => {
-      slides.forEach((slide) => {
-        if (slide.userData.videoElement) {
-          slide.userData.videoElement.pause();
-          slide.userData.videoElement.src = "";
-        }
-      });
       window.removeEventListener("keydown", handleKeyDown);
       window.removeEventListener("wheel", handleWheel);
       window.removeEventListener("touchstart", handleTouchStart);
       window.removeEventListener("touchmove", handleTouchMove);
       window.removeEventListener("touchend", handleTouchEnd);
       window.removeEventListener("resize", handleResize);
+      document.removeEventListener("visibilitychange", handleVisibilityChange);
+      slides.forEach((slide) => {
+        if (slide.userData.mediaCleanup) {
+          slide.userData.mediaCleanup();
+        }
+        if (slide.material?.map && !videoTextures.includes(slide.material.map)) {
+          slide.material.map.dispose();
+        }
+        slide.geometry.dispose();
+        slide.material.dispose();
+      });
+
+      videos.length = 0;
+      videoTextures.length = 0;
       renderer.dispose();
     };
   }, [isMobile]);
@@ -475,4 +534,4 @@ const HeroCarousel_Responsive3 = () => {
   );
 };
 
-export default HeroCarousel_Responsive3
+export default HeroCarousel_Responsive3;
