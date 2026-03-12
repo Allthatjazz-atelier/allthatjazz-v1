@@ -84,7 +84,7 @@ export default function Home() {
         {/* <HeroCarousel4 /> */}
         {/* <HeroCarousel3 /> */}
         {/* <HeroCarousel2 /> */}
-        <HeroCarousel_Responsive5 />
+        <HeroCarousel_Responsive />
         {/* <HeroCarousel /> */}
         {/* <Content4 /> */}
       </HeaderFooter8>
