@@ -123,8 +123,8 @@ const HeroCarousel_Responsive5 = () => {
     const slideUnit = isVertical ? slideHeight + gap : slideWidth + gap;
     const totalSize = slideCount * slideUnit;
     const mobileVideoActiveRange = slideUnit * 2.5;
-    const widthSegments = isMobile ? 16 : 32;
-    const heightSegments = isMobile ? 8 : 16;
+    const widthSegments = isMobile ? 8 : 32;
+    const heightSegments = isMobile ? 4 : 16;
 
     const slides = [];
     const videos = [];
@@ -358,17 +358,23 @@ const HeroCarousel_Responsive5 = () => {
       positionAttr.needsUpdate = true;
     };
 
-    const updateVideoPlaybackState = (slide, basePos) => {
-      if (!slide.userData.isVideo || !slide.userData.videoElement) return;
-      const video = slide.userData.videoElement;
-      if (!video.src) return; // lazy load aún no activado
+    let activeVideoSlide = null;
 
-      const shouldPlay = Math.abs(basePos) <= mobileVideoActiveRange;
-      if (shouldPlay && video.paused) {
-        video.play().catch(() => {});
-      } else if (!shouldPlay && !video.paused) {
-        video.pause();
-      }
+    const updateVideoPlaybackState = (slide, basePos) => {
+    if (!slide.userData.isVideo || !slide.userData.videoElement) return;
+    const video = slide.userData.videoElement;
+    const isCentered = Math.abs(basePos) < slideUnit * 0.6;
+
+    if (isCentered) {
+        if (activeVideoSlide && activeVideoSlide !== slide) {
+        // Pausar el anterior
+        activeVideoSlide.userData.videoElement?.pause();
+        }
+        activeVideoSlide = slide;
+        if (video.paused) video.play().catch(() => {});
+    } else {
+        if (!video.paused) video.pause();
+    }
     };
 
     // ── Event Handlers ─────────────────────────────────────────────────────
@@ -498,9 +504,18 @@ const HeroCarousel_Responsive5 = () => {
 
         slide.position.z += (-0.8 - slide.position.z) * 0.1;
         slide.scale.set(slide.userData.baseScale.x, slide.userData.baseScale.y, 1);
+        const distanceThreshold = isVertical ? slideHeight * 2.5 : slideWidth * 2.5;
+
+        if (Math.abs(slide.userData.currentPos) < distanceThreshold) {
         updateCurve(slide, isVertical ? slide.position.y : slide.position.x, currentDistortionFactor);
+        }
       });
 
+      const isIdle = Math.abs(currentPosition - targetPosition) < 0.001 
+        && currentDistortionFactor < 0.01;
+
+        if (isIdle && !isScrolling) return; // no renderizar si nada ha cambiado
+        
       renderer.render(scene, camera);
     };
 
