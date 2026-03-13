@@ -83,8 +83,8 @@ export default function HeaderFooter8({ children }) {
           
       </div>
 
-      {/* Contenido principal */}
-      <div className="w-full h-full bg-white mix-blend-difference">{children}</div>
+      {/* Contenido principal - sin mix-blend para que el hero (AquaSliderWithHero2) se vea normal */}
+      <div className="w-full h-full">{children}</div>
 
       {/* About modal - Figma: Background blur 45.2, Fill #FFFFFF 15% (blur reducido para acercarse al render de Figma) */}
       {isAboutOpen && (
