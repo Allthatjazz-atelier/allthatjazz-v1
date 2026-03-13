@@ -79,9 +79,12 @@ export const useOptimizedMedia = () => {
       const entry = manifest?.videos?.find((v) => v.name === baseName);
 
       if (!entry) {
-        // Fallback: servir el original si no hay manifest todavía
+        const fallbackName = originalName.endsWith(".mp4")
+          ? originalName
+          : `${originalName}.mp4`;
+      
         return {
-          sources: [{ src: `/motion/${originalName}`, type: "video/mp4" }],
+          sources: [{ src: `/motion/${fallbackName}`, type: "video/mp4" }],
           poster: null,
           hasOptimized: false,
         };

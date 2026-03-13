@@ -43,4 +43,4 @@ next-env.d.ts
 # optimized media
 public/motion/optimized/
 public/story/optimized/
-public/media-manifest.json
+# public/media-manifest.json
