@@ -5,7 +5,7 @@ import * as THREE from "three";
 import gsap from "gsap";
 import { useOptimizedMedia } from "@/hooks/useOptimizedMedia";
 
-// ─── AquaSlider shaders (bubble lens transition) ───────────────────────────────
+// ─── Desktop: AquaSlider shaders (bubble lens transition) ──────────────────
 const aquaVertexShader = `
   varying vec2 vUv;
   void main() {
@@ -66,44 +66,34 @@ const aquaFragmentShader = `
   }
 `;
 
-// ─── Mobile GPU vertex shader ──────────────────────────────────────────────────
-// Replicates the original bulge + global wave distortion entirely on the GPU.
-// CPU cost per frame: 3 uniform writes per slide (vs ~153 Math.sin() calls).
-const mobileSlideVert = `
-  uniform float uTime;
-  uniform float uDistortion;
-  uniform float uWorldPos;
-  uniform float uSlideHeight;
+// ─── Mobile: radial reveal crossfade (no lens distortion, no RenderTargets) ─
+const mobileCrossfadeFrag = `
+  uniform sampler2D uTexture1;
+  uniform sampler2D uTexture2;
+  uniform float uProgress;
+  uniform vec2 uTex1Size;
+  uniform vec2 uTex2Size;
+  uniform vec2 uPlaneSize;
   varying vec2 vUv;
+
+  vec2 coverUV(vec2 uv, vec2 texSize) {
+    vec2 ratio = uPlaneSize / texSize;
+    float sc = max(ratio.x, ratio.y);
+    return (uv - 0.5) * (uPlaneSize / (texSize * sc)) + 0.5;
+  }
 
   void main() {
-    vUv = uv;
-    vec3 pos = position;
-
-    float centerRadius = uSlideHeight * 0.6;
-    float globalRadius = uSlideHeight * 2.5;
-    float axisPos      = uWorldPos + pos.y;
-
-    // Centre bulge
-    float dCenter = min(abs(axisPos) / centerRadius, 1.0);
-    float bulge   = sin((1.0 - dCenter) * 3.14159 * 0.5) * uDistortion * 2.8;
-    bulge         = pow(bulge, 1.1);
-
-    // Global wave
-    float dGlobal = min(abs(axisPos) / globalRadius, 1.0);
-    float gWave   = sin((1.0 - dGlobal) * 3.14159) * uDistortion * 1.4;
-
-    pos.z = bulge + gWave;
-    gl_Position = projectionMatrix * modelViewMatrix * vec4(pos, 1.0);
+    vec2 uv1 = coverUV(vUv, uTex1Size);
+    vec2 uv2 = coverUV(vUv, uTex2Size);
+    vec4 t1 = texture2D(uTexture1, uv1);
+    vec4 t2 = texture2D(uTexture2, uv2);
+    float d = length(vUv - 0.5);
+    float reveal = smoothstep(d - 0.08, d + 0.08, uProgress * 0.7071);
+    gl_FragColor = mix(t1, t2, reveal);
   }
 `;
-const mobileSlideFrag = `
-  uniform sampler2D uTexture;
-  varying vec2 vUv;
-  void main() { gl_FragColor = texture2D(uTexture, vUv); }
-`;
 
-// ─── Data ──────────────────────────────────────────────────────────────────────
+// ─── Data ──────────────────────────────────────────────────────────────────
 const IMAGE_NAMES = [
   ["story1.png",  "story2.png",  "story3.png"],
   ["story4.png",  "story5.png",  "story6.png"],
@@ -120,7 +110,7 @@ const VIDEO_NAMES = [
   "Portfolio-Gallery-4-5.mp4",
 ];
 
-// ─── Component ─────────────────────────────────────────────────────────────────
+// ─── Component ─────────────────────────────────────────────────────────────
 const AquaSliderWithHero5 = () => {
   const canvasRef = useRef(null);
   const [isMobile, setIsMobile] = useState(false);
@@ -151,7 +141,7 @@ const AquaSliderWithHero5 = () => {
 
     const canvas = canvasRef.current;
 
-    // ── Single WebGL renderer for everything ───────────────────────────
+    // ── Renderer ──────────────────────────────────────────────────────
     const renderer = new THREE.WebGLRenderer({
       canvas,
       antialias: !isMobile,
@@ -168,20 +158,11 @@ const AquaSliderWithHero5 = () => {
     const camera = new THREE.PerspectiveCamera(45, window.innerWidth / window.innerHeight, 0.01, 100);
     camera.position.z = isMobile ? 9.5 : 5;
 
-    // Orthographic camera used only for rendering AquaSlider scenes into RenderTargets
-    const aquaCamera = new THREE.OrthographicCamera(-1, 1, 1, -1, 0, 1);
-
     // ── Dimensions ────────────────────────────────────────────────────
     const slideWidth  = isMobile ? 4.0 : 2.0;
     const slideHeight = isMobile ? 4.5 : 2.5;
     const gap         = isMobile ? 0.2 : 0.05;
     const isVertical  = isMobile;
-
-    // RenderTarget resolution: móvil más baja para aligerar GPU
-    //   desktop: 512 × 640
-    //   mobile:  384 × 432 (≈44% menos píxeles)
-    const offW = isMobile ? 384 : 512;
-    const offH = isMobile ? 432 : 640;
 
     const settings = {
       wheelSensitivity:      0.01,
@@ -190,53 +171,85 @@ const AquaSliderWithHero5 = () => {
       smoothing:             0.1,
       slideLerp:             0.075,
       distortionDecay:       0.95,
-      // Móvil: distorsión muy reducida para evitar lag (shaders + videos)
-      maxDistortion:         isMobile ? 0.45 : 2.5,
-      distortionSensitivity: isMobile ? 0.08 : 0.15,
+      maxDistortion:         2.5,
+      distortionSensitivity: 0.15,
       distortionSmoothing:   0.075,
     };
 
-    // ── AquaSlider scenes + RenderTargets (no extra WebGL contexts) ────
-    const GROUP_COUNT   = resolvedGroups.length; // 5
-    const aquaScenes    = [];
-    const aquaMaterials = [];
-    const aquaTargets   = [];
-    const aquaTextures  = []; // THREE.Texture[][] — raw textures per group
-    const aquaStates    = []; // { currentIndex, isTransitioning }
+    // ── Aqua textures (shared: loaded for both paths) ─────────────────
+    const GROUP_COUNT   = resolvedGroups.length;
+    const aquaTextures  = [];
+    const aquaStates    = [];
+
+    // Desktop-only: RenderTarget pipeline
+    let aquaCamera, aquaScenes, aquaMaterials, aquaTargets;
+    if (!isMobile) {
+      aquaCamera    = new THREE.OrthographicCamera(-1, 1, 1, -1, 0, 1);
+      aquaScenes    = [];
+      aquaMaterials = [];
+      aquaTargets   = [];
+    }
+
+    // Mobile-only: lightweight crossfade materials (one per aqua group)
+    let mobileCrossfadeMats;
+    if (isMobile) {
+      mobileCrossfadeMats = [];
+    }
+
+    const offW = 512;
+    const offH = 640;
 
     for (let g = 0; g < GROUP_COUNT; g++) {
-      const aqScene = new THREE.Scene();
-      const mat = new THREE.ShaderMaterial({
-        uniforms: {
-          uTexture1:     { value: null },
-          uTexture2:     { value: null },
-          uProgress:     { value: 0 },
-          uResolution:   { value: new THREE.Vector2(offW, offH) },
-          uTexture1Size: { value: new THREE.Vector2(1, 1) },
-          uTexture2Size: { value: new THREE.Vector2(1, 1) },
-        },
-        vertexShader:   aquaVertexShader,
-        fragmentShader: aquaFragmentShader,
-      });
-      aqScene.add(new THREE.Mesh(new THREE.PlaneGeometry(2, 2), mat));
-
-      const target = new THREE.WebGLRenderTarget(offW, offH, {
-        minFilter: THREE.LinearFilter,
-        magFilter: THREE.LinearFilter,
-      });
-      target.texture.colorSpace = THREE.SRGBColorSpace;
-
-      aquaScenes.push(aqScene);
-      aquaMaterials.push(mat);
-      aquaTargets.push(target);
+      const texArr = new Array(resolvedGroups[g].length).fill(null);
+      let loaded = 0;
+      aquaTextures.push(texArr);
       aquaStates.push({ currentIndex: 0, isTransitioning: false });
 
-      // Load images for this group
-      const loader = new THREE.TextureLoader();
-      const texArr = new Array(resolvedGroups[g].length).fill(null);
-      let loaded   = 0;
-      aquaTextures.push(texArr);
+      if (isMobile) {
+        // Crossfade ShaderMaterial: 2 texture reads + 1 smoothstep (vs bubble lens)
+        const cfMat = new THREE.ShaderMaterial({
+          uniforms: {
+            uTexture1:  { value: null },
+            uTexture2:  { value: null },
+            uProgress:  { value: 0 },
+            uTex1Size:  { value: new THREE.Vector2(1, 1) },
+            uTex2Size:  { value: new THREE.Vector2(1, 1) },
+            uPlaneSize: { value: new THREE.Vector2(slideWidth, slideHeight) },
+          },
+          vertexShader:   aquaVertexShader,
+          fragmentShader: mobileCrossfadeFrag,
+        });
+        mobileCrossfadeMats.push(cfMat);
+      } else {
+        // Desktop: full bubble lens + RenderTarget
+        const aqScene = new THREE.Scene();
+        const mat = new THREE.ShaderMaterial({
+          uniforms: {
+            uTexture1:     { value: null },
+            uTexture2:     { value: null },
+            uProgress:     { value: 0 },
+            uResolution:   { value: new THREE.Vector2(offW, offH) },
+            uTexture1Size: { value: new THREE.Vector2(1, 1) },
+            uTexture2Size: { value: new THREE.Vector2(1, 1) },
+          },
+          vertexShader:   aquaVertexShader,
+          fragmentShader: aquaFragmentShader,
+        });
+        aqScene.add(new THREE.Mesh(new THREE.PlaneGeometry(2, 2), mat));
 
+        const target = new THREE.WebGLRenderTarget(offW, offH, {
+          minFilter: THREE.LinearFilter,
+          magFilter: THREE.LinearFilter,
+        });
+        target.texture.colorSpace = THREE.SRGBColorSpace;
+
+        aquaScenes.push(aqScene);
+        aquaMaterials.push(mat);
+        aquaTargets.push(target);
+      }
+
+      // Load images — callback sets the right material per platform
+      const loader = new THREE.TextureLoader();
       resolvedGroups[g].forEach((src, j) => {
         loader.load(src, (tex) => {
           tex.minFilter  = tex.magFilter = THREE.LinearFilter;
@@ -244,39 +257,70 @@ const AquaSliderWithHero5 = () => {
           tex.userData   = { size: new THREE.Vector2(tex.image.width, tex.image.height) };
           texArr[j] = tex;
           if (++loaded === resolvedGroups[g].length) {
-            mat.uniforms.uTexture1.value     = texArr[0];
-            mat.uniforms.uTexture2.value     = texArr[1 % texArr.length];
-            mat.uniforms.uTexture1Size.value = texArr[0].userData.size;
-            mat.uniforms.uTexture2Size.value = texArr[1 % texArr.length].userData.size;
+            const t0 = texArr[0];
+            const t1 = texArr[1 % texArr.length];
+            if (isMobile) {
+              const m = mobileCrossfadeMats[g];
+              m.uniforms.uTexture1.value = t0;
+              m.uniforms.uTexture2.value = t1;
+              m.uniforms.uTex1Size.value = t0.userData.size;
+              m.uniforms.uTex2Size.value = t1.userData.size;
+            } else {
+              const m = aquaMaterials[g];
+              m.uniforms.uTexture1.value     = t0;
+              m.uniforms.uTexture2.value     = t1;
+              m.uniforms.uTexture1Size.value = t0.userData.size;
+              m.uniforms.uTexture2Size.value = t1.userData.size;
+            }
           }
         }, undefined, (err) => console.warn(`AquaSlider: couldn't load ${src}`, err));
       });
     }
 
+    // ── advanceAquaGroup (tap to cycle images) ────────────────────────
     const advanceAquaGroup = (g) => {
       const state  = aquaStates[g];
       const texArr = aquaTextures[g];
       if (state.isTransitioning || texArr.some((t) => !t)) return;
       state.isTransitioning = true;
       const next = (state.currentIndex + 1) % texArr.length;
-      const mat  = aquaMaterials[g];
-      mat.uniforms.uTexture1.value     = texArr[state.currentIndex];
-      mat.uniforms.uTexture2.value     = texArr[next];
-      mat.uniforms.uTexture1Size.value = texArr[state.currentIndex].userData.size;
-      mat.uniforms.uTexture2Size.value = texArr[next].userData.size;
-      gsap.fromTo(mat.uniforms.uProgress, { value: 0 }, {
-        value: 1, duration: 2.5, ease: "power2.inOut",
-        onComplete: () => {
-          mat.uniforms.uProgress.value     = 0;
-          mat.uniforms.uTexture1.value     = texArr[next];
-          mat.uniforms.uTexture1Size.value = texArr[next].userData.size;
-          state.currentIndex    = next;
-          state.isTransitioning = false;
-        },
-      });
+
+      if (isMobile) {
+        const mat = mobileCrossfadeMats[g];
+        mat.uniforms.uTexture1.value = texArr[state.currentIndex];
+        mat.uniforms.uTexture2.value = texArr[next];
+        mat.uniforms.uTex1Size.value = texArr[state.currentIndex].userData.size;
+        mat.uniforms.uTex2Size.value = texArr[next].userData.size;
+        gsap.fromTo(mat.uniforms.uProgress, { value: 0 }, {
+          value: 1, duration: 1.5, ease: "power2.inOut",
+          onComplete: () => {
+            mat.uniforms.uTexture1.value = texArr[next];
+            mat.uniforms.uTex1Size.value = texArr[next].userData.size;
+            mat.uniforms.uProgress.value = 0;
+            state.currentIndex    = next;
+            state.isTransitioning = false;
+          },
+        });
+      } else {
+        const mat = aquaMaterials[g];
+        mat.uniforms.uTexture1.value     = texArr[state.currentIndex];
+        mat.uniforms.uTexture2.value     = texArr[next];
+        mat.uniforms.uTexture1Size.value = texArr[state.currentIndex].userData.size;
+        mat.uniforms.uTexture2Size.value = texArr[next].userData.size;
+        gsap.fromTo(mat.uniforms.uProgress, { value: 0 }, {
+          value: 1, duration: 2.5, ease: "power2.inOut",
+          onComplete: () => {
+            mat.uniforms.uProgress.value     = 0;
+            mat.uniforms.uTexture1.value     = texArr[next];
+            mat.uniforms.uTexture1Size.value = texArr[next].userData.size;
+            state.currentIndex    = next;
+            state.isTransitioning = false;
+          },
+        });
+      }
     };
 
-    // ── Video setup (usa useOptimizedMedia: mobile=720p WebM/MP4, desktop=1080p) ─
+    // ── Video setup ───────────────────────────────────────────────────
     const videos        = [];
     const videoTextures = [];
 
@@ -309,18 +353,23 @@ const AquaSliderWithHero5 = () => {
       videoTextures.push(tex);
     });
 
-    // ── Carousel layout: 5 aqua groups + 5 videos → 20 virtual slots ──
-    const VIDEO_COUNT   = VIDEO_NAMES.length;       // 5
-    const UNIQUE_COUNT  = GROUP_COUNT + VIDEO_COUNT;  // 10
+    // ── Carousel layout ───────────────────────────────────────────────
+    const VIDEO_COUNT   = VIDEO_NAMES.length;
+    const UNIQUE_COUNT  = GROUP_COUNT + VIDEO_COUNT;
     const REPEAT        = 2;
-    const slideCount    = UNIQUE_COUNT * REPEAT;      // 20
+    const slideCount    = UNIQUE_COUNT * REPEAT;
     const slideUnit     = isVertical ? slideHeight + gap : slideWidth + gap;
     const totalSize     = slideCount * slideUnit;
-    const mobileActiveRange = slideUnit * 2.5;
 
-    // Móvil: menos segmentos = menos vértices = shader más rápido
-    const wSegs = isMobile ? 12 : 32;
-    const hSegs = isMobile ? 6 : 16;
+    // Mobile: 1×1 segments (flat cards), Desktop: 32×16 (for vertex distortion)
+    const wSegs = isMobile ? 1 : 32;
+    const hSegs = isMobile ? 1 : 16;
+
+    // Cylinder carousel params (mobile only)
+    const cylinderRadius = slideHeight * 2.8;
+    const cylinderDepth  = 2.0;
+    const cylinderScale  = 0.10;
+    const cylinderTilt   = 0.10;
 
     const slides    = [];
     const raycaster = new THREE.Raycaster();
@@ -333,24 +382,16 @@ const AquaSliderWithHero5 = () => {
       const videoIndex = isAqua ? null : uid - GROUP_COUNT;
 
       const geo = new THREE.PlaneGeometry(slideWidth, slideHeight, wSegs, hSegs);
-      const tex = isAqua ? aquaTargets[groupIndex].texture : videoTextures[videoIndex];
 
       let mat;
       if (isMobile) {
-        // GPU shader: entire distortion computed on GPU, CPU just sets 4 uniforms
-        mat = new THREE.ShaderMaterial({
-          uniforms: {
-            uTexture:     { value: tex },
-            uTime:        { value: 0 },
-            uDistortion:  { value: 0 },
-            uWorldPos:    { value: 0 },
-            uSlideHeight: { value: slideHeight },
-          },
-          vertexShader:   mobileSlideVert,
-          fragmentShader: mobileSlideFrag,
-        });
+        if (isAqua) {
+          mat = mobileCrossfadeMats[groupIndex];
+        } else {
+          mat = new THREE.MeshBasicMaterial({ map: videoTextures[videoIndex] });
+        }
       } else {
-        // Desktop: MeshBasicMaterial, distortion done in JS (updateCurveDesktop)
+        const tex = isAqua ? aquaTargets[groupIndex].texture : videoTextures[videoIndex];
         mat = new THREE.MeshBasicMaterial({ map: tex, side: THREE.DoubleSide });
       }
 
@@ -359,7 +400,6 @@ const AquaSliderWithHero5 = () => {
       else            mesh.position.x = i * slideUnit;
 
       mesh.userData = {
-        // Desktop needs original vertex positions for CPU distortion
         originalVertices: !isMobile ? [...geo.attributes.position.array] : null,
         index: i, uid, isAqua, groupIndex, videoIndex,
         targetPos: 0, currentPos: 0,
@@ -380,7 +420,7 @@ const AquaSliderWithHero5 = () => {
       }
     });
 
-    // ── Desktop CPU distortion (original AquaSliderWithHero2 logic) ───
+    // ── Desktop CPU distortion ────────────────────────────────────────
     const updateCurveDesktop = (mesh, worldPosition, distortionFactor) => {
       const positionAttr = mesh.geometry.attributes.position;
       const original     = mesh.userData.originalVertices;
@@ -399,7 +439,7 @@ const AquaSliderWithHero5 = () => {
       positionAttr.needsUpdate = true;
     };
 
-    // ── Scroll + distortion state ──────────────────────────────────────
+    // ── Scroll + distortion state ─────────────────────────────────────
     let currentPosition         = 0;
     let targetPosition          = 0;
     let isScrolling             = false;
@@ -536,16 +576,17 @@ const AquaSliderWithHero5 = () => {
       currentDistortionFactor +=
         (targetDistortionFactor - currentDistortionFactor) * settings.distortionSmoothing;
 
-      // ── Phase 1: render each AquaSlider into its RenderTarget ────────
-      // Same renderer, same GL context — zero context-switching cost
-      aquaScenes.forEach((aqScene, g) => {
-        if (!aquaMaterials[g].uniforms.uTexture1.value) return;
-        renderer.setRenderTarget(aquaTargets[g]);
-        renderer.render(aqScene, aquaCamera);
-      });
-      renderer.setRenderTarget(null);
+      // ── Desktop only: render aqua RenderTargets ──────────────────────
+      if (!isMobile) {
+        aquaScenes.forEach((aqScene, g) => {
+          if (!aquaMaterials[g].uniforms.uTexture1.value) return;
+          renderer.setRenderTarget(aquaTargets[g]);
+          renderer.render(aqScene, aquaCamera);
+        });
+        renderer.setRenderTarget(null);
+      }
 
-      // ── Phase 2: update carousel positions + distortion ───────────────
+      // ── Update slide positions ───────────────────────────────────────
       slides.forEach((slide, i) => {
         let basePos = i * slideUnit - currentPosition;
         basePos = ((basePos % totalSize) + totalSize) % totalSize;
@@ -562,33 +603,38 @@ const AquaSliderWithHero5 = () => {
         if (isVertical) slide.position.y = slide.userData.currentPos;
         else            slide.position.x = slide.userData.currentPos;
 
-        slide.position.z += (-0.8 - slide.position.z) * 0.1;
-        slide.scale.set(1, 1, 1);
-
         const worldPos = isVertical ? slide.position.y : slide.position.x;
 
         if (isMobile) {
-          // GPU handles all distortion — CPU just pushes 4 floats
-          const u = slide.material.uniforms;
-          u.uDistortion.value = currentDistortionFactor * settings.maxDistortion;
-          u.uWorldPos.value   = worldPos;
-          // uTime and uSlideHeight don't change per frame for the bulge shader
-          // but keep uTime in case you want to animate it later
+          // ── Cylinder carousel: depth + scale + tilt (zero shader cost) ──
+          const dist = Math.abs(worldPos);
+          const t    = Math.min(dist / cylinderRadius, 1.0);
+          const ease = t * t;
 
-          // Range-based video play/pause — saves GPU bandwidth off-screen
+          const targetZ = -0.2 - ease * cylinderDepth;
+          slide.position.z += (targetZ - slide.position.z) * 0.15;
+
+          const s = 1.0 - ease * cylinderScale;
+          slide.scale.set(s, s, 1);
+
+          const targetRotX = (worldPos / cylinderRadius) * cylinderTilt;
+          slide.rotation.x += (targetRotX - slide.rotation.x) * 0.15;
+
+          // Only play the nearest 1-2 videos
           if (!slide.userData.isAqua) {
             const vid     = videos[slide.userData.videoIndex];
-            const inRange = Math.abs(basePos) <= mobileActiveRange;
+            const inRange = Math.abs(basePos) <= slideUnit * 1.5;
             if (inRange  && vid.paused)  vid.play().catch(() => {});
             if (!inRange && !vid.paused) vid.pause();
           }
         } else {
-          // Desktop: original CPU radial distortion (works great on desktop)
+          // ── Desktop: CPU vertex distortion ──────────────────────────────
+          slide.position.z += (-0.8 - slide.position.z) * 0.1;
+          slide.scale.set(1, 1, 1);
           updateCurveDesktop(slide, worldPos, currentDistortionFactor);
         }
       });
 
-      // ── Phase 3: render main scene to screen ─────────────────────────
       renderer.render(scene, camera);
     };
 
@@ -608,13 +654,19 @@ const AquaSliderWithHero5 = () => {
       window.removeEventListener("resize",     handleResize);
       document.removeEventListener("visibilitychange", handleVisibility);
 
-      aquaMaterials.forEach((m) => m.dispose());
-      aquaTargets.forEach((t) => t.dispose());
-      aquaScenes.forEach((s, g) => {
-        s.children.forEach((c) => c.geometry?.dispose());
-        aquaTextures[g].forEach((t) => t?.dispose());
+      if (isMobile) {
+        mobileCrossfadeMats.forEach((m) => m.dispose());
+      } else {
+        aquaMaterials.forEach((m) => m.dispose());
+        aquaTargets.forEach((t) => t.dispose());
+        aquaScenes.forEach((s) => s.children.forEach((c) => c.geometry?.dispose()));
+      }
+      aquaTextures.forEach((group) => group.forEach((t) => t?.dispose()));
+
+      slides.forEach((s) => {
+        s.geometry.dispose();
+        if (!isMobile || !s.userData.isAqua) s.material.dispose();
       });
-      slides.forEach((s) => { s.geometry.dispose(); s.material.dispose(); });
       videos.forEach((v) => { v.pause(); v.src = ""; v.load(); });
       videoTextures.forEach((t) => t.dispose());
       renderer.dispose();
