@@ -41,6 +41,6 @@ yarn-error.log*
 next-env.d.ts
 
 # optimized media
-public/motion/optimized/
-public/story/optimized/
+# public/motion/optimized/
+# public/story/optimized/
 # public/media-manifest.json
