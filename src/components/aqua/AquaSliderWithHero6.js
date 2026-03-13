@@ -19,6 +19,12 @@ const aquaFrag = `
     vec2 s = uResolution / ts; float sc = min(s.x,s.y);
     return (uv * uResolution - (uResolution - ts*sc)*0.5) / (ts*sc);
   }
+  vec4 sampleContain(sampler2D tex, vec2 uv, vec2 ts) {
+    vec2 suv = containUV(uv, ts);
+    if (suv.x < 0.0 || suv.x > 1.0 || suv.y < 0.0 || suv.y > 1.0)
+      return vec4(1.0, 1.0, 1.0, 1.0);
+    return texture2D(tex, suv);
+  }
   struct LD { vec2 uv; float inside; };
   LD lens(vec2 p, vec2 uv, vec2 c, float r) {
     vec2 dir = normalize(p-c); float fr = r*0.25; float fs = r/3000.0;
@@ -31,7 +37,10 @@ const aquaFrag = `
     float r=uProgress*length(uResolution)*1.5;
     float mask=step(r, length(c-p));
     LD d=lens(p,containUV(vUv,uTexture2Size),c,r);
-    gl_FragColor=mix(texture2D(uTexture2,d.uv), texture2D(uTexture1,containUV(vUv,uTexture1Size)), max(mask,1.0-d.inside));
+    vec4 c1 = sampleContain(uTexture1, vUv, uTexture1Size);
+    vec4 c2 = (d.uv.x >= 0.0 && d.uv.x <= 1.0 && d.uv.y >= 0.0 && d.uv.y <= 1.0)
+      ? texture2D(uTexture2, d.uv) : vec4(1.0, 1.0, 1.0, 1.0);
+    gl_FragColor = mix(c2, c1, max(mask, 1.0 - d.inside));
   }
 `;
 
@@ -149,13 +158,10 @@ const AquaSliderWithHero6 = () => {
     // ─── HEADER TUNABLES — edita todo aquí ────────────────────────────
     const HEADER = {
       // Altura del strip de texto en unidades de mundo
-      // ↑ sube si el texto se ve pequeño; ↓ baja para más compacto
       height:    isMobile ? 0.50 : 0.24,
 
-      // Espacio entre el borde superior del slide y el borde inferior del header
-      // Desktop: casi cero → header pegado a la foto
-      // Móvil:   un pelín para que respire
-      gap:       isMobile ? 0.07 : 0.02,
+      // Gap entre imagen y header (0 = pegado, encuadrado con vértices)
+      gap:       0,
 
       // Padding horizontal del texto dentro del canvas (px sobre HDR_W = 512)
       padLeft:   16,
@@ -171,12 +177,7 @@ const AquaSliderWithHero6 = () => {
 
     const HEADER_H        = HEADER.height;
     const HEADER_GAP      = HEADER.gap;
-    // Espacio entre slides: debe acomodar el header completo + un poco de aire
-    // Desktop: gap mínimo (header es muy fino)
-    // Móvil:   gap = HEADER_H + HEADER_GAP + breathing room
-    const slideGap        = isMobile ? (HEADER_H + HEADER_GAP + 0.18) : 0.05;
-    // Y del centro del header respecto al centro del slide
-    const HEADER_Y_OFFSET = slideHeight / 2 + HEADER_GAP + HEADER_H / 2;
+    const slideGap        = isMobile ? (HEADER_H + HEADER_GAP + 0.1) : 0.05;
 
     // Canvas del header (alta resolución para que sea nítido en retina)
     const HDR_W = 512, HDR_H = 64;
@@ -634,10 +635,10 @@ const AquaSliderWithHero6 = () => {
           const bs = slide.userData.isAqua ? aquaStates[slide.userData.groupIndex].baseScale : videoBaseScale[slide.userData.videoIndex];
           slide.scale.set(bs.x, bs.y, 1);
           slide.rotation.x = 0;
-          // Header: plano, directamente encima del slide
-          hMesh.position.x = slide.position.x;
-          hMesh.position.y = slide.userData.currentPos + HEADER_Y_OFFSET;
-          hMesh.position.z = 0;
+          // Header: encuadrado con vértices de la imagen, sin gap
+          const headerY = slide.userData.currentPos + (slideHeight / 2) * bs.y + HEADER_GAP + HEADER_H / 2;
+          hMesh.position.set(slide.position.x, headerY, 0);
+          hMesh.scale.set(bs.x, 1, 1);
 
           if (!slide.userData.isAqua) {
             const vi = slide.userData.videoIndex, vid = videos[vi];
@@ -680,12 +681,11 @@ const AquaSliderWithHero6 = () => {
           slide.scale.set(bs.x, bs.y, 1);
           updateCurve(slide, worldPos, currentDistortionFactor, 0);
 
-          // Header: misma X y Z que el slide, fijo en Y = HEADER_Y_OFFSET sobre el eje del carrusel
-          hMesh.position.x = slide.userData.currentPos;
-          hMesh.position.y = HEADER_Y_OFFSET;
-          hMesh.position.z = slide.position.z;
-          // Distorsión continua: el header usa su Y real en el mundo
-          updateCurve(hMesh, worldPos, currentDistortionFactor, HEADER_Y_OFFSET);
+          // Header: encuadrado con vértices de la imagen, sin gap
+          const headerY = (slideHeight / 2) * bs.y + HEADER_GAP + HEADER_H / 2;
+          hMesh.position.set(slide.userData.currentPos, headerY, slide.position.z);
+          hMesh.scale.set(bs.x, 1, 1);
+          updateCurve(hMesh, worldPos, currentDistortionFactor, headerY);
         }
       });
 
