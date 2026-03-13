@@ -243,13 +243,14 @@ const extractPoster = async (inputPath, outputPath) => {
     log.skip(`Poster ya existe: ${path.basename(outputPath)}`);
     return;
   }
-  // Extrae el frame en t=0.001 para evitar frame negro en algunos codecs
+  // JPEG es universal en ffmpeg; WebP puede fallar si no está compilado libwebp
   await runFfmpeg([
     "-y",
     "-ss", "0.001",
     "-i", inputPath,
     "-frames:v", "1",
     "-q:v", "2",
+    "-f", "image2",
     outputPath,
   ]);
 };
@@ -273,14 +274,14 @@ const processVideo = async (inputPath, baseName) => {
       }
     }
 
-    // Poster desde la versión mobile mp4 (más rápido de leer)
-    const posterPath = `${base}.poster.webp`;
+    // Poster desde la versión mobile mp4 (JPEG = compatible con cualquier ffmpeg)
+    const posterPath = `${base}.poster.jpg`;
     const sourceForPoster = `${base}.mobile.mp4`;
     if (fs.existsSync(sourceForPoster)) {
       await extractPoster(sourceForPoster, posterPath);
       if (fs.existsSync(posterPath)) {
         log.ok(`poster: ${getFileSize(posterPath)}`);
-        result.poster = `/motion/optimized/${baseName}.poster.webp`;
+        result.poster = `/motion/optimized/${baseName}.poster.jpg`;
       }
     }
   } catch (err) {
