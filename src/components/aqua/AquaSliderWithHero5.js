@@ -101,11 +101,11 @@ const IMAGE_NAMES = [
 ];
 
 const VIDEO_NAMES = [
-  "Allthatjazz cinematic©Feb26.mp4",
-  "ATJ About Cuaderno.mp4",
-  "ATJ_AboutMotion 02.mp4",
-  "Playground_Carhartt-WIP_24012026 (1)_1.mp4",
-  "Portfolio-Gallery-4-5.mp4",
+  "Allthatjazz cinematic©Feb26",
+  "ATJ About Cuaderno",
+  "ATJ_AboutMotion 02",
+  "Playground_Carhartt-WIP_24012026 (1)_1",
+  "Portfolio-Gallery-4-5",
 ];
 
 // ─── Component ─────────────────────────────────────────────────────────────

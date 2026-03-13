@@ -92,7 +92,7 @@ export default function Home() {
         {/* <HeroCarousel2 /> */}
         {/* <HeroCarousel_Responsive4 /> */}
         {/* <AquaSlider /> */}
-        <AquaSliderWithHero5 />
+        <AquaSliderWithHero5  />
         {/* <HeroCarousel /> */}
         {/* <Content4 /> */}
       </HeaderFooter8>
