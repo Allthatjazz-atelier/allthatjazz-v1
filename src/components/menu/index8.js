@@ -1,6 +1,7 @@
 "use client";
 import { useState, useEffect, useRef } from "react";
-import AboutSection5 from "../about/index5";
+import AboutSection6 from "../about/index6";
+import BerlinClock from "../tools/BerlinClock";
 
 export default function HeaderFooter8({ children }) {
   const [isAboutOpen, setIsAboutOpen] = useState(false);
@@ -59,32 +60,42 @@ export default function HeaderFooter8({ children }) {
   // --- RENDER
   return (
     <>
+    {/* Clock fijo arriba */}
+    <div className="fixed top-0 left-0 w-full flex justify-center pt-[16px] z-[9999] pointer-events-none">
+      <BerlinClock />
+    </div>
       {/* Contenedor fijo siempre visible */}
-      <div className="fixed bottom-0 left-0 w-full flex flex-col justify-center items-center pb-2 leading-[2.75rem] mix-blend-difference z-[9999] HeaderFooter select-none pointer-events-auto">
+      <div className="fixed bottom-0 left-0 w-full flex flex-col justify-center items-center pb-2 leading-[2.75rem] z-[9999] HeaderFooter select-none pointer-events-auto">
         {/* H1 Scramble y Footer */}
         <div className="flex" onClick={() => setIsAboutOpen(!isAboutOpen)}>
           <h1
             ref={h1Ref}
-            className="text-[4rem] tracking-[-0.04em] text-white select-none whitespace-nowrap cursor-pointer"
+            className="text-[4rem] tracking-[-0.04em] text-black select-none whitespace-nowrap cursor-pointer"
           >
             allthatjazz
           </h1>
         </div>
 
         {/* Tagline siempre visible */}
-          <p className="flex text-[1.35rem] text-white MyFont2 tracking-[-0.02em] pointer-none">
+          <p className="flex text-[1.35rem] text-black MyFont2 tracking-[-0.02em] pointer-none">
             Atelier de création graphique et digitale.
           </p>
           
       </div>
 
       {/* Contenido principal */}
-      <div className="w-full h-full bg-white text-black">{children}</div>
+      <div className="w-full h-full bg-white mix-blend-difference">{children}</div>
 
-      {/* About modal */}
+      {/* About modal - Figma: Background blur 45.2, Fill #FFFFFF 15% (blur reducido para acercarse al render de Figma) */}
       {isAboutOpen && (
-        <div className="fixed inset-0 z-[1000] bg-black text-white overflow-y-auto">
-          <AboutSection5 />
+        <div className="fixed inset-0 z-[1000] overflow-y-auto text-white mix-blend-difference"
+          style={{
+            backgroundColor: 'rgba(255, 255, 255, 0.15)',
+            backdropFilter: 'blur(20px)',
+            WebkitBackdropFilter: 'blur(20px)',
+          }}
+        >
+          <AboutSection6 />
         </div>
       )}
     </>
