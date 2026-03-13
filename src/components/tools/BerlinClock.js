@@ -11,6 +11,7 @@ export default function BerlinClock() {
         timeZone: "Europe/Berlin",
         hour: "2-digit",
         minute: "2-digit",
+        second: "2-digit",
         hour12: false,
       }).format(new Date());
 
@@ -24,7 +25,7 @@ export default function BerlinClock() {
   }, []);
 
   return (
-    <div className="flex items-center gap-1 text-[0.875rem] text-black">
+    <div className="flex items-center gap-1 text-[0.875rem] text-black tabular-nums">
       <span>Berlin, {time}</span>
       <img
         src="/avatar/✦.svg"

@@ -5,7 +5,7 @@ import * as THREE from "three";
 import gsap from "gsap";
 import { useOptimizedMedia } from "@/hooks/useOptimizedMedia";
 
-// ─── Desktop: AquaSlider shaders (bubble lens transition) ──────────────────
+// ─── AquaSlider shaders (bubble lens transition) — desktop y móvil ───────────
 const aquaVertexShader = `
   varying vec2 vUv;
   void main() {
@@ -63,33 +63,6 @@ const aquaFragmentShader = `
     vec4 newImg = texture2D(uTexture2, distortion.distortedUV);
     float finalMask = max(mask, 1.0 - distortion.inside);
     gl_FragColor = mix(newImg, currentImg, finalMask);
-  }
-`;
-
-// ─── Mobile: radial reveal crossfade (no lens distortion, no RenderTargets) ─
-const mobileCrossfadeFrag = `
-  uniform sampler2D uTexture1;
-  uniform sampler2D uTexture2;
-  uniform float uProgress;
-  uniform vec2 uTex1Size;
-  uniform vec2 uTex2Size;
-  uniform vec2 uPlaneSize;
-  varying vec2 vUv;
-
-  vec2 coverUV(vec2 uv, vec2 texSize) {
-    vec2 ratio = uPlaneSize / texSize;
-    float sc = max(ratio.x, ratio.y);
-    return (uv - 0.5) * (uPlaneSize / (texSize * sc)) + 0.5;
-  }
-
-  void main() {
-    vec2 uv1 = coverUV(vUv, uTex1Size);
-    vec2 uv2 = coverUV(vUv, uTex2Size);
-    vec4 t1 = texture2D(uTexture1, uv1);
-    vec4 t2 = texture2D(uTexture2, uv2);
-    float d = length(vUv - 0.5);
-    float reveal = smoothstep(d - 0.08, d + 0.08, uProgress * 0.7071);
-    gl_FragColor = mix(t1, t2, reveal);
   }
 `;
 
@@ -176,28 +149,17 @@ const AquaSliderWithHero5 = () => {
       distortionSmoothing:   0.075,
     };
 
-    // ── Aqua textures (shared: loaded for both paths) ─────────────────
+    // ── Aqua: bubble lens + RenderTarget (mismo efecto en desktop y móvil) ───
     const GROUP_COUNT   = resolvedGroups.length;
     const aquaTextures  = [];
     const aquaStates    = [];
+    const aquaCamera    = new THREE.OrthographicCamera(-1, 1, 1, -1, 0, 1);
+    const aquaScenes    = [];
+    const aquaMaterials = [];
+    const aquaTargets   = [];
 
-    // Desktop-only: RenderTarget pipeline
-    let aquaCamera, aquaScenes, aquaMaterials, aquaTargets;
-    if (!isMobile) {
-      aquaCamera    = new THREE.OrthographicCamera(-1, 1, 1, -1, 0, 1);
-      aquaScenes    = [];
-      aquaMaterials = [];
-      aquaTargets   = [];
-    }
-
-    // Mobile-only: lightweight crossfade materials (one per aqua group)
-    let mobileCrossfadeMats;
-    if (isMobile) {
-      mobileCrossfadeMats = [];
-    }
-
-    const offW = 512;
-    const offH = 640;
+    const offW = isMobile ? 384 : 512;
+    const offH = isMobile ? 432 : 640;
 
     for (let g = 0; g < GROUP_COUNT; g++) {
       const texArr = new Array(resolvedGroups[g].length).fill(null);
@@ -205,50 +167,31 @@ const AquaSliderWithHero5 = () => {
       aquaTextures.push(texArr);
       aquaStates.push({ currentIndex: 0, isTransitioning: false });
 
-      if (isMobile) {
-        // Crossfade ShaderMaterial: 2 texture reads + 1 smoothstep (vs bubble lens)
-        const cfMat = new THREE.ShaderMaterial({
-          uniforms: {
-            uTexture1:  { value: null },
-            uTexture2:  { value: null },
-            uProgress:  { value: 0 },
-            uTex1Size:  { value: new THREE.Vector2(1, 1) },
-            uTex2Size:  { value: new THREE.Vector2(1, 1) },
-            uPlaneSize: { value: new THREE.Vector2(slideWidth, slideHeight) },
-          },
-          vertexShader:   aquaVertexShader,
-          fragmentShader: mobileCrossfadeFrag,
-        });
-        mobileCrossfadeMats.push(cfMat);
-      } else {
-        // Desktop: full bubble lens + RenderTarget
-        const aqScene = new THREE.Scene();
-        const mat = new THREE.ShaderMaterial({
-          uniforms: {
-            uTexture1:     { value: null },
-            uTexture2:     { value: null },
-            uProgress:     { value: 0 },
-            uResolution:   { value: new THREE.Vector2(offW, offH) },
-            uTexture1Size: { value: new THREE.Vector2(1, 1) },
-            uTexture2Size: { value: new THREE.Vector2(1, 1) },
-          },
-          vertexShader:   aquaVertexShader,
-          fragmentShader: aquaFragmentShader,
-        });
-        aqScene.add(new THREE.Mesh(new THREE.PlaneGeometry(2, 2), mat));
+      const aqScene = new THREE.Scene();
+      const mat = new THREE.ShaderMaterial({
+        uniforms: {
+          uTexture1:     { value: null },
+          uTexture2:     { value: null },
+          uProgress:     { value: 0 },
+          uResolution:   { value: new THREE.Vector2(offW, offH) },
+          uTexture1Size: { value: new THREE.Vector2(1, 1) },
+          uTexture2Size: { value: new THREE.Vector2(1, 1) },
+        },
+        vertexShader:   aquaVertexShader,
+        fragmentShader: aquaFragmentShader,
+      });
+      aqScene.add(new THREE.Mesh(new THREE.PlaneGeometry(2, 2), mat));
 
-        const target = new THREE.WebGLRenderTarget(offW, offH, {
-          minFilter: THREE.LinearFilter,
-          magFilter: THREE.LinearFilter,
-        });
-        target.texture.colorSpace = THREE.SRGBColorSpace;
+      const target = new THREE.WebGLRenderTarget(offW, offH, {
+        minFilter: THREE.LinearFilter,
+        magFilter: THREE.LinearFilter,
+      });
+      target.texture.colorSpace = THREE.SRGBColorSpace;
 
-        aquaScenes.push(aqScene);
-        aquaMaterials.push(mat);
-        aquaTargets.push(target);
-      }
+      aquaScenes.push(aqScene);
+      aquaMaterials.push(mat);
+      aquaTargets.push(target);
 
-      // Load images — callback sets the right material per platform
       const loader = new THREE.TextureLoader();
       resolvedGroups[g].forEach((src, j) => {
         loader.load(src, (tex) => {
@@ -259,25 +202,17 @@ const AquaSliderWithHero5 = () => {
           if (++loaded === resolvedGroups[g].length) {
             const t0 = texArr[0];
             const t1 = texArr[1 % texArr.length];
-            if (isMobile) {
-              const m = mobileCrossfadeMats[g];
-              m.uniforms.uTexture1.value = t0;
-              m.uniforms.uTexture2.value = t1;
-              m.uniforms.uTex1Size.value = t0.userData.size;
-              m.uniforms.uTex2Size.value = t1.userData.size;
-            } else {
-              const m = aquaMaterials[g];
-              m.uniforms.uTexture1.value     = t0;
-              m.uniforms.uTexture2.value     = t1;
-              m.uniforms.uTexture1Size.value = t0.userData.size;
-              m.uniforms.uTexture2Size.value = t1.userData.size;
-            }
+            const m = aquaMaterials[g];
+            m.uniforms.uTexture1.value     = t0;
+            m.uniforms.uTexture2.value     = t1;
+            m.uniforms.uTexture1Size.value = t0.userData.size;
+            m.uniforms.uTexture2Size.value = t1.userData.size;
           }
         }, undefined, (err) => console.warn(`AquaSlider: couldn't load ${src}`, err));
       });
     }
 
-    // ── advanceAquaGroup (tap to cycle images) ────────────────────────
+    // ── advanceAquaGroup (tap/click para cambiar foto — mismo efecto en ambos) ─
     const advanceAquaGroup = (g) => {
       const state  = aquaStates[g];
       const texArr = aquaTextures[g];
@@ -285,39 +220,21 @@ const AquaSliderWithHero5 = () => {
       state.isTransitioning = true;
       const next = (state.currentIndex + 1) % texArr.length;
 
-      if (isMobile) {
-        const mat = mobileCrossfadeMats[g];
-        mat.uniforms.uTexture1.value = texArr[state.currentIndex];
-        mat.uniforms.uTexture2.value = texArr[next];
-        mat.uniforms.uTex1Size.value = texArr[state.currentIndex].userData.size;
-        mat.uniforms.uTex2Size.value = texArr[next].userData.size;
-        gsap.fromTo(mat.uniforms.uProgress, { value: 0 }, {
-          value: 1, duration: 1.5, ease: "power2.inOut",
-          onComplete: () => {
-            mat.uniforms.uTexture1.value = texArr[next];
-            mat.uniforms.uTex1Size.value = texArr[next].userData.size;
-            mat.uniforms.uProgress.value = 0;
-            state.currentIndex    = next;
-            state.isTransitioning = false;
-          },
-        });
-      } else {
-        const mat = aquaMaterials[g];
-        mat.uniforms.uTexture1.value     = texArr[state.currentIndex];
-        mat.uniforms.uTexture2.value     = texArr[next];
-        mat.uniforms.uTexture1Size.value = texArr[state.currentIndex].userData.size;
-        mat.uniforms.uTexture2Size.value = texArr[next].userData.size;
-        gsap.fromTo(mat.uniforms.uProgress, { value: 0 }, {
-          value: 1, duration: 2.5, ease: "power2.inOut",
-          onComplete: () => {
-            mat.uniforms.uProgress.value     = 0;
-            mat.uniforms.uTexture1.value     = texArr[next];
-            mat.uniforms.uTexture1Size.value = texArr[next].userData.size;
-            state.currentIndex    = next;
-            state.isTransitioning = false;
-          },
-        });
-      }
+      const mat = aquaMaterials[g];
+      mat.uniforms.uTexture1.value     = texArr[state.currentIndex];
+      mat.uniforms.uTexture2.value     = texArr[next];
+      mat.uniforms.uTexture1Size.value = texArr[state.currentIndex].userData.size;
+      mat.uniforms.uTexture2Size.value = texArr[next].userData.size;
+      gsap.fromTo(mat.uniforms.uProgress, { value: 0 }, {
+        value: 1, duration: 2.5, ease: "power2.inOut",
+        onComplete: () => {
+          mat.uniforms.uProgress.value     = 0;
+          mat.uniforms.uTexture1.value     = texArr[next];
+          mat.uniforms.uTexture1Size.value = texArr[next].userData.size;
+          state.currentIndex    = next;
+          state.isTransitioning = false;
+        },
+      });
     };
 
     // ── Video setup ───────────────────────────────────────────────────
@@ -361,15 +278,9 @@ const AquaSliderWithHero5 = () => {
     const slideUnit     = isVertical ? slideHeight + gap : slideWidth + gap;
     const totalSize     = slideCount * slideUnit;
 
-    // Mobile: 1×1 segments (flat cards), Desktop: 32×16 (for vertex distortion)
+    // Mobile: 1×1 segments (slider plano), Desktop: 32×16 (para vertex distortion)
     const wSegs = isMobile ? 1 : 32;
     const hSegs = isMobile ? 1 : 16;
-
-    // Cylinder carousel params (mobile only)
-    const cylinderRadius = slideHeight * 2.8;
-    const cylinderDepth  = 2.0;
-    const cylinderScale  = 0.10;
-    const cylinderTilt   = 0.10;
 
     const slides    = [];
     const raycaster = new THREE.Raycaster();
@@ -383,17 +294,8 @@ const AquaSliderWithHero5 = () => {
 
       const geo = new THREE.PlaneGeometry(slideWidth, slideHeight, wSegs, hSegs);
 
-      let mat;
-      if (isMobile) {
-        if (isAqua) {
-          mat = mobileCrossfadeMats[groupIndex];
-        } else {
-          mat = new THREE.MeshBasicMaterial({ map: videoTextures[videoIndex] });
-        }
-      } else {
-        const tex = isAqua ? aquaTargets[groupIndex].texture : videoTextures[videoIndex];
-        mat = new THREE.MeshBasicMaterial({ map: tex, side: THREE.DoubleSide });
-      }
+      const tex = isAqua ? aquaTargets[groupIndex].texture : videoTextures[videoIndex];
+      const mat = new THREE.MeshBasicMaterial({ map: tex, side: THREE.DoubleSide });
 
       const mesh = new THREE.Mesh(geo, mat);
       if (isVertical) mesh.position.y = i * slideUnit;
@@ -502,7 +404,7 @@ const AquaSliderWithHero5 = () => {
       const cur   = isVertical ? e.touches[0].clientY : e.touches[0].clientX;
       const delta = cur - touchLast;
       touchLast   = cur;
-      targetDistortionFactor = Math.min(1, targetDistortionFactor + Math.abs(delta) * 0.05);
+      if (!isMobile) targetDistortionFactor = Math.min(1, targetDistortionFactor + Math.abs(delta) * 0.05);
       targetPosition -= delta * settings.touchSensitivity;
       isScrolling     = true;
     };
@@ -515,9 +417,9 @@ const AquaSliderWithHero5 = () => {
       }
       const velocity = (touchLast - touchStart) * 0.005;
       if (Math.abs(velocity) > 0.5) {
-        autoScrollSpeed        = -velocity * settings.momentumMultiplier * 0.05;
-        targetDistortionFactor = Math.min(1, Math.abs(velocity) * 3 * settings.distortionSensitivity);
-        isScrolling            = true;
+        autoScrollSpeed = -velocity * settings.momentumMultiplier * 0.05;
+        if (!isMobile) targetDistortionFactor = Math.min(1, Math.abs(velocity) * 3 * settings.distortionSensitivity);
+        isScrolling    = true;
         setTimeout(() => { isScrolling = false; }, 800);
       }
     };
@@ -559,32 +461,33 @@ const AquaSliderWithHero5 = () => {
 
       currentPosition += (targetPosition - currentPosition) * settings.smoothing;
 
-      const currentVelocity = Math.abs(currentPosition - prevPos) / deltaTime;
-      velocityHistory.push(currentVelocity);
-      velocityHistory.shift();
-      const avgVelocity = velocityHistory.reduce((s, v) => s + v, 0) / velocityHistory.length;
-
-      if (avgVelocity > peakVelocity) peakVelocity = avgVelocity;
-      const isDecelerating = (avgVelocity / (peakVelocity + 0.001)) < 0.7 && peakVelocity > 0.5;
-      peakVelocity *= 0.99;
-
-      if (currentVelocity > 0.05)
-        targetDistortionFactor = Math.max(targetDistortionFactor, Math.min(1, currentVelocity * 0.1));
-      if (isDecelerating || avgVelocity < 0.2)
-        targetDistortionFactor *= isDecelerating ? settings.distortionDecay : settings.distortionDecay * 0.9;
-
-      currentDistortionFactor +=
-        (targetDistortionFactor - currentDistortionFactor) * settings.distortionSmoothing;
-
-      // ── Desktop only: render aqua RenderTargets ──────────────────────
+      // Distorsión solo en desktop
       if (!isMobile) {
-        aquaScenes.forEach((aqScene, g) => {
-          if (!aquaMaterials[g].uniforms.uTexture1.value) return;
-          renderer.setRenderTarget(aquaTargets[g]);
-          renderer.render(aqScene, aquaCamera);
-        });
-        renderer.setRenderTarget(null);
+        const currentVelocity = Math.abs(currentPosition - prevPos) / deltaTime;
+        velocityHistory.push(currentVelocity);
+        velocityHistory.shift();
+        const avgVelocity = velocityHistory.reduce((s, v) => s + v, 0) / velocityHistory.length;
+
+        if (avgVelocity > peakVelocity) peakVelocity = avgVelocity;
+        const isDecelerating = (avgVelocity / (peakVelocity + 0.001)) < 0.7 && peakVelocity > 0.5;
+        peakVelocity *= 0.99;
+
+        if (currentVelocity > 0.05)
+          targetDistortionFactor = Math.max(targetDistortionFactor, Math.min(1, currentVelocity * 0.1));
+        if (isDecelerating || avgVelocity < 0.2)
+          targetDistortionFactor *= isDecelerating ? settings.distortionDecay : settings.distortionDecay * 0.9;
+
+        currentDistortionFactor +=
+          (targetDistortionFactor - currentDistortionFactor) * settings.distortionSmoothing;
       }
+
+      // ── Render aqua bubble lens a RenderTargets (desktop y móvil) ─────
+      aquaScenes.forEach((aqScene, g) => {
+        if (!aquaMaterials[g].uniforms.uTexture1.value) return;
+        renderer.setRenderTarget(aquaTargets[g]);
+        renderer.render(aqScene, aquaCamera);
+      });
+      renderer.setRenderTarget(null);
 
       // ── Update slide positions ───────────────────────────────────────
       slides.forEach((slide, i) => {
@@ -606,21 +509,12 @@ const AquaSliderWithHero5 = () => {
         const worldPos = isVertical ? slide.position.y : slide.position.x;
 
         if (isMobile) {
-          // ── Cylinder carousel: depth + scale + tilt (zero shader cost) ──
-          const dist = Math.abs(worldPos);
-          const t    = Math.min(dist / cylinderRadius, 1.0);
-          const ease = t * t;
+          // ── Móvil: slider plano, sin distorsión ─────────────────────────
+          slide.position.z = 0;
+          slide.scale.set(1, 1, 1);
+          slide.rotation.x = 0;
 
-          const targetZ = -0.2 - ease * cylinderDepth;
-          slide.position.z += (targetZ - slide.position.z) * 0.15;
-
-          const s = 1.0 - ease * cylinderScale;
-          slide.scale.set(s, s, 1);
-
-          const targetRotX = (worldPos / cylinderRadius) * cylinderTilt;
-          slide.rotation.x += (targetRotX - slide.rotation.x) * 0.15;
-
-          // Only play the nearest 1-2 videos
+          // Solo reproducir videos cercanos al centro
           if (!slide.userData.isAqua) {
             const vid     = videos[slide.userData.videoIndex];
             const inRange = Math.abs(basePos) <= slideUnit * 1.5;
@@ -654,18 +548,14 @@ const AquaSliderWithHero5 = () => {
       window.removeEventListener("resize",     handleResize);
       document.removeEventListener("visibilitychange", handleVisibility);
 
-      if (isMobile) {
-        mobileCrossfadeMats.forEach((m) => m.dispose());
-      } else {
-        aquaMaterials.forEach((m) => m.dispose());
-        aquaTargets.forEach((t) => t.dispose());
-        aquaScenes.forEach((s) => s.children.forEach((c) => c.geometry?.dispose()));
-      }
+      aquaMaterials.forEach((m) => m.dispose());
+      aquaTargets.forEach((t) => t.dispose());
+      aquaScenes.forEach((s) => s.children.forEach((c) => c.geometry?.dispose()));
       aquaTextures.forEach((group) => group.forEach((t) => t?.dispose()));
 
       slides.forEach((s) => {
         s.geometry.dispose();
-        if (!isMobile || !s.userData.isAqua) s.material.dispose();
+        s.material.dispose();
       });
       videos.forEach((v) => { v.pause(); v.src = ""; v.load(); });
       videoTextures.forEach((t) => t.dispose());
