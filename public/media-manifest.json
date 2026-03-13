@@ -1,69 +1,126 @@
 {
-  "videos": [
+  "videos": [],
+  "images": [
     {
-      "original": "/motion/ATJ About Cuaderno.mp4",
-      "mobile_mp4": "/motion/optimized/ATJ About Cuaderno.mobile.mp4",
-      "mobile_webm": "/motion/optimized/ATJ About Cuaderno.mobile.webm",
-      "desktop_mp4": "/motion/optimized/ATJ About Cuaderno.desktop.mp4",
-      "desktop_webm": "/motion/optimized/ATJ About Cuaderno.desktop.webm",
-      "poster": "/motion/optimized/ATJ About Cuaderno.poster.jpg",
-      "name": "ATJ About Cuaderno"
+      "original": "/story/story1.png",
+      "mobile_webp": "/story/optimized/story1.mobile.webp",
+      "mobile_jpg": "/story/optimized/story1.mobile.jpg",
+      "desktop_webp": "/story/optimized/story1.desktop.webp",
+      "desktop_jpg": "/story/optimized/story1.desktop.jpg",
+      "name": "story1"
     },
     {
-      "original": "/motion/ATJ_AboutMotion 02.mp4",
-      "mobile_mp4": "/motion/optimized/ATJ_AboutMotion 02.mobile.mp4",
-      "mobile_webm": "/motion/optimized/ATJ_AboutMotion 02.mobile.webm",
-      "desktop_mp4": "/motion/optimized/ATJ_AboutMotion 02.desktop.mp4",
-      "desktop_webm": "/motion/optimized/ATJ_AboutMotion 02.desktop.webm",
-      "poster": "/motion/optimized/ATJ_AboutMotion 02.poster.jpg",
-      "name": "ATJ_AboutMotion 02"
+      "original": "/story/story10.png",
+      "mobile_webp": "/story/optimized/story10.mobile.webp",
+      "mobile_jpg": "/story/optimized/story10.mobile.jpg",
+      "desktop_webp": "/story/optimized/story10.desktop.webp",
+      "desktop_jpg": "/story/optimized/story10.desktop.jpg",
+      "name": "story10"
     },
     {
-      "original": "/motion/Allthatjazz cinematic©Feb26.mp4",
-      "mobile_mp4": "/motion/optimized/Allthatjazz cinematic©Feb26.mobile.mp4",
-      "mobile_webm": "/motion/optimized/Allthatjazz cinematic©Feb26.mobile.webm",
-      "desktop_mp4": "/motion/optimized/Allthatjazz cinematic©Feb26.desktop.mp4",
-      "desktop_webm": "/motion/optimized/Allthatjazz cinematic©Feb26.desktop.webm",
-      "poster": "/motion/optimized/Allthatjazz cinematic©Feb26.poster.jpg",
-      "name": "Allthatjazz cinematic©Feb26"
+      "original": "/story/story11.png",
+      "mobile_webp": "/story/optimized/story11.mobile.webp",
+      "mobile_jpg": "/story/optimized/story11.mobile.jpg",
+      "desktop_webp": "/story/optimized/story11.desktop.webp",
+      "desktop_jpg": "/story/optimized/story11.desktop.jpg",
+      "name": "story11"
     },
     {
-      "original": "/motion/Playground_Carhartt-WIP_24012026 (1)_1.mp4",
-      "mobile_mp4": "/motion/optimized/Playground_Carhartt-WIP_24012026 (1)_1.mobile.mp4",
-      "mobile_webm": "/motion/optimized/Playground_Carhartt-WIP_24012026 (1)_1.mobile.webm",
-      "desktop_mp4": "/motion/optimized/Playground_Carhartt-WIP_24012026 (1)_1.desktop.mp4",
-      "desktop_webm": "/motion/optimized/Playground_Carhartt-WIP_24012026 (1)_1.desktop.webm",
-      "poster": "/motion/optimized/Playground_Carhartt-WIP_24012026 (1)_1.poster.jpg",
-      "name": "Playground_Carhartt-WIP_24012026 (1)_1"
+      "original": "/story/story12.png",
+      "mobile_webp": "/story/optimized/story12.mobile.webp",
+      "mobile_jpg": "/story/optimized/story12.mobile.jpg",
+      "desktop_webp": "/story/optimized/story12.desktop.webp",
+      "desktop_jpg": "/story/optimized/story12.desktop.jpg",
+      "name": "story12"
     },
     {
-      "original": "/motion/Portfolio-Gallery-4-5.mp4",
-      "mobile_mp4": "/motion/optimized/Portfolio-Gallery-4-5.mobile.mp4",
-      "mobile_webm": "/motion/optimized/Portfolio-Gallery-4-5.mobile.webm",
-      "desktop_mp4": "/motion/optimized/Portfolio-Gallery-4-5.desktop.mp4",
-      "desktop_webm": "/motion/optimized/Portfolio-Gallery-4-5.desktop.webm",
-      "poster": "/motion/optimized/Portfolio-Gallery-4-5.poster.jpg",
-      "name": "Portfolio-Gallery-4-5"
+      "original": "/story/story13.png",
+      "mobile_webp": "/story/optimized/story13.mobile.webp",
+      "mobile_jpg": "/story/optimized/story13.mobile.jpg",
+      "desktop_webp": "/story/optimized/story13.desktop.webp",
+      "desktop_jpg": "/story/optimized/story13.desktop.jpg",
+      "name": "story13"
     },
     {
-      "original": "/motion/motionatj.mp4",
-      "mobile_mp4": "/motion/optimized/motionatj.mobile.mp4",
-      "mobile_webm": "/motion/optimized/motionatj.mobile.webm",
-      "desktop_mp4": "/motion/optimized/motionatj.desktop.mp4",
-      "desktop_webm": "/motion/optimized/motionatj.desktop.webm",
-      "poster": "/motion/optimized/motionatj.poster.jpg",
-      "name": "motionatj"
+      "original": "/story/story14.png",
+      "mobile_webp": "/story/optimized/story14.mobile.webp",
+      "mobile_jpg": "/story/optimized/story14.mobile.jpg",
+      "desktop_webp": "/story/optimized/story14.desktop.webp",
+      "desktop_jpg": "/story/optimized/story14.desktop.jpg",
+      "name": "story14"
     },
     {
-      "original": "/motion/promojohnny.mp4",
-      "mobile_mp4": "/motion/optimized/promojohnny.mobile.mp4",
-      "mobile_webm": "/motion/optimized/promojohnny.mobile.webm",
-      "desktop_mp4": "/motion/optimized/promojohnny.desktop.mp4",
-      "desktop_webm": "/motion/optimized/promojohnny.desktop.webm",
-      "poster": "/motion/optimized/promojohnny.poster.jpg",
-      "name": "promojohnny"
+      "original": "/story/story15.png",
+      "mobile_webp": "/story/optimized/story15.mobile.webp",
+      "mobile_jpg": "/story/optimized/story15.mobile.jpg",
+      "desktop_webp": "/story/optimized/story15.desktop.webp",
+      "desktop_jpg": "/story/optimized/story15.desktop.jpg",
+      "name": "story15"
+    },
+    {
+      "original": "/story/story2.png",
+      "mobile_webp": "/story/optimized/story2.mobile.webp",
+      "mobile_jpg": "/story/optimized/story2.mobile.jpg",
+      "desktop_webp": "/story/optimized/story2.desktop.webp",
+      "desktop_jpg": "/story/optimized/story2.desktop.jpg",
+      "name": "story2"
+    },
+    {
+      "original": "/story/story3.png",
+      "mobile_webp": "/story/optimized/story3.mobile.webp",
+      "mobile_jpg": "/story/optimized/story3.mobile.jpg",
+      "desktop_webp": "/story/optimized/story3.desktop.webp",
+      "desktop_jpg": "/story/optimized/story3.desktop.jpg",
+      "name": "story3"
+    },
+    {
+      "original": "/story/story4.png",
+      "mobile_webp": "/story/optimized/story4.mobile.webp",
+      "mobile_jpg": "/story/optimized/story4.mobile.jpg",
+      "desktop_webp": "/story/optimized/story4.desktop.webp",
+      "desktop_jpg": "/story/optimized/story4.desktop.jpg",
+      "name": "story4"
+    },
+    {
+      "original": "/story/story5.png",
+      "mobile_webp": "/story/optimized/story5.mobile.webp",
+      "mobile_jpg": "/story/optimized/story5.mobile.jpg",
+      "desktop_webp": "/story/optimized/story5.desktop.webp",
+      "desktop_jpg": "/story/optimized/story5.desktop.jpg",
+      "name": "story5"
+    },
+    {
+      "original": "/story/story6.png",
+      "mobile_webp": "/story/optimized/story6.mobile.webp",
+      "mobile_jpg": "/story/optimized/story6.mobile.jpg",
+      "desktop_webp": "/story/optimized/story6.desktop.webp",
+      "desktop_jpg": "/story/optimized/story6.desktop.jpg",
+      "name": "story6"
+    },
+    {
+      "original": "/story/story7.png",
+      "mobile_webp": "/story/optimized/story7.mobile.webp",
+      "mobile_jpg": "/story/optimized/story7.mobile.jpg",
+      "desktop_webp": "/story/optimized/story7.desktop.webp",
+      "desktop_jpg": "/story/optimized/story7.desktop.jpg",
+      "name": "story7"
+    },
+    {
+      "original": "/story/story8.png",
+      "mobile_webp": "/story/optimized/story8.mobile.webp",
+      "mobile_jpg": "/story/optimized/story8.mobile.jpg",
+      "desktop_webp": "/story/optimized/story8.desktop.webp",
+      "desktop_jpg": "/story/optimized/story8.desktop.jpg",
+      "name": "story8"
+    },
+    {
+      "original": "/story/story9.png",
+      "mobile_webp": "/story/optimized/story9.mobile.webp",
+      "mobile_jpg": "/story/optimized/story9.mobile.jpg",
+      "desktop_webp": "/story/optimized/story9.desktop.webp",
+      "desktop_jpg": "/story/optimized/story9.desktop.jpg",
+      "name": "story9"
     }
   ],
-  "images": [],
-  "generatedAt": "2026-03-13T11:37:33.509Z"
+  "generatedAt": "2026-03-13T21:01:44.031Z"
 }

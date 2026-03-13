@@ -85,11 +85,11 @@ const headerFrag = `
 
 // ─── Data ──────────────────────────────────────────────────────────────────────
 const IMAGE_NAMES = [
-  ["story1.png",  "story2.png",  "story3.png"],
-  ["story4.png",  "story5.png",  "story6.png"],
-  ["story7.png",  "story8.png",  "story9.png"],
-  ["story10.png", "story11.png", "story12.png"],
-  ["story13.png", "story14.png", "story15.png"],
+  ["story1",  "story2",  "story3"],
+  ["story4",  "story5",  "story6"],
+  ["story7",  "story8",  "story9"],
+  ["story10", "story11", "story12"],
+  ["story13", "story14", "story15"],
 ];
 const VIDEO_NAMES = [
   "Allthatjazz cinematic©Feb26",
