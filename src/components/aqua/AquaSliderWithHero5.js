@@ -236,9 +236,10 @@ const AquaSliderWithHero5 = () => {
       });
     };
 
-    // ── Video setup: ambos usan VideoTexture; móvil solo reproduce el centrado ─
+    // ── Video setup ───────────────────────────────────────────────────
     const videos        = [];
     const videoTextures = [];
+    const videoSrcs     = []; // para recargar en móvil
 
     const pickVideoSrc = (sources) => {
       if (!sources?.length) return null;
@@ -249,8 +250,9 @@ const AquaSliderWithHero5 = () => {
 
     resolvedVideos.forEach(({ sources }) => {
       const src = pickVideoSrc(sources);
+      videoSrcs.push(src);
       const video = document.createElement("video");
-      if (src) video.src = encodeURI(src);
+      if (src && !isMobile) video.src = encodeURI(src);
       video.muted       = true;
       video.loop        = true;
       video.playsInline = true;
@@ -268,6 +270,26 @@ const AquaSliderWithHero5 = () => {
       videos.push(video);
       videoTextures.push(tex);
     });
+
+
+    // Móvil: posters iniciales (se muestran hasta que el video cargue)
+    const placeholderCanvas = document.createElement("canvas");
+    placeholderCanvas.width = 64;
+    placeholderCanvas.height = 64;
+    const phCtx = placeholderCanvas.getContext("2d");
+    phCtx.fillStyle = "#1a1a1a";
+    phCtx.fillRect(0, 0, 64, 64);
+    const placeholderTex = new THREE.CanvasTexture(placeholderCanvas);
+    placeholderTex.colorSpace = THREE.SRGBColorSpace;
+
+    let posterTextures = null;
+    let videoLoaded   = null;
+    let videoLoading  = null;
+    if (isMobile) {
+      posterTextures = resolvedVideos.map(() => placeholderTex.clone());
+      videoLoaded   = videoSrcs.map(() => false);
+      videoLoading  = videoSrcs.map(() => false);
+    }
 
     // ── Carousel layout ───────────────────────────────────────────────
     const VIDEO_COUNT   = VIDEO_NAMES.length;
@@ -293,7 +315,9 @@ const AquaSliderWithHero5 = () => {
 
       const geo = new THREE.PlaneGeometry(slideWidth, slideHeight, wSegs, hSegs);
 
-      const tex = isAqua ? aquaTargets[groupIndex].texture : videoTextures[videoIndex];
+      const tex = isAqua
+        ? aquaTargets[groupIndex].texture
+        : (isMobile ? posterTextures[videoIndex] : videoTextures[videoIndex]);
       const mat = new THREE.MeshBasicMaterial({ map: tex, side: THREE.DoubleSide });
 
       const mesh = new THREE.Mesh(geo, mat);
@@ -304,6 +328,7 @@ const AquaSliderWithHero5 = () => {
         originalVertices: !isMobile ? [...geo.attributes.position.array] : null,
         index: i, uid, isAqua, groupIndex, videoIndex,
         targetPos: 0, currentPos: 0,
+        showingPoster: isMobile && !isAqua,
       };
 
       scene.add(mesh);
@@ -320,6 +345,25 @@ const AquaSliderWithHero5 = () => {
         s.userData.targetPos = s.userData.currentPos = s.position.x;
       }
     });
+
+    // Móvil: cargar posters reales (reemplazan placeholder)
+    if (isMobile) {
+      resolvedVideos.forEach(({ poster }, vi) => {
+        if (poster) {
+          new THREE.TextureLoader().load(encodeURI(poster), (tex) => {
+            tex.colorSpace = THREE.SRGBColorSpace;
+            tex.minFilter = tex.magFilter = THREE.LinearFilter;
+            const old = posterTextures[vi];
+            posterTextures[vi] = tex;
+            if (old) old.dispose();
+            slides.forEach((s) => {
+              if (!s.userData.isAqua && s.userData.videoIndex === vi && s.userData.showingPoster)
+                s.material.map = tex;
+            });
+          });
+        }
+      });
+    }
 
     // ── Desktop CPU distortion ────────────────────────────────────────
     const updateCurveDesktop = (mesh, worldPosition, distortionFactor) => {
@@ -489,6 +533,21 @@ const AquaSliderWithHero5 = () => {
       renderer.setRenderTarget(null);
 
       // ── Update slide positions ───────────────────────────────────────
+      // Móvil: precalcular si algún slide de cada video está en rango (evita descargar si el otro copy está visible)
+      const videoAnyInRange = isMobile ? videoSrcs.map(() => false) : null;
+      if (isMobile) {
+        slides.forEach((slide) => {
+          if (slide.userData.isAqua) return;
+          const i = slide.userData.index;
+          let basePos = i * slideUnit - currentPosition;
+          basePos = ((basePos % totalSize) + totalSize) % totalSize;
+          if (basePos > totalSize / 2) basePos -= totalSize;
+          const dist = Math.abs(basePos);
+          if (dist <= slideUnit * 1.5)
+            videoAnyInRange[slide.userData.videoIndex] = true;
+        });
+      }
+
       slides.forEach((slide, i) => {
         let basePos = i * slideUnit - currentPosition;
         basePos = ((basePos % totalSize) + totalSize) % totalSize;
@@ -508,16 +567,63 @@ const AquaSliderWithHero5 = () => {
         const worldPos = isVertical ? slide.position.y : slide.position.x;
 
         if (isMobile) {
-          // ── Móvil: slider plano; solo reproduce el video centrado ─────────────
           slide.position.z = 0;
           slide.scale.set(1, 1, 1);
           slide.rotation.x = 0;
 
           if (!slide.userData.isAqua) {
-            const vid     = videos[slide.userData.videoIndex];
-            const inRange = Math.abs(basePos) <= slideUnit * 1.5;
-            if (inRange  && vid.paused)  vid.play().catch(() => {});
-            if (!inRange && !vid.paused) vid.pause();
+            const vi      = slide.userData.videoIndex;
+            const vid     = videos[vi];
+            const dist    = Math.abs(basePos);
+            const inRange = dist <= slideUnit * 1.5;
+            const far     = dist > slideUnit * 2.5;
+            const anyInRange = videoAnyInRange[vi];
+
+            if (far && videoLoaded[vi] && !anyInRange) {
+              vid.pause();
+              vid.src = "";
+              vid.load();
+              videoLoaded[vi] = false;
+              slides.forEach((s) => {
+                if (!s.userData.isAqua && s.userData.videoIndex === vi) {
+                  s.material.map = posterTextures[vi];
+                  s.userData.showingPoster = true;
+                }
+              });
+            } else if (inRange) {
+              if (!videoLoaded[vi] && !videoLoading[vi]) {
+                const src = videoSrcs[vi];
+                if (src) {
+                  videoLoading[vi] = true;
+                  vid.src = encodeURI(src);
+                  vid.load();
+                  const onCanPlay = () => {
+                    vid.removeEventListener("canplay", onCanPlay);
+                    vid.removeEventListener("error", onError);
+                    videoLoaded[vi] = true;
+                    videoLoading[vi] = false;
+                    slides.forEach((s) => {
+                      if (!s.userData.isAqua && s.userData.videoIndex === vi) {
+                        s.material.map = videoTextures[vi];
+                        s.userData.showingPoster = false;
+                      }
+                    });
+                    vid.play().catch(() => {});
+                  };
+                  const onError = () => {
+                    vid.removeEventListener("canplay", onCanPlay);
+                    vid.removeEventListener("error", onError);
+                    videoLoading[vi] = false;
+                  };
+                  vid.addEventListener("canplay", onCanPlay);
+                  vid.addEventListener("error", onError);
+                }
+              } else if (videoLoaded[vi] && vid.paused) {
+                vid.play().catch(() => {});
+              }
+            } else if (!inRange && videoLoaded[vi] && !far) {
+              if (!vid.paused) vid.pause();
+            }
           }
         } else {
           // ── Desktop: CPU vertex distortion ──────────────────────────────
@@ -551,6 +657,7 @@ const AquaSliderWithHero5 = () => {
       aquaScenes.forEach((s) => s.children.forEach((c) => c.geometry?.dispose()));
       videos.forEach((v) => { v.pause(); v.src = ""; v.load(); });
       aquaTextures.forEach((group) => group.forEach((t) => t?.dispose()));
+      if (posterTextures) posterTextures.forEach((t) => t?.dispose?.());
 
       slides.forEach((s) => {
         s.geometry.dispose();
