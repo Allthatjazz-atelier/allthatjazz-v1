@@ -112,12 +112,12 @@ const IMAGE_NAMES = [
   ["story13.png", "story14.png", "story15.png"],
 ];
 
-const VIDEO_SRCS = [
-  "/motion/Allthatjazz cinematic©Feb26.mp4",
-  "/motion/ATJ About Cuaderno.mp4",
-  "/motion/ATJ_AboutMotion 02.mp4",
-  "/motion/Playground_Carhartt-WIP_24012026 (1)_1.mp4",
-  "/motion/Portfolio-Gallery-4-5.mp4",
+const VIDEO_NAMES = [
+  "Allthatjazz cinematic©Feb26.mp4",
+  "ATJ About Cuaderno.mp4",
+  "ATJ_AboutMotion 02.mp4",
+  "Playground_Carhartt-WIP_24012026 (1)_1.mp4",
+  "Portfolio-Gallery-4-5.mp4",
 ];
 
 // ─── Component ─────────────────────────────────────────────────────────────────
@@ -125,7 +125,7 @@ const AquaSliderWithHero5 = () => {
   const canvasRef = useRef(null);
   const [isMobile, setIsMobile] = useState(false);
 
-  const { getImage, isLoaded } = useOptimizedMedia();
+  const { getImage, getVideo, isLoaded } = useOptimizedMedia();
 
   const resolvedGroups = useMemo(() => {
     if (!isLoaded) return null;
@@ -133,6 +133,11 @@ const AquaSliderWithHero5 = () => {
       group.map((name) => getImage(name).src)
     );
   }, [isLoaded, getImage]);
+
+  const resolvedVideos = useMemo(() => {
+    if (!isLoaded) return null;
+    return VIDEO_NAMES.map((name) => getVideo(name));
+  }, [isLoaded, getVideo]);
 
   useEffect(() => {
     const check = () => setIsMobile(window.innerWidth <= 768);
@@ -142,7 +147,7 @@ const AquaSliderWithHero5 = () => {
   }, []);
 
   useEffect(() => {
-    if (!resolvedGroups) return;
+    if (!resolvedGroups || !resolvedVideos) return;
 
     const canvas = canvasRef.current;
 
@@ -172,11 +177,11 @@ const AquaSliderWithHero5 = () => {
     const gap         = isMobile ? 0.2 : 0.05;
     const isVertical  = isMobile;
 
-    // RenderTarget resolution matches slide aspect ratio exactly
-    //   desktop: 2 / 2.5 = 0.8  → 512 × 640
-    //   mobile:  4 / 4.5 ≈ 0.889 → 512 × 576
-    const offW = 512;
-    const offH = isMobile ? 576 : 640;
+    // RenderTarget resolution: móvil más baja para aligerar GPU
+    //   desktop: 512 × 640
+    //   mobile:  384 × 432 (≈44% menos píxeles)
+    const offW = isMobile ? 384 : 512;
+    const offH = isMobile ? 432 : 640;
 
     const settings = {
       wheelSensitivity:      0.01,
@@ -185,8 +190,9 @@ const AquaSliderWithHero5 = () => {
       smoothing:             0.1,
       slideLerp:             0.075,
       distortionDecay:       0.95,
-      maxDistortion:         isMobile ? 1.6 : 2.5,
-      distortionSensitivity: 0.15,
+      // Móvil: distorsión muy reducida para evitar lag (shaders + videos)
+      maxDistortion:         isMobile ? 0.45 : 2.5,
+      distortionSensitivity: isMobile ? 0.08 : 0.15,
       distortionSmoothing:   0.075,
     };
 
@@ -270,13 +276,21 @@ const AquaSliderWithHero5 = () => {
       });
     };
 
-    // ── Video setup ───────────────────────────────────────────────────
+    // ── Video setup (usa useOptimizedMedia: mobile=720p WebM/MP4, desktop=1080p) ─
     const videos        = [];
     const videoTextures = [];
 
-    VIDEO_SRCS.forEach((src) => {
+    const pickVideoSrc = (sources) => {
+      if (!sources?.length) return null;
+      const v = document.createElement("video");
+      const picked = sources.find((s) => v.canPlayType(s.type) !== "") || sources[0];
+      return picked?.src || null;
+    };
+
+    resolvedVideos.forEach(({ sources }) => {
+      const src = pickVideoSrc(sources);
       const video = document.createElement("video");
-      video.src         = encodeURI(src);
+      if (src) video.src = encodeURI(src);
       video.muted       = true;
       video.loop        = true;
       video.playsInline = true;
@@ -289,14 +303,14 @@ const AquaSliderWithHero5 = () => {
       tex.magFilter       = THREE.LinearFilter;
       tex.generateMipmaps = false;
 
-      if (!isMobile) video.play().catch(() => {});
+      if (!isMobile && src) video.play().catch(() => {});
 
       videos.push(video);
       videoTextures.push(tex);
     });
 
     // ── Carousel layout: 5 aqua groups + 5 videos → 20 virtual slots ──
-    const VIDEO_COUNT   = VIDEO_SRCS.length;         // 5
+    const VIDEO_COUNT   = VIDEO_NAMES.length;       // 5
     const UNIQUE_COUNT  = GROUP_COUNT + VIDEO_COUNT;  // 10
     const REPEAT        = 2;
     const slideCount    = UNIQUE_COUNT * REPEAT;      // 20
@@ -304,8 +318,9 @@ const AquaSliderWithHero5 = () => {
     const totalSize     = slideCount * slideUnit;
     const mobileActiveRange = slideUnit * 2.5;
 
-    const wSegs = isMobile ? 24 : 32;
-    const hSegs = isMobile ? 12 : 16;
+    // Móvil: menos segmentos = menos vértices = shader más rápido
+    const wSegs = isMobile ? 12 : 32;
+    const hSegs = isMobile ? 6 : 16;
 
     const slides    = [];
     const raycaster = new THREE.Raycaster();
@@ -604,7 +619,7 @@ const AquaSliderWithHero5 = () => {
       videoTextures.forEach((t) => t.dispose());
       renderer.dispose();
     };
-  }, [isMobile, resolvedGroups]);
+  }, [isMobile, resolvedGroups, resolvedVideos]);
 
   return (
     <canvas
