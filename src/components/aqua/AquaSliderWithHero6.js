@@ -168,7 +168,7 @@ const AquaSliderWithHero6 = () => {
       padRight:  16,
 
       // Estilo de texto
-      fontSize:  28,          // px del canvas — más alto = más nítido en retina
+      fontSize:  20,          // px del canvas — más alto = más nítido en retina
       color:     "#111111",
       font:      '600 {SIZE}px -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
       letterSpacingRatio: -0.045, // −4.5%

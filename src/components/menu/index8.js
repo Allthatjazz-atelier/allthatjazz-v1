@@ -77,7 +77,7 @@ export default function HeaderFooter8({ children }) {
         </div>
 
         {/* Tagline siempre visible */}
-          <p className="flex text-[1.35rem] text-black MyFont2 tracking-[-0.02em] pointer-none">
+          <p className="flex text-[1.35rem] text-black MyFont2 tracking-[-0.05em] pointer-none">
             Atelier de création graphique et digitale.
           </p>
           
