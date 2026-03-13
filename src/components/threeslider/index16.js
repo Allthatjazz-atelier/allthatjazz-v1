@@ -514,7 +514,11 @@ const HeroCarousel_Responsive5 = () => {
       const isIdle = Math.abs(currentPosition - targetPosition) < 0.001 
         && currentDistortionFactor < 0.01;
 
-        if (isIdle && !isScrolling) return; // no renderizar si nada ha cambiado
+        if (isIdle && !isScrolling) {
+          setTimeout(() => requestAnimationFrame(animate), 120);
+          renderer.render(scene, camera);
+          return;
+        }
         
       renderer.render(scene, camera);
     };
