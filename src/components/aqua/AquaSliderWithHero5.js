@@ -66,6 +66,28 @@ const aquaFragmentShader = `
   }
 `;
 
+// ─── Video: corrección de rango limitado (16-235) → full range (evita colores apagados) ─
+const videoVert = `
+  varying vec2 vUv;
+  void main() {
+    vUv = uv;
+    gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
+  }
+`;
+const videoFrag = `
+  uniform sampler2D uMap;
+  uniform float uExpandRange;
+  varying vec2 vUv;
+  void main() {
+    vec4 c = texture2D(uMap, vUv);
+    if (uExpandRange > 0.0) {
+      c.rgb = (c.rgb - 0.062745) / 0.858824;
+      c = clamp(c, 0.0, 1.0);
+    }
+    gl_FragColor = c;
+  }
+`;
+
 // ─── Data ──────────────────────────────────────────────────────────────────
 const IMAGE_NAMES = [
   ["story1.png",  "story2.png",  "story3.png"],
@@ -315,10 +337,25 @@ const AquaSliderWithHero5 = () => {
 
       const geo = new THREE.PlaneGeometry(slideWidth, slideHeight, wSegs, hSegs);
 
-      const tex = isAqua
-        ? aquaTargets[groupIndex].texture
-        : (isMobile ? posterTextures[videoIndex] : videoTextures[videoIndex]);
-      const mat = new THREE.MeshBasicMaterial({ map: tex, side: THREE.DoubleSide });
+      let mat;
+      if (isAqua) {
+        mat = new THREE.MeshBasicMaterial({
+          map: aquaTargets[groupIndex].texture,
+          side: THREE.DoubleSide,
+        });
+      } else {
+        const tex = isMobile ? posterTextures[videoIndex] : videoTextures[videoIndex];
+        const isPoster = isMobile;
+        mat = new THREE.ShaderMaterial({
+          uniforms: {
+            uMap:         { value: tex },
+            uExpandRange: { value: isPoster ? 0 : 1 },
+          },
+          vertexShader:   videoVert,
+          fragmentShader: videoFrag,
+          side: THREE.DoubleSide,
+        });
+      }
 
       const mesh = new THREE.Mesh(geo, mat);
       if (isVertical) mesh.position.y = i * slideUnit;
@@ -358,7 +395,7 @@ const AquaSliderWithHero5 = () => {
             if (old) old.dispose();
             slides.forEach((s) => {
               if (!s.userData.isAqua && s.userData.videoIndex === vi && s.userData.showingPoster)
-                s.material.map = tex;
+                s.material.uniforms.uMap.value = tex;
             });
           });
         }
@@ -586,7 +623,8 @@ const AquaSliderWithHero5 = () => {
               videoLoaded[vi] = false;
               slides.forEach((s) => {
                 if (!s.userData.isAqua && s.userData.videoIndex === vi) {
-                  s.material.map = posterTextures[vi];
+                  s.material.uniforms.uMap.value = posterTextures[vi];
+                  s.material.uniforms.uExpandRange.value = 0;
                   s.userData.showingPoster = true;
                 }
               });
@@ -604,7 +642,8 @@ const AquaSliderWithHero5 = () => {
                     videoLoading[vi] = false;
                     slides.forEach((s) => {
                       if (!s.userData.isAqua && s.userData.videoIndex === vi) {
-                        s.material.map = videoTextures[vi];
+                        s.material.uniforms.uMap.value = videoTextures[vi];
+                        s.material.uniforms.uExpandRange.value = 1;
                         s.userData.showingPoster = false;
                       }
                     });
