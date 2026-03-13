@@ -15,8 +15,8 @@ const aquaFrag = `
   uniform float uProgress;
   uniform vec2 uResolution, uTexture1Size, uTexture2Size;
   varying vec2 vUv;
-  vec2 coverUV(vec2 uv, vec2 ts) {
-    vec2 s = uResolution / ts; float sc = max(s.x,s.y);
+  vec2 containUV(vec2 uv, vec2 ts) {
+    vec2 s = uResolution / ts; float sc = min(s.x,s.y);
     return (uv * uResolution - (uResolution - ts*sc)*0.5) / (ts*sc);
   }
   struct LD { vec2 uv; float inside; };
@@ -30,8 +30,8 @@ const aquaFrag = `
     vec2 p=vUv*uResolution, c=uResolution*0.5;
     float r=uProgress*length(uResolution)*1.5;
     float mask=step(r, length(c-p));
-    LD d=lens(p,coverUV(vUv,uTexture2Size),c,r);
-    gl_FragColor=mix(texture2D(uTexture2,d.uv), texture2D(uTexture1,coverUV(vUv,uTexture1Size)), max(mask,1.0-d.inside));
+    LD d=lens(p,containUV(vUv,uTexture2Size),c,r);
+    gl_FragColor=mix(texture2D(uTexture2,d.uv), texture2D(uTexture1,containUV(vUv,uTexture1Size)), max(mask,1.0-d.inside));
   }
 `;
 
@@ -45,13 +45,17 @@ const slideFrag = `
   uniform float uExpandRange, uRadius, uAspect;
   varying vec2 vUv;
   void main() {
-    vec2 p = (vUv-0.5); p.x *= uAspect;
-    vec2 q = abs(p) - vec2(uAspect*0.5, 0.5) + uRadius;
-    float a = smoothstep(0.006,-0.006, length(max(q,0.0))-uRadius);
-    if (a < 0.01) discard;
     vec4 c = texture2D(uMap, vUv);
     if (uExpandRange > 0.5) { c.rgb=(c.rgb-0.062745)/0.858824; c=clamp(c,0.0,1.0); }
-    gl_FragColor = vec4(c.rgb, a);
+    if (uRadius < 0.001) {
+      gl_FragColor = c;
+    } else {
+      vec2 p = (vUv-0.5); p.x *= uAspect;
+      vec2 q = abs(p) - vec2(uAspect*0.5, 0.5) + uRadius;
+      float a = smoothstep(0.006,-0.006, length(max(q,0.0))-uRadius);
+      if (a < 0.01) discard;
+      gl_FragColor = vec4(c.rgb, a);
+    }
   }
 `;
 
@@ -136,10 +140,9 @@ const AquaSliderWithHero6 = () => {
     camera.position.z = isMobile ? 9.5 : 5;
     const aquaCamera = new THREE.OrthographicCamera(-1, 1, 1, -1, 0, 1);
 
-    // ── Dimensions ────────────────────────────────────────────────────
-    // Móvil: slides más compactos para dejar espacio al header encima (scroll vertical)
-    const slideWidth  = isMobile ? 3.5 : 2.0;
-    const slideHeight = isMobile ? 3.9 : 2.5;
+    // ── Dimensions (igual que HeroCarousel_Responsive4) ─────────────────
+    const slideWidth  = isMobile ? 4.0 : 2.0;
+    const slideHeight = isMobile ? 4.5 : 2.5;
     const slideAspect = slideWidth / slideHeight;
     const isVertical  = isMobile;
 
@@ -178,7 +181,7 @@ const AquaSliderWithHero6 = () => {
     // Canvas del header (alta resolución para que sea nítido en retina)
     const HDR_W = 512, HDR_H = 64;
 
-    const BORDER_RADIUS = 0.04; // radio de esquinas del slide (UV space)
+    const BORDER_RADIUS = 0; // sin border radius en los slides
 
     const settings = {
       wheelSensitivity: 0.01, touchSensitivity: 0.01, momentumMultiplier: 2,
@@ -196,9 +199,10 @@ const AquaSliderWithHero6 = () => {
       const texArr = new Array(resolvedGroups[g].length).fill(null);
       let loaded = 0;
       aquaTextures.push(texArr);
-      aquaStates.push({ currentIndex: 0, isTransitioning: false });
+      aquaStates.push({ currentIndex: 0, isTransitioning: false, baseScale: { x: 1, y: 1 } });
 
       const aqScene = new THREE.Scene();
+      aqScene.background = new THREE.Color(0xffffff);
       const mat = new THREE.ShaderMaterial({
         uniforms: {
           uTexture1: { value: null }, uTexture2: { value: null }, uProgress: { value: 0 },
@@ -227,6 +231,14 @@ const AquaSliderWithHero6 = () => {
             m.uniforms.uTexture1.value = texArr[0]; m.uniforms.uTexture2.value = texArr[1 % texArr.length];
             m.uniforms.uTexture1Size.value = texArr[0].userData.size;
             m.uniforms.uTexture2Size.value = texArr[1 % texArr.length].userData.size;
+            const ts = texArr[0].userData.size;
+            const mediaAspect = ts.x / ts.y;
+            const slideAspect = slideWidth / slideHeight;
+            if (mediaAspect > slideAspect) {
+              aquaStates[g].baseScale = { x: 1, y: slideAspect / mediaAspect };
+            } else {
+              aquaStates[g].baseScale = { x: mediaAspect / slideAspect, y: 1 };
+            }
           }
         }, undefined, (e) => console.warn(src, e));
       });
@@ -302,6 +314,14 @@ const AquaSliderWithHero6 = () => {
           m.uniforms.uTexture1Size.value = texArr[next].userData.size;
           state.currentIndex    = next;
           state.isTransitioning = false;
+          const ts = texArr[next].userData.size;
+          const mediaAspect = ts.x / ts.y;
+          const slideAspect = slideWidth / slideHeight;
+          if (mediaAspect > slideAspect) {
+            state.baseScale = { x: 1, y: slideAspect / mediaAspect };
+          } else {
+            state.baseScale = { x: mediaAspect / slideAspect, y: 1 };
+          }
         },
       });
     };
@@ -313,7 +333,9 @@ const AquaSliderWithHero6 = () => {
       const v = document.createElement("video");
       return (sources.find((s) => v.canPlayType(s.type) !== "") || sources[0])?.src || null;
     };
-    resolvedVideos.forEach(({ sources }) => {
+    const videoBaseScale = VIDEO_NAMES.map(() => ({ x: 1, y: 1 }));
+    const videoMetaListeners = [];
+    resolvedVideos.forEach(({ sources }, vi) => {
       const src = pickSrc(sources); videoSrcs.push(src);
       const vid = document.createElement("video");
       if (src && !isMobile) vid.src = encodeURI(src);
@@ -322,13 +344,24 @@ const AquaSliderWithHero6 = () => {
       const tex = new THREE.VideoTexture(vid);
       tex.colorSpace = THREE.SRGBColorSpace; tex.minFilter = tex.magFilter = THREE.LinearFilter;
       tex.generateMipmaps = false;
+      const onMeta = () => {
+        const mediaAspect = vid.videoWidth / vid.videoHeight;
+        const slideAspect = slideWidth / slideHeight;
+        if (mediaAspect > slideAspect) {
+          videoBaseScale[vi] = { x: 1, y: slideAspect / mediaAspect };
+        } else {
+          videoBaseScale[vi] = { x: mediaAspect / slideAspect, y: 1 };
+        }
+      };
+      vid.addEventListener("loadedmetadata", onMeta);
+      videoMetaListeners.push({ vid, onMeta });
       if (!isMobile && src) vid.play().catch(() => {});
       videos.push(vid); videoTextures.push(tex);
     });
 
     // Móvil: placeholder oscuro mientras carga el vídeo
     const phC = document.createElement("canvas"); phC.width = phC.height = 64;
-    const phCtx = phC.getContext("2d"); phCtx.fillStyle = "#1a1a1a"; phCtx.fillRect(0, 0, 64, 64);
+    const phCtx = phC.getContext("2d"); phCtx.fillStyle = "#ffffff"; phCtx.fillRect(0, 0, 64, 64);
     const placeholderTex = new THREE.CanvasTexture(phC);
     placeholderTex.colorSpace = THREE.SRGBColorSpace;
 
@@ -411,13 +444,20 @@ const AquaSliderWithHero6 = () => {
         isVertical ? s.position.y : s.position.x;
     });
 
-    // Móvil: cargar posters reales
+    // Móvil: cargar posters reales y aplicar aspect
     if (isMobile) {
       resolvedVideos.forEach(({ poster }, vi) => {
         if (!poster) return;
         new THREE.TextureLoader().load(encodeURI(poster), (tex) => {
           tex.colorSpace = THREE.SRGBColorSpace; tex.minFilter = tex.magFilter = THREE.LinearFilter;
           const old = posterTextures[vi]; posterTextures[vi] = tex; if (old) old.dispose();
+          const mediaAspect = tex.image.width / tex.image.height;
+          const slideAspect = slideWidth / slideHeight;
+          if (mediaAspect > slideAspect) {
+            videoBaseScale[vi] = { x: 1, y: slideAspect / mediaAspect };
+          } else {
+            videoBaseScale[vi] = { x: mediaAspect / slideAspect, y: 1 };
+          }
           slides.forEach((s) => {
             if (!s.userData.isAqua && s.userData.videoIndex === vi && s.userData.showingPoster)
               s.material.uniforms.uMap.value = tex;
@@ -590,7 +630,10 @@ const AquaSliderWithHero6 = () => {
         const hMesh    = headerMeshes[i];
 
         if (isMobile) {
-          slide.position.z = 0; slide.scale.set(1, 1, 1); slide.rotation.x = 0;
+          slide.position.z = 0;
+          const bs = slide.userData.isAqua ? aquaStates[slide.userData.groupIndex].baseScale : videoBaseScale[slide.userData.videoIndex];
+          slide.scale.set(bs.x, bs.y, 1);
+          slide.rotation.x = 0;
           // Header: plano, directamente encima del slide
           hMesh.position.x = slide.position.x;
           hMesh.position.y = slide.userData.currentPos + HEADER_Y_OFFSET;
@@ -633,7 +676,8 @@ const AquaSliderWithHero6 = () => {
         } else {
           // Desktop: z-push + CPU vertex distortion
           slide.position.z += (-0.8 - slide.position.z) * 0.1;
-          slide.scale.set(1, 1, 1);
+          const bs = slide.userData.isAqua ? aquaStates[slide.userData.groupIndex].baseScale : videoBaseScale[slide.userData.videoIndex];
+          slide.scale.set(bs.x, bs.y, 1);
           updateCurve(slide, worldPos, currentDistortionFactor, 0);
 
           // Header: misma X y Z que el slide, fijo en Y = HEADER_Y_OFFSET sobre el eje del carrusel
@@ -672,6 +716,7 @@ const AquaSliderWithHero6 = () => {
       headerTextures.forEach((t) => t.dispose());
       slides.forEach((s)       => { s.geometry.dispose(); s.material.dispose(); });
       headerMeshes.forEach((h) => { h.geometry.dispose(); h.material.dispose(); });
+      videoMetaListeners.forEach(({ vid, onMeta }) => vid.removeEventListener("loadedmetadata", onMeta));
       videos.forEach((v) => { v.pause(); v.src = ""; v.load(); });
       videoTextures.forEach((t) => t.dispose());
       if (posterTextures) posterTextures.forEach((t) => t?.dispose?.());
