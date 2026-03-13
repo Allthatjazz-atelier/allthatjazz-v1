@@ -4,6 +4,7 @@ import TrailWrapper from "@/components/animatedcursor/wrapper";
 import AquaSlider from "@/components/aqua/AquaSlider";
 import AquaSliderWithHero from "@/components/aqua/AquaSliderWithHero";
 import AquaSliderWithHero2 from "@/components/aqua/AquaSliderWithHero2";
+import AquaSliderWithHero3 from "@/components/aqua/AquaSliderWithHero3";
 import Content from "@/components/content";
 import Content2 from "@/components/content/index2";
 import Content3 from "@/components/content/index3";
@@ -89,7 +90,7 @@ export default function Home() {
         {/* <HeroCarousel2 /> */}
         {/* <HeroCarousel_Responsive4 /> */}
         {/* <AquaSlider /> */}
-        <AquaSliderWithHero2 />
+        <AquaSliderWithHero3 />
         {/* <HeroCarousel /> */}
         {/* <Content4 /> */}
       </HeaderFooter8>
