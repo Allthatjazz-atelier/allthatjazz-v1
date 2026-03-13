@@ -91,7 +91,7 @@ export default function Home() {
         {/* <HeroCarousel2 /> */}
         {/* <HeroCarousel_Responsive4 /> */}
         {/* <AquaSlider /> */}
-        <AquaSliderWithHero4 />
+        <AquaSliderWithHero2 />
         {/* <HeroCarousel /> */}
         {/* <Content4 /> */}
       </HeaderFooter8>
