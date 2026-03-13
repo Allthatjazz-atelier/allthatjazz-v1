@@ -6,6 +6,7 @@ import HeroCarousel2_4 from "@/components/threeslider/index11";
 import WebGlCarousel from "@/components/webglslider";
 import AquaSliderWithHero5 from "@/components/aqua/AquaSliderWithHero5";
 import AquaSliderWithHero6 from "@/components/aqua/AquaSliderWithHero6";
+import HeroCarousel_Responsive5 from "@/components/threeslider/index16";
 
 export default function Tests() {
 
@@ -16,7 +17,7 @@ export default function Tests() {
         {/* <HeroCarousel2_3 /> */}
         {/* <HeroCarousel2_4 /> */}
         {/* <WebGlCarousel /> */}
-        <AquaSliderWithHero6 />
+        <HeroCarousel_Responsive5/>
       </HeaderFooter8>
     </div>
   );
