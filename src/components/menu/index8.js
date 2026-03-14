@@ -88,15 +88,24 @@ export default function HeaderFooter8({ children }) {
 
       {/* About modal - Figma: Background blur 45.2, Fill #FFFFFF 15% (blur reducido para acercarse al render de Figma) */}
       {isAboutOpen && (
-        <div className="fixed inset-0 z-[1000] overflow-y-auto text-white mix-blend-difference"
-          style={{
-            backgroundColor: 'rgba(255, 255, 255, 0.15)',
-            backdropFilter: 'blur(20px)',
-            WebkitBackdropFilter: 'blur(20px)',
-          }}
-        >
-          <AboutSection6 />
-        </div>
+        <>
+          {/* Capa 1: solo blur, zero blend */}
+          <div
+            className="fixed inset-0 z-[1000]"
+            style={{
+              backgroundColor: 'rgba(255, 255, 255, 0.15)',
+              backdropFilter: 'blur(20px)',
+              WebkitBackdropFilter: 'blur(20px)',
+              transform: 'translateZ(0)',           // fuerza GPU compositing en Safari
+              WebkitTransform: 'translateZ(0)',
+            }}
+          />
+
+          {/* Capa 2: contenido + mix-blend, zero backdrop-filter */}
+          <div className="fixed inset-0 z-[1001] overflow-y-auto text-white mix-blend-difference">
+            <AboutSection6 />
+          </div>
+        </>
       )}
     </>
   );

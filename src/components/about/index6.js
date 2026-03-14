@@ -3,17 +3,8 @@ import gsap from 'gsap';
 
 export default function AboutSection6() {
   const imageRef = useRef(null);
-  const containerRef = useRef(null);
   const [isDesktop, setIsDesktop] = useState(false);
 
-  const projects = [
-    { name: 'Divorce from New York/High praise Records', image: '/hero/img3.png' },
-    { name: 'Johnny Carretes', image: '/hero/img12.png' },
-    { name: 'Vilarnau', image: '/hero/img10.png' },
-    { name: 'MM Discos', image: '/hero/img15.png' },
-    { name: 'Playground Goodies', image: '/hero/img16.png' },
-    { name: 'Bisous Bisous', image: '/hero/img19.png' }
-  ];
 
   useEffect(() => {
     // Detectar si es desktop (768px = breakpoint md de Tailwind)
@@ -40,64 +31,6 @@ export default function AboutSection6() {
     };
   }, [isDesktop]);
 
-  const handleMouseEnter = (imageSrc, target) => {
-    if (!isDesktop || !imageRef.current) return;
-
-    // hover del p → mover un poco a la derecha
-    gsap.to(target, {
-      x: 8,
-      duration: 0.25,
-      ease: "power2.out"
-    });
-
-    // mostrar imagen
-    gsap.killTweensOf(imageRef.current);
-    imageRef.current.src = imageSrc;
-
-    gsap.to(imageRef.current, {
-      scale: 1,
-      opacity: 1,
-      visibility: "visible",
-      duration: 0.4,
-      ease: "power2.out"
-    });
-  };
-
-  const handleMouseLeaveP = (target) => {
-    if (!isDesktop) return;
-
-    gsap.to(target, {
-      x: 0,
-      duration: 0.25,
-      ease: "power2.in"
-    });
-  };
-
-  const handleMouseMove = (e) => {
-    if (!isDesktop || !imageRef.current) return;
-
-    gsap.to(imageRef.current, {
-      x: e.clientX,
-      y: e.clientY,
-      duration: 0.25,
-      ease: "power2.out"
-    });
-  };
-
-  const handleMouseLeave = () => {
-    if (!isDesktop || !imageRef.current) return;
-
-    gsap.killTweensOf(imageRef.current);
-    gsap.to(imageRef.current, {
-      scale: 0.8,
-      opacity: 0,
-      duration: 0.3,
-      ease: "power2.in",
-      onComplete: () => {
-        gsap.set(imageRef.current, { visibility: "hidden" });
-      }
-    });
-  };
 
   return (
     <div className="relative w-full h-screen gap-12 flex flex-col text-[0.875rem] md:text-[0.875rem] tracking-[-0.04em] items-center justify-start pt-[16vh] md:pt-0 md:justify-center px-4 leading-none text-center">
