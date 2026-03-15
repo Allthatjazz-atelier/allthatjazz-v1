@@ -2,7 +2,6 @@
 import { useState, useEffect, useRef, useCallback } from "react";
 import * as THREE from "three";
 import gsap from "gsap";
-import AboutSection6 from "../about/index6";
 import BerlinClock from "../tools/BerlinClock";
 import AboutSection7 from "../about/index7";
 
@@ -77,6 +76,7 @@ const fragmentShader = `
   }
 `;
 
+// ── Captura la página sharp ───────────────────────────────────────────────────
 function capturePageTexture() {
   const aquaCanvas = document.querySelector("[data-aqua-canvas='true']");
   if (!aquaCanvas) return null;
@@ -98,6 +98,55 @@ function capturePageTexture() {
   return tex;
 }
 
+// ── Captura la página con blur aplicado en canvas — aproxima el backdropFilter
+//    Esto es tex2 en el opening: la burbuja revela una versión blureada
+//    de la página con lens distortion, igual que el closing revela la página sharp
+function captureBlurredPageTexture() {
+  const aquaCanvas = document.querySelector("[data-aqua-canvas='true']");
+  if (!aquaCanvas) return null;
+  const w = window.innerWidth, h = window.innerHeight;
+
+  // Canvas intermedio sin blur para el fallback check
+  const src = document.createElement("canvas");
+  src.width = w; src.height = h;
+  const sCtx = src.getContext("2d");
+  sCtx.drawImage(aquaCanvas, 0, 0, w, h);
+  const px = sCtx.getImageData(w >> 1, h >> 1, 1, 1).data;
+
+  const off = document.createElement("canvas");
+  off.width = w; off.height = h;
+  const ctx = off.getContext("2d");
+
+  if (px[0] === 0 && px[1] === 0 && px[2] === 0) {
+    // Fallback: gradiente oscuro blureado
+    const tmp = document.createElement("canvas");
+    tmp.width = w; tmp.height = h;
+    const tCtx = tmp.getContext("2d");
+    const g = tCtx.createRadialGradient(w/2, h/2, 0, w/2, h/2, w * 0.7);
+    g.addColorStop(0, "#2a2a3a");
+    g.addColorStop(1, "#0d0d15");
+    tCtx.fillStyle = g; tCtx.fillRect(0, 0, w, h);
+    ctx.filter = "blur(20px)";
+    ctx.drawImage(tmp, 0, 0, w, h);
+  } else {
+    // Página real blureada — mismo valor que el backdropFilter CSS (20px)
+    ctx.filter = "blur(20px)";
+    ctx.drawImage(aquaCanvas, 0, 0, w, h);
+  }
+
+  ctx.filter = "none";
+
+  // Overlay blanco semitransparente — aproxima el rgba(255,255,255,0.15) del modal
+  ctx.fillStyle = "rgba(255, 255, 255, 0.15)";
+  ctx.fillRect(0, 0, w, h);
+
+  const tex = new THREE.CanvasTexture(off);
+  tex.minFilter = tex.magFilter = THREE.LinearFilter;
+  tex.userData  = { size: new THREE.Vector2(w, h) };
+  return tex;
+}
+
+// ── tex transparente — para el closing (fuera de la burbuja = CSS blur visible)
 function createTransparentTexture() {
   const w = window.innerWidth, h = window.innerHeight;
   const data = new Uint8Array([0, 0, 0, 0]);
@@ -107,13 +156,14 @@ function createTransparentTexture() {
   return tex;
 }
 
-export default function HeaderFooter9({ children }) {
+// ── Componente ────────────────────────────────────────────────────────────────
+export default function HeaderFooter8({ children }) {
   const [modalState, setModalState] = useState("closed");
 
   const h1Ref        = useRef(null);
   const canvasRef    = useRef(null);
   const blurLayerRef = useRef(null);
-  const contentRef   = useRef(null);   // mismo clip-path que blurLayer en opening
+  const contentRef   = useRef(null);
   const materialRef  = useRef(null);
   const loopIdRef    = useRef(null);
   const animRef      = useRef(false);
@@ -196,38 +246,75 @@ export default function HeaderFooter9({ children }) {
     const maxR = Math.sqrt(window.innerWidth ** 2 + window.innerHeight ** 2);
 
     // ── OPENING ───────────────────────────────────────────────────────────────
-    // Blur layer + content wrapper comparten el mismo clip-path creciente.
-    // El texto ya está montado desde el principio del opening,
-    // su animación de blur-to-sharp empieza inmediatamente en AboutSection6.
+    // El contenido (z-1004) va ENCIMA del canvas (z-1003).
+    // Su clip-path crece en sync con la burbuja del shader.
+    // El shader pinta la transición de la página debajo.
+    // El texto aparece desde el primer frame dentro de la burbuja, blureado,
+    // y se va despejando — la burbuja del shader ES el about abriéndose.
     if (modalState === "opening") {
-      if (animRef.current) return;
+      if (animRef.current || !mat) return;
       animRef.current = true;
 
-      const clipStart = "circle(0px at 50% 50%)";
+      const tex1 = capturePageTexture();
+      const tex2 = captureBlurredPageTexture();
+      if (!tex1 || !tex2) { setModalState("open"); animRef.current = false; return; }
 
+      // Blur CSS invisible — al terminar tomará el relevo sin corte
       if (blurLayerRef.current) {
         blurLayerRef.current.style.transition = "none";
-        blurLayerRef.current.style.opacity    = "1";
-        blurLayerRef.current.style.clipPath   = clipStart;
-      }
-      if (contentRef.current) {
-        contentRef.current.style.clipPath = clipStart;
+        blurLayerRef.current.style.opacity    = "0";
+        blurLayerRef.current.style.clipPath   = "none";
       }
 
+      // Contenido encima del canvas — clip-path empieza en 0, crece con la burbuja
+      if (contentRef.current) {
+        contentRef.current.style.zIndex   = "1004";
+        contentRef.current.style.opacity  = "1";
+        contentRef.current.style.clipPath = "circle(0px at 50% 50%)";
+        // Texto pre-blureado desde frame 0
+        const reveals = contentRef.current.querySelectorAll('[data-reveal]');
+        gsap.set(reveals, { filter: 'blur(14px)' });
+        // Blur se despeja durante toda la transición
+        gsap.to(reveals, {
+          filter:   'blur(0px)',
+          duration: 2.2,
+          ease:     'power2.out',
+          stagger:  0.18,
+          delay:    0.1,
+        });
+      }
+
+      mat.uniforms.uTexture1.value     = tex1;
+      mat.uniforms.uTexture2.value     = tex2;
+      mat.uniforms.uTexture1Size.value = tex1.userData.size;
+      mat.uniforms.uTexture2Size.value = tex2.userData.size;
+      mat.uniforms.uProgress.value     = 0;
+
       const prog = { v: 0 };
+
       gsap.to(prog, {
         v: 1,
-        duration: 1.6,
+        duration: 2.5,
         ease: "power2.inOut",
         onUpdate() {
-          const clip = `circle(${prog.v * maxR * 1.06}px at 50% 50%)`;
-          if (blurLayerRef.current) blurLayerRef.current.style.clipPath = clip;
-          // content sigue el mismo clip-path — el texto crece con el círculo
-          if (contentRef.current)   contentRef.current.style.clipPath   = clip;
+          mat.uniforms.uProgress.value = prog.v;
+          // clip-path del contenido sincronizado con la burbuja del shader
+          const r = prog.v * maxR * 1.06;
+          if (contentRef.current)
+            contentRef.current.style.clipPath = `circle(${r}px at 50% 50%)`;
         },
         onComplete() {
-          if (blurLayerRef.current) blurLayerRef.current.style.clipPath = "none";
-          if (contentRef.current)   contentRef.current.style.clipPath   = "none";
+          mat.uniforms.uProgress.value = 0;
+          tex1.dispose(); tex2.dispose();
+          // CSS blur toma el relevo, contenido vuelve a z normal
+          if (blurLayerRef.current) {
+            blurLayerRef.current.style.opacity  = "1";
+            blurLayerRef.current.style.clipPath = "none";
+          }
+          if (contentRef.current) {
+            contentRef.current.style.zIndex   = "1001";
+            contentRef.current.style.clipPath = "none";
+          }
           animRef.current = false;
           setModalState("open");
         },
@@ -235,6 +322,9 @@ export default function HeaderFooter9({ children }) {
     }
 
     // ── CLOSING ───────────────────────────────────────────────────────────────
+    // tex1 = transparente  (fuera de burbuja → CSS blur visible debajo)
+    // tex2 = página sharp  (dentro de burbuja → se revela con lens distortion)
+    // blur + contenido se contraen juntos con la burbuja
     if (modalState === "closing") {
       if (animRef.current || !mat) return;
       animRef.current = true;
@@ -243,11 +333,7 @@ export default function HeaderFooter9({ children }) {
       const tex2 = capturePageTexture();
       if (!tex2) { setModalState("closed"); animRef.current = false; return; }
 
-      // Sin fade — el texto permanece visible y es "engullido" por la burbuja
-      // El content sigue el mismo clip-path inverso que el blur
-      if (contentRef.current) {
-        contentRef.current.style.clipPath = "none"; // empieza cubriendo todo
-      }
+      if (contentRef.current) contentRef.current.style.clipPath = "none";
       if (blurLayerRef.current) {
         blurLayerRef.current.style.transition = "none";
         blurLayerRef.current.style.opacity    = "1";
@@ -267,8 +353,6 @@ export default function HeaderFooter9({ children }) {
         ease: "power2.inOut",
         onUpdate() {
           mat.uniforms.uProgress.value = prog.v;
-          // blur y contenido se contraen juntos — el texto queda dentro
-          // del círculo que se encoge y es engullido por la burbuja
           const r = `circle(${Math.max(0, (1 - prog.v) * maxR * 1.06)}px at 50% 50%)`;
           if (blurLayerRef.current) blurLayerRef.current.style.clipPath = r;
           if (contentRef.current)   contentRef.current.style.clipPath   = r;
@@ -288,10 +372,8 @@ export default function HeaderFooter9({ children }) {
   }, [modalState]);
 
   const isVisible   = modalState !== "closed";
-  // ← contenido montado desde "opening" para que el texto empiece su animación
-  // al mismo tiempo que el clip-path
   const showContent = modalState === "opening" || modalState === "open" || modalState === "closing";
-  const isClosing   = modalState === "closing";
+  const isTransitioning = modalState === "opening" || modalState === "closing";
 
   return (
     <>
@@ -315,13 +397,14 @@ export default function HeaderFooter9({ children }) {
 
       <div className="w-full h-full">{children}</div>
 
+      {/* Canvas activo en ambas transiciones */}
       <canvas
         ref={canvasRef}
         className="fixed inset-0 pointer-events-none"
         style={{
           display: "block", width: "100%", height: "100%",
-          zIndex:  isClosing ? 1003 : -1,
-          opacity: isClosing ? 1    : 0,
+          zIndex:  isTransitioning ? 1003 : -1,
+          opacity: isTransitioning ? 1    : 0,
         }}
       />
 
@@ -334,7 +417,8 @@ export default function HeaderFooter9({ children }) {
               backgroundColor:      "rgba(255, 255, 255, 0.15)",
               backdropFilter:       "blur(20px)",
               WebkitBackdropFilter: "blur(20px)",
-              clipPath:             "circle(0px at 50% 50%)",
+              clipPath:             "none",
+              opacity:              0,
               transform:            "translateZ(0)",
               WebkitTransform:      "translateZ(0)",
             }}
@@ -344,10 +428,10 @@ export default function HeaderFooter9({ children }) {
             <div
               ref={contentRef}
               className="fixed inset-0 z-[1001] overflow-y-auto text-white mix-blend-difference"
-              style={{ clipPath: "circle(0px at 50% 50%)" }}
+              style={{ clipPath: "none" }}
               onClick={handleClose}
             >
-              <AboutSection7 />
+              <AboutSection7 skipReveal />
             </div>
           )}
         </>
