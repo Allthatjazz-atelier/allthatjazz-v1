@@ -4,6 +4,8 @@ import * as THREE from "three";
 import gsap from "gsap";
 import BerlinClock from "../tools/BerlinClock";
 import AboutSection7 from "../about/index7";
+import BerlinClock3 from "../tools/BerlinClock3";
+import BerlinClock2 from "../tools/BerlinClock2";
 
 const vertexShader = `
   varying vec2 vUv;
@@ -157,7 +159,7 @@ function createTransparentTexture() {
 }
 
 // ── Componente ────────────────────────────────────────────────────────────────
-export default function HeaderFooter8({ children }) {
+export default function HeaderFooter10({ children }) {
   const [modalState, setModalState] = useState("closed");
 
   const h1Ref        = useRef(null);
@@ -378,7 +380,7 @@ export default function HeaderFooter8({ children }) {
   return (
     <>
       <div className="fixed top-0 left-0 w-full flex justify-center pt-[16px] z-[9999] pointer-events-none">
-        <BerlinClock />
+        <BerlinClock2 />
       </div>
 
       <div className="fixed bottom-0 left-0 w-full flex flex-col justify-center items-center pb-2 leading-[2.75rem] z-[9999] HeaderFooter select-none pointer-events-auto">
@@ -395,7 +397,7 @@ export default function HeaderFooter8({ children }) {
         </p>
       </div>
 
-      <div className="w-full h-full">{children}</div>
+      <div id="main-content" className="w-full h-full">{children}</div>
 
       {/* Canvas activo en ambas transiciones */}
       <canvas

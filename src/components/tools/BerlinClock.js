@@ -25,12 +25,13 @@ export default function BerlinClock() {
   }, []);
 
   return (
-    <div className="flex items-center gap-1 text-[0.875rem] text-black tabular-nums">
+    <div className="flex items-center gap-1 text-[0.875rem] text-black">
       <span>Berlin, {time}</span>
       <img
         src="/avatar/✦.svg"
         alt="avatar"
-        className="w-[14px] h-[14px]"
+        className="w-[14px] h-[14px] pointer-events-auto transition-transform duration-700 ease-in-out hover:rotate-[360deg]"
+        style={{ transformOrigin: "center" }}
       />
     </div>
   );
