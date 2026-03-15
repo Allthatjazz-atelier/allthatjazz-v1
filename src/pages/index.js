@@ -23,6 +23,7 @@ import HeaderFooter5 from "@/components/menu/index5";
 import HeaderFooter6 from "@/components/menu/index6";
 import HeaderFooter7 from "@/components/menu/index7";
 import HeaderFooter8 from "@/components/menu/index8";
+import HeaderFooter9 from "@/components/menu/index9";
 import RoundedAnimatedSlider from "@/components/roundedanimatedslider";
 import RoundedAnimatedSlider2 from "@/components/roundedanimatedslider/index2";
 import RoundedAnimatedSlider3 from "@/components/roundedanimatedslider/index3";
@@ -75,7 +76,7 @@ export default function Home() {
 
   return (
     <div className="h-full w-full overflow-hidden">
-      <HeaderFooter8>
+      <HeaderFooter9>
         {/* <RoundedAnimatedSlider2 images={images} /> */}
         {/* <AnimatedCursor /> */}
         {/* <TrailWrapper /> */}
@@ -96,7 +97,7 @@ export default function Home() {
         <AquaSliderWithHero6  />
         {/* <HeroCarousel /> */}
         {/* <Content4 /> */}
-      </HeaderFooter8>
+      </HeaderFooter9>
     </div>
   );
 }

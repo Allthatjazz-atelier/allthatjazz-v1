@@ -135,7 +135,7 @@ const AquaSliderWithHero6 = () => {
     // ── Renderer ──────────────────────────────────────────────────────
     const renderer = new THREE.WebGLRenderer({
       canvas, antialias: !isMobile,
-      preserveDrawingBuffer: false,
+      preserveDrawingBuffer: true,
       powerPreference: isMobile ? "default" : "high-performance",
       failIfMajorPerformanceCaveat: false,
     });
@@ -729,6 +729,7 @@ const AquaSliderWithHero6 = () => {
     <canvas
       ref={canvasRef}
       style={{ position: "fixed", top: 0, left: 0, width: "100vw", height: "100vh", cursor: "pointer" }}
+      data-aqua-canvas="true" 
     />
   );
 };
