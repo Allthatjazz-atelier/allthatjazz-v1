@@ -185,7 +185,7 @@ const AquaSliderWithHero6 = () => {
     const BORDER_RADIUS = 0; // sin border radius en los slides
 
     const settings = {
-      wheelSensitivity: 0.01, touchSensitivity: 0.024, momentumMultiplier: 4.5,
+      wheelSensitivity: 0.01, touchSensitivity: 0.028, momentumMultiplier: 5.2,
       smoothing: 0.22, slideLerp: 0.18, distortionDecay: 0.95, maxDistortion: 2.5,
       distortionSensitivity: 0.15, distortionSmoothing: 0.075,
     };
