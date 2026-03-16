@@ -185,8 +185,8 @@ const AquaSliderWithHero6 = () => {
     const BORDER_RADIUS = 0; // sin border radius en los slides
 
     const settings = {
-      wheelSensitivity: 0.01, touchSensitivity: 0.01, momentumMultiplier: 2,
-      smoothing: 0.1, slideLerp: 0.075, distortionDecay: 0.95, maxDistortion: 2.5,
+      wheelSensitivity: 0.01, touchSensitivity: 0.024, momentumMultiplier: 4.5,
+      smoothing: 0.22, slideLerp: 0.18, distortionDecay: 0.95, maxDistortion: 2.5,
       distortionSensitivity: 0.15, distortionSmoothing: 0.075,
     };
 
@@ -308,7 +308,7 @@ const AquaSliderWithHero6 = () => {
       m.uniforms.uTexture1Size.value = texArr[state.currentIndex].userData.size;
       m.uniforms.uTexture2Size.value = texArr[next].userData.size;
       gsap.fromTo(m.uniforms.uProgress, { value: 0 }, {
-        value: 1, duration: 2.5, ease: "power2.inOut",
+        value: 1, duration: 1.1, ease: "power2.inOut",
         onComplete: () => {
           m.uniforms.uProgress.value     = 0;
           m.uniforms.uTexture1.value     = texArr[next];
@@ -539,7 +539,7 @@ const AquaSliderWithHero6 = () => {
       const dy = Math.abs(e.changedTouches[0].clientY - touchStartClient.y);
       if (dx < 10 && dy < 10) { hitSlider(e.changedTouches[0].clientX, e.changedTouches[0].clientY); return; }
       const vel = (touchLast - touchStart) * 0.005;
-      if (Math.abs(vel) > 0.5) {
+      if (Math.abs(vel) > 0.15) {
         autoScrollSpeed = -vel * settings.momentumMultiplier * 0.05;
         if (!isMobile) targetDistortionFactor = Math.min(1, Math.abs(vel) * 3 * settings.distortionSensitivity);
         isScrolling = true; setTimeout(() => { isScrolling = false; }, 800);
@@ -575,7 +575,7 @@ const AquaSliderWithHero6 = () => {
 
       if (isScrolling) {
         targetPosition  += autoScrollSpeed;
-        autoScrollSpeed *= Math.max(0.92, 0.97 - Math.abs(autoScrollSpeed) * 0.5);
+        autoScrollSpeed *= Math.max(0.96, 0.97 - Math.abs(autoScrollSpeed) * 0.5);
         if (Math.abs(autoScrollSpeed) < 0.001) autoScrollSpeed = 0;
       }
       currentPosition += (targetPosition - currentPosition) * settings.smoothing;
