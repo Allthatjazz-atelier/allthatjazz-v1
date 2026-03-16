@@ -290,7 +290,7 @@ const AquaSliderWithHero6 = () => {
 
     // ── advanceAquaGroup ──────────────────────────────────────────────
     // FIX: el counter se actualiza INMEDIATAMENTE al llamar advance(),
-    // no al finalizar la transición de 2.5 s.
+    // no al finalizar la transición.
     const advanceAquaGroup = (g) => {
       const state  = aquaStates[g];
       const texArr = aquaTextures[g];
@@ -308,7 +308,7 @@ const AquaSliderWithHero6 = () => {
       m.uniforms.uTexture1Size.value = texArr[state.currentIndex].userData.size;
       m.uniforms.uTexture2Size.value = texArr[next].userData.size;
       gsap.fromTo(m.uniforms.uProgress, { value: 0 }, {
-        value: 1, duration: 2.5, ease: "power2.inOut",
+        value: 1, duration: 1.1, ease: "power2.inOut",
         onComplete: () => {
           m.uniforms.uProgress.value     = 0;
           m.uniforms.uTexture1.value     = texArr[next];

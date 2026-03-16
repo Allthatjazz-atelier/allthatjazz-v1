@@ -380,7 +380,7 @@ export default function HeaderFooter10({ children }) {
   return (
     <>
       <div className="fixed top-0 left-0 w-full flex justify-center pt-[16px] z-[9999] pointer-events-none">
-        <BerlinClock2 />
+        <BerlinClock />
       </div>
 
       <div className="fixed bottom-0 left-0 w-full flex flex-col justify-center items-center pb-2 leading-[2.75rem] z-[9999] HeaderFooter select-none pointer-events-auto">
