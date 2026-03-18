@@ -80,66 +80,68 @@ const fragmentShader = `
 
 // ── Captura la página sharp ───────────────────────────────────────────────────
 function capturePageTexture() {
-  const aquaCanvas = document.querySelector("[data-aqua-canvas='true']");
-  if (!aquaCanvas) return null;
-  const w = window.innerWidth, h = window.innerHeight;
-  const off = document.createElement("canvas");
-  off.width = w; off.height = h;
-  const ctx = off.getContext("2d");
-  ctx.drawImage(aquaCanvas, 0, 0, w, h);
-  const px = ctx.getImageData(w >> 1, h >> 1, 1, 1).data;
-  if (px[0] === 0 && px[1] === 0 && px[2] === 0) {
-    const g = ctx.createRadialGradient(w/2, h/2, 0, w/2, h/2, w * 0.7);
-    g.addColorStop(0, "#2a2a3a");
-    g.addColorStop(1, "#0d0d15");
-    ctx.fillStyle = g; ctx.fillRect(0, 0, w, h);
-  }
-  const tex = new THREE.CanvasTexture(off);
-  tex.minFilter = tex.magFilter = THREE.LinearFilter;
-  tex.userData  = { size: new THREE.Vector2(w, h) };
-  return tex;
-}
-
-// ── Captura la página con blur aplicado en canvas ─────────────────────────────
-function captureBlurredPageTexture() {
-  const aquaCanvas = document.querySelector("[data-aqua-canvas='true']");
-  if (!aquaCanvas) return null;
-  const w = window.innerWidth, h = window.innerHeight;
-
-  const src = document.createElement("canvas");
-  src.width = w; src.height = h;
-  const sCtx = src.getContext("2d");
-  sCtx.drawImage(aquaCanvas, 0, 0, w, h);
-  const px = sCtx.getImageData(w >> 1, h >> 1, 1, 1).data;
-
-  const off = document.createElement("canvas");
-  off.width = w; off.height = h;
-  const ctx = off.getContext("2d");
-
-  if (px[0] === 0 && px[1] === 0 && px[2] === 0) {
-    const tmp = document.createElement("canvas");
-    tmp.width = w; tmp.height = h;
-    const tCtx = tmp.getContext("2d");
-    const g = tCtx.createRadialGradient(w/2, h/2, 0, w/2, h/2, w * 0.7);
-    g.addColorStop(0, "#2a2a3a");
-    g.addColorStop(1, "#0d0d15");
-    tCtx.fillStyle = g; tCtx.fillRect(0, 0, w, h);
-    ctx.filter = "blur(20px)";
-    ctx.drawImage(tmp, 0, 0, w, h);
-  } else {
-    ctx.filter = "blur(20px)";
+    const aquaCanvas = document.querySelector("[data-aqua-canvas='true']");
+    if (!aquaCanvas) return null;
+    const w = window.innerWidth, h = window.innerHeight;
+    const off = document.createElement("canvas");
+    off.width = w; off.height = h;
+    const ctx = off.getContext("2d");
     ctx.drawImage(aquaCanvas, 0, 0, w, h);
+  
+    // Comprobar alpha (px[3]) en lugar de RGB — un canvas vacío tiene alpha=0
+    // independientemente del color de fondo
+    const px = ctx.getImageData(w >> 1, h >> 1, 1, 1).data;
+    if (px[3] < 10) {
+      // Canvas vacío — fallback blanco para que coincida con scene.background del slider
+      ctx.fillStyle = "#ffffff";
+      ctx.fillRect(0, 0, w, h);
+    }
+  
+    const tex = new THREE.CanvasTexture(off);
+    tex.minFilter = tex.magFilter = THREE.LinearFilter;
+    tex.userData  = { size: new THREE.Vector2(w, h) };
+    return tex;
   }
-
-  ctx.filter = "none";
-  ctx.fillStyle = "rgba(255, 255, 255, 0.15)";
-  ctx.fillRect(0, 0, w, h);
-
-  const tex = new THREE.CanvasTexture(off);
-  tex.minFilter = tex.magFilter = THREE.LinearFilter;
-  tex.userData  = { size: new THREE.Vector2(w, h) };
-  return tex;
-}
+  
+  // ── Captura la página con blur ────────────────────────────────────────────────
+  function captureBlurredPageTexture() {
+    const aquaCanvas = document.querySelector("[data-aqua-canvas='true']");
+    if (!aquaCanvas) return null;
+    const w = window.innerWidth, h = window.innerHeight;
+  
+    const src = document.createElement("canvas");
+    src.width = w; src.height = h;
+    const sCtx = src.getContext("2d");
+    sCtx.drawImage(aquaCanvas, 0, 0, w, h);
+  
+    // Mismo fix: comprobar alpha
+    const px = sCtx.getImageData(w >> 1, h >> 1, 1, 1).data;
+  
+    const off = document.createElement("canvas");
+    off.width = w; off.height = h;
+    const ctx = off.getContext("2d");
+  
+    if (px[3] < 10) {
+      // Canvas vacío — fallback blanco blureado
+      ctx.fillStyle = "#ffffff";
+      ctx.fillRect(0, 0, w, h);
+      ctx.filter = "blur(20px)";
+      ctx.fillRect(0, 0, w, h);
+      ctx.filter = "none";
+    } else {
+      ctx.filter = "blur(20px)";
+      ctx.drawImage(aquaCanvas, 0, 0, w, h);
+      ctx.filter = "none";
+    }
+  
+    ctx.fillStyle = "rgba(255, 255, 255, 0.15)";
+    ctx.fillRect(0, 0, w, h);
+  
+    const tex = new THREE.CanvasTexture(off);
+    tex.minFilter = tex.magFilter = THREE.LinearFilter;
+    tex.userData  = { size: new THREE.Vector2(w, h) };
+    return tex;
+  }
 
 // ── tex transparente — para el closing ───────────────────────────────────────
 function createTransparentTexture() {
