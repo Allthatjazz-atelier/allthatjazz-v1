@@ -26,7 +26,7 @@ export default function BerlinClock() {
     const updateTime = () => {
       const berlinTime = new Intl.DateTimeFormat("de-DE", {
         timeZone: "Europe/Berlin",
-        hour: "2-digit", minute: "2-digit", second: "2-digit", hour12: false,
+        hour: "2-digit", minute: "2-digit", hour12: false,
       }).format(new Date());
       setTime(berlinTime);
     };
