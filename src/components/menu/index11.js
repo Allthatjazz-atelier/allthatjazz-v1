@@ -3,7 +3,7 @@ import { useState, useEffect, useRef, useCallback } from "react";
 import * as THREE from "three";
 import gsap from "gsap";
 import BerlinClock from "../tools/BerlinClock";
-import AboutSection8 from "../about/index8";
+import AboutSection7 from "../about/index7";
 import BerlinClock3 from "../tools/BerlinClock3";
 import BerlinClock2 from "../tools/BerlinClock2";
 
@@ -100,7 +100,7 @@ function capturePageTexture() {
   return tex;
 }
 
-// ── Captura la página con blur aplicado en canvas ────────────────────────────
+// ── Captura la página con blur aplicado en canvas ─────────────────────────────
 function captureBlurredPageTexture() {
   const aquaCanvas = document.querySelector("[data-aqua-canvas='true']");
   if (!aquaCanvas) return null;
@@ -162,9 +162,6 @@ export default function HeaderFooter11({ children }) {
   const materialRef  = useRef(null);
   const loopIdRef    = useRef(null);
   const animRef      = useRef(false);
-
-  // Texturas precapturadas en hover — evita readback GPU en el momento del click
-  const prewarmRef = useRef({ tex1: null, tex2: null, busy: false });
 
   const words = ["allthatjazz","すべてのジャズ","όλοαυτότζαζ","वह सभी जाज है","allthatjazz"];
 
@@ -244,44 +241,37 @@ export default function HeaderFooter11({ children }) {
     const maxR = Math.sqrt(window.innerWidth ** 2 + window.innerHeight ** 2);
 
     // ── OPENING ───────────────────────────────────────────────────────────────
-    // Onda invertida: la burbuja parte GRANDE (cubre toda la pantalla) y se
-    // contrae hacia el centro — efecto "desde los bordes hacia el centro".
+    // Inverso al closing: la burbuja parte desde los extremos (progress=0.667,
+    // que equivale exactamente a la diagonal del viewport) y se contrae
+    // hacia el centro (progress=0).
     //
-    // Asignación de texturas para progress 1→0:
-    //   tex1 = blurred  (visible FUERA de la burbuja = toda la pantalla al inicio)
-    //   tex2 = sharp    (visible DENTRO de la burbuja con lens distortion)
+    // tex1 = blurred (fuera de la burbuja = lo que se ve al inicio en toda la pantalla)
+    // tex2 = sharp   (dentro de la burbuja con lens distortion)
+    // progress 0.667 → 0, duration 2.0, ease power2.out
     //
-    // Al inicio  (progress=1): burbuja ocupa todo → se ve tex2(sharp) con lens ≈ toda la pantalla
-    // Al final   (progress=0): burbuja desaparece → se ve tex1(blurred) ≈ fondo del about
-    //   El CSS blur toma el relevo en onComplete sin corte visible.
-    //
-    // El clip-path del contenido crece 0→maxR independientemente (misma dirección
-    // de revelado que antes, el about aparece desde el centro).
+    // El clip-path del contenido crece de 0 a maxR en paralelo,
+    // normalizado para que empiece en 0 cuando prog.v=0.667.
     if (modalState === "opening") {
       if (animRef.current || !mat) return;
       animRef.current = true;
 
-      // tex1 = blurred (fuera de burbuja), tex2 = sharp (dentro de burbuja)
-      // Usar texturas precapturadas en hover si están disponibles — arranque sin retraso
-      const pw   = prewarmRef.current;
-      const tex1 = pw.tex1 ?? captureBlurredPageTexture();
-      const tex2 = pw.tex2 ?? capturePageTexture();
-      pw.tex1 = null; pw.tex2 = null; // consumidas
+      // tex1=blurred (fuera), tex2=sharp (dentro con lens)
+      const tex1 = captureBlurredPageTexture();
+      const tex2 = capturePageTexture();
       if (!tex1 || !tex2) { setModalState("open"); animRef.current = false; return; }
 
-      // Blur CSS invisible — tomará el relevo al terminar
+      // Blur CSS invisible — tomará el relevo en onComplete
       if (blurLayerRef.current) {
         blurLayerRef.current.style.transition = "none";
         blurLayerRef.current.style.opacity    = "0";
         blurLayerRef.current.style.clipPath   = "none";
       }
 
-      // Contenido encima del canvas — clip-path crece 0→maxR
+      // Contenido encima del canvas, oculto hasta que la burbuja termine
       if (contentRef.current) {
         contentRef.current.style.zIndex   = "1004";
         contentRef.current.style.opacity  = "1";
         contentRef.current.style.clipPath = "circle(0px at 50% 50%)";
-        // El texto arranca invisible+blureado — el reveal se lanza en onComplete
         const reveals = contentRef.current.querySelectorAll('[data-reveal]');
         gsap.set(reveals, { filter: 'blur(14px)', opacity: 0 });
       }
@@ -290,19 +280,20 @@ export default function HeaderFooter11({ children }) {
       mat.uniforms.uTexture2.value     = tex2;
       mat.uniforms.uTexture1Size.value = tex1.userData.size;
       mat.uniforms.uTexture2Size.value = tex2.userData.size;
-      // Empezamos en 1 (burbuja grande) y vamos hacia 0 (burbuja desaparece)
-      mat.uniforms.uProgress.value     = 1;
+      // 0.667 = diagonal exacta del viewport (length(res) / length(res)*1.5)
+      // → la burbuja arranca justo en las esquinas, visible desde el frame 0
+      mat.uniforms.uProgress.value     = 0.667;
 
-      const prog = { v: 1 };
+      const prog = { v: 0.667 };
 
       gsap.to(prog, {
-        v: 0,                   // ← invertido respecto al original
-        duration: 2.5,
-        ease: "power2.inOut",
+        v:        0,
+        duration: 2.0,
+        ease:     "power2.out",
         onUpdate() {
           mat.uniforms.uProgress.value = prog.v;
-          // clip-path del contenido sigue creciendo (0→maxR), independiente del shader
-          const r = (1 - prog.v) * maxR * 1.06;
+          // Normalizado: r=0 cuando prog.v=0.667, r=maxR*1.06 cuando prog.v=0
+          const r = ((0.667 - prog.v) / 0.667) * maxR * 1.06;
           if (contentRef.current)
             contentRef.current.style.clipPath = `circle(${r}px at 50% 50%)`;
         },
@@ -317,7 +308,7 @@ export default function HeaderFooter11({ children }) {
             contentRef.current.style.zIndex   = "1001";
             contentRef.current.style.clipPath = "none";
           }
-          // Lanzar el reveal del texto AHORA que la burbuja ha terminado
+          // Reveal del texto una vez terminada la burbuja
           if (contentRef.current) {
             const reveals = contentRef.current.querySelectorAll('[data-reveal]');
             gsap.to(reveals, {
@@ -335,9 +326,10 @@ export default function HeaderFooter11({ children }) {
     }
 
     // ── CLOSING ───────────────────────────────────────────────────────────────
-    // Sin cambios — la burbuja crece desde el centro y revela la página.
+    // Sin cambios respecto al HeaderFooter10 original.
     // tex1 = transparente  (fuera de burbuja → CSS blur visible debajo)
     // tex2 = página sharp  (dentro de burbuja → se revela con lens distortion)
+    // progress 0 → 1, duration 2.5, ease power2.inOut
     if (modalState === "closing") {
       if (animRef.current || !mat) return;
       animRef.current = true;
@@ -361,9 +353,9 @@ export default function HeaderFooter11({ children }) {
 
       const prog = { v: 0 };
       gsap.to(prog, {
-        v: 1,
+        v:        1,
         duration: 2.5,
-        ease: "power2.inOut",
+        ease:     "power2.inOut",
         onUpdate() {
           mat.uniforms.uProgress.value = prog.v;
           const r = `circle(${Math.max(0, (1 - prog.v) * maxR * 1.06)}px at 50% 50%)`;
@@ -395,7 +387,7 @@ export default function HeaderFooter11({ children }) {
       </div>
 
       <div className="fixed bottom-0 left-0 w-full flex flex-col justify-center items-center pb-2 leading-[2.75rem] z-[9999] HeaderFooter select-none pointer-events-auto">
-        <div className="flex" onClick={isVisible ? handleClose : handleOpen} onMouseEnter={() => { if (modalState === "closed" && !animRef.current) { const pw = prewarmRef.current; if (!pw.busy && !pw.tex1) { pw.busy = true; requestAnimationFrame(() => { pw.tex1 = captureBlurredPageTexture(); pw.tex2 = capturePageTexture(); pw.busy = false; }); } } }}>
+        <div className="flex" onClick={isVisible ? handleClose : handleOpen}>
           <h1
             ref={h1Ref}
             className="text-[4rem] tracking-[-0.04em] text-black select-none whitespace-nowrap cursor-pointer"
@@ -444,7 +436,7 @@ export default function HeaderFooter11({ children }) {
               style={{ clipPath: "none" }}
               onClick={handleClose}
             >
-              <AboutSection8 skipReveal />
+              <AboutSection7 skipReveal />
             </div>
           )}
         </>
