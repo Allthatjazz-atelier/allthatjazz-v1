@@ -43,6 +43,7 @@ const VIDEO_NAMES = [
   "ATJ_AboutMotion 02",
   "Playground_Carhartt-WIP_24012026 (1)_1",
   "Portfolio-Gallery-4-5",
+  "JC_Reel 4_5_1.mp4"
 ];
 
 // ── Etiquetas ─────────────────────────────────────────────────────────────────
@@ -159,14 +160,14 @@ const FinalSlider3 = () => {
     const scene  = new THREE.Scene();
     scene.background = new THREE.Color(0xffffff);
     const camera = new THREE.PerspectiveCamera(45, window.innerWidth / window.innerHeight, 0.01, 100);
-    camera.position.z = isMobile ? 9.5 : 5;
+    camera.position.z = isMobile ? 8.0 : 5;
 
     // ── Dimensions ───────────────────────────────────────────────────
-    const slideWidth  = isMobile ? 4.0 : 2.0;
-    const slideHeight = isMobile ? 4.5 : 2.5;
+    const slideWidth  = isMobile ? 3.0 : 2.0;
+    const slideHeight = isMobile ? 3.375 : 2.5;  // aspect ratio 4/4.5 mantenido
     const slideAspect = slideWidth / slideHeight;
-    const isVertical  = false; // carrusel horizontal en móvil y desktop
-    const slideGap    = isMobile ? 0.70 : 0.05;
+    const isVertical  = false; // horizontal en ambos
+    const slideGap    = isMobile ? 0.00 : 0.05;
 
     const BORDER_RADIUS = 0;
 
@@ -552,7 +553,7 @@ const FinalSlider3 = () => {
         if (hits.length > 1) {
           let minDist = Infinity;
           hits.forEach((h) => {
-            const d = Math.abs(h.object.position.x);
+            const d = Math.abs(h.object.position.y);
             if (d < minDist) { minDist = d; bestHit = h; }
           });
         }
@@ -625,12 +626,58 @@ const FinalSlider3 = () => {
     const handleTouchEnd = (e) => {
       const dx = Math.abs(e.changedTouches[0].clientX - touchStartClient.x);
       const dy = Math.abs(e.changedTouches[0].clientY - touchStartClient.y);
-      if (dx < 20 && dy < 20) { suppressNextClick = true; hitSlider(e.changedTouches[0].clientX, e.changedTouches[0].clientY); return; }
-      const vel = (touchLast - touchStart) * 0.005;
-      if (Math.abs(vel) > 0.15) {
-        autoScrollSpeed = -vel * settings.momentumMultiplier * 0.05;
-        if (!isMobile) targetDistortionFactor = Math.min(1, Math.abs(vel) * 3 * settings.distortionSensitivity);
-        isScrolling = true; setTimeout(() => { isScrolling = false; }, 800);
+
+      // Tap — mostrar caption y avanzar imagen
+      if (dx < 20 && dy < 20) {
+        suppressNextClick = true;
+        hitSlider(e.changedTouches[0].clientX, e.changedTouches[0].clientY);
+        return;
+      }
+
+      if (isMobile) {
+        // ── Snap al slide más cercano con inercia ────────────────────
+        const vel = (touchLast - touchStart) * 0.005;
+
+        // Aplicar un poco de inercia primero
+        let projectedPos = currentPosition - vel * settings.momentumMultiplier * 0.8;
+
+        // Encontrar el slide más cercano a la posición proyectada
+        let bestDist = Infinity;
+        let snapPos  = currentPosition;
+        slides.forEach((s) => {
+          // Posición canónica del slide en el loop
+          let basePos = s.userData.index * slideUnit - projectedPos;
+          basePos = ((basePos % totalSize) + totalSize) % totalSize;
+          if (basePos > totalSize / 2) basePos -= totalSize;
+          const dist = Math.abs(basePos);
+          if (dist < bestDist) {
+            bestDist = dist;
+            // El snap target es la posición que centraría este slide
+            snapPos = s.userData.index * slideUnit;
+            // Ajustar al ciclo más cercano al currentPosition
+            while (snapPos - currentPosition > totalSize / 2)  snapPos -= totalSize;
+            while (snapPos - currentPosition < -totalSize / 2) snapPos += totalSize;
+          }
+        });
+
+        // Animar suavemente al snap con gsap
+        const snapObj = { v: currentPosition };
+        isScrolling = false;
+        gsap.to(snapObj, {
+          v:        snapPos,
+          duration: 0.5,
+          ease:     "power3.out",
+          onUpdate() { targetPosition = snapObj.v; currentPosition = snapObj.v; },
+          onComplete() { targetPosition = snapPos; currentPosition = snapPos; },
+        });
+      } else {
+        // Desktop: inercia libre original
+        const vel = (touchLast - touchStart) * 0.005;
+        if (Math.abs(vel) > 0.15) {
+          autoScrollSpeed = -vel * settings.momentumMultiplier * 0.05;
+          isScrolling = true;
+          setTimeout(() => { isScrolling = false; }, 800);
+        }
       }
     };
     const handleResize = () => {

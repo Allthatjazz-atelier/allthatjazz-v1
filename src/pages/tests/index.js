@@ -18,7 +18,8 @@ export default function Tests() {
         {/* <HeroCarousel2_3 /> */}
         {/* <HeroCarousel2_4 /> */}
         {/* <WebGlCarousel /> */}
-        <HeroCarousel_Responsive4/>
+        <AquaSliderWithHero6 />
+        {/* <HeroCarousel_Responsive4/> */}
       </HeaderFooter8>
     </div>
   );
