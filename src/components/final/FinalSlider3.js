@@ -162,11 +162,11 @@ const FinalSlider3 = () => {
     camera.position.z = isMobile ? 8.0 : 5;
 
     // ── Dimensions ───────────────────────────────────────────────────
-    const slideWidth  = isMobile ? 3.2 : 2.0;
-    const slideHeight = isMobile ? 3.6 : 2.5;
+    const slideWidth  = isMobile ? 3.4 : 2.0;
+    const slideHeight = isMobile ? 3.8 : 2.5;
     const slideAspect = slideWidth / slideHeight;
     const isVertical  = false; // horizontal en ambos
-    const slideGap    = isMobile ? 0.05 : 0.05;
+    const slideGap    = isMobile ? 0.02 : 0.05;
 
     const BORDER_RADIUS = 0;
 
@@ -641,7 +641,7 @@ const FinalSlider3 = () => {
         // touchStart y touchLast son coordenadas de pantalla en px
         const swipePx    = touchStart - touchLast; // px totales arrastrados
         const swipeWorld = swipePx * settings.touchSensitivity; // en unidades de mundo
-        const threshold  = slideUnit * 0.33; // 33% del slide para confirmar cambio
+        const threshold  = slideUnit * 0.40; // 40% del slide para confirmar cambio
         const vel        = (touchLast - touchStart) * 0.005;
         const fastSwipe  = Math.abs(vel) > 0.3; // gesto rápido = confirmar siempre
 
