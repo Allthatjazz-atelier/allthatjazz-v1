@@ -162,8 +162,8 @@ const FinalSlider4 = () => {
     camera.position.z = isMobile ? 8.0 : 5;
 
     // ── Dimensions ───────────────────────────────────────────────────
-    const slideWidth  = isMobile ? 4.2 : 2.0;
-    const slideHeight = isMobile ? 4.725 : 2.5;
+    const slideWidth  = isMobile ? 3.8 : 2.0;
+    const slideHeight = isMobile ? 4.25 : 2.5;
     const slideAspect = slideWidth / slideHeight;
     const isVertical  = false; // horizontal en ambos
     const slideGap    = isMobile ? 0.02 : 0.05;
