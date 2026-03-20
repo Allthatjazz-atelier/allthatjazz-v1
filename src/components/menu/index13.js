@@ -155,8 +155,80 @@ export default function HeaderFooter13({ children }) {
   const animRef      = useRef(false);
   const breathRef    = useRef(null); // tween de respiración del hover
 
-  // ── Hover SVG effect ─────────────────────────────────────────────────────
-  const [hovered, setHovered] = useState(false);
+  // ── Hover SVG effect — imperativo, estado persistente en ref ──────────────
+  const hoveredRef  = useRef(false);
+  // stateRef persiste entre llamadas — GSAP siempre anima el mismo objeto
+  const svgStateRef = useRef({ scale: 0, blur: 0, glow: 0, freq: 0.008 });
+  // mainTweenRef — tween de entrada, para poder matarlo explícitamente
+  const mainTweenRef = useRef(null);
+
+  const applyHover = useCallback((on) => {
+    // Ignorar si el about está abierto o animándose
+    if (animRef.current) return;
+
+    hoveredRef.current = on;
+
+    const turb = document.getElementById("atj-turb");
+    const disp = document.getElementById("atj-disp");
+    const blur = document.getElementById("atj-blur");
+    const glow = document.getElementById("atj-glow");
+    const el   = h1Ref.current;
+    if (!turb || !disp || !blur || !glow || !el) return;
+
+    // Matar todos los tweens activos — siempre el mismo objeto ref
+    if (mainTweenRef.current)  { mainTweenRef.current.kill();  mainTweenRef.current  = null; }
+    if (breathRef.current)     { breathRef.current.kill();     breathRef.current     = null; }
+
+    const s = svgStateRef.current;
+
+    const update = () => {
+      disp.setAttribute("scale",          s.scale.toFixed(3));
+      blur.setAttribute("stdDeviation",   s.blur.toFixed(3));
+      glow.setAttribute("stdDeviation",   s.glow.toFixed(3));
+      turb.setAttribute("baseFrequency",  `${s.freq.toFixed(4)} ${(s.freq * 1.6).toFixed(4)}`);
+    };
+
+    if (on) {
+      el.style.filter = "url(#atj-filter)";
+      mainTweenRef.current = gsap.to(s, {
+        scale: 9, blur: 0.45, glow: 3.5, freq: 0.012,
+        duration: 1.1,
+        ease: "sine.out",
+        onUpdate: update,
+        onComplete() {
+          if (!hoveredRef.current) return;
+          breathRef.current = gsap.to(s, {
+            scale: 7, glow: 2, freq: 0.008,
+            duration: 2.8, ease: "sine.inOut",
+            yoyo: true, repeat: -1,
+            onUpdate: update,
+          });
+        },
+      });
+    } else {
+      mainTweenRef.current = gsap.to(s, {
+        scale: 0, blur: 0, glow: 0, freq: 0.008,
+        duration: 0.5, ease: "sine.inOut",
+        onUpdate: update,
+        onComplete() {
+          if (hoveredRef.current) return; // volvió a entrar mientras salía
+          el.style.filter = "none";
+          // Reset limpio del state para el próximo hover
+          s.scale = 0; s.blur = 0; s.glow = 0; s.freq = 0.008;
+          update();
+        },
+      });
+    }
+  }, []);
+
+  // ── Visibilidad: resetear hover al cambiar pestaña ──────────────────────
+  useEffect(() => {
+    const onVisibility = () => {
+      if (document.hidden) applyHover(false);
+    };
+    document.addEventListener("visibilitychange", onVisibility);
+    return () => document.removeEventListener("visibilitychange", onVisibility);
+  }, [applyHover]);
 
   const words = ["allthatjazz","すべてのジャズ","όλοαυτότζαζ","वह सभी जाज है","allthatjazz"];
 
@@ -183,84 +255,7 @@ export default function HeaderFooter13({ children }) {
     })();
   }, []);
 
-  // ── SVG hover effect — distorsión fina de bordes, como mancha ────────────
-  useEffect(() => {
-    const turb = document.getElementById("atj-turb");
-    const disp = document.getElementById("atj-disp");
-    const blur = document.getElementById("atj-blur");
-    const glow = document.getElementById("atj-glow");
-    const el   = h1Ref.current;
-    if (!turb || !disp || !blur || !glow || !el) return;
-
-    // Cancelar SIEMPRE el tween de respiración antes de cualquier otra cosa
-    if (breathRef.current) {
-      breathRef.current.kill();
-      breathRef.current = null;
-    }
-
-    // Leer el estado actual de los atributos para arrancar desde donde estamos
-    const state = {
-      scale: parseFloat(disp.getAttribute("scale") || "0"),
-      blur:  parseFloat(blur.getAttribute("stdDeviation") || "0"),
-      glow:  parseFloat(glow.getAttribute("stdDeviation") || "0"),
-      freq:  parseFloat((turb.getAttribute("baseFrequency") || "0.008").split(" ")[0]),
-    };
-
-    // Matar todos los tweens activos sobre state
-    gsap.killTweensOf(state);
-
-    const update = () => {
-      disp.setAttribute("scale", state.scale.toFixed(3));
-      blur.setAttribute("stdDeviation", state.blur.toFixed(3));
-      glow.setAttribute("stdDeviation", state.glow.toFixed(3));
-      turb.setAttribute("baseFrequency",
-        `${state.freq.toFixed(4)} ${(state.freq * 1.6).toFixed(4)}`);
-    };
-
-    if (hovered) {
-      el.style.filter = "url(#atj-filter)";
-
-      gsap.to(state, {
-        scale: 14,
-        blur:  0.7,
-        glow:  5,
-        freq:  0.015,
-        duration: 1.0,
-        ease: "sine.out",   // entrada suave sin delay — más fiable
-        overwrite: "auto",  // cancela automáticamente tweens conflictivos
-        onUpdate: update,
-        onComplete() {
-          // Guardar ref del tween de respiración para poder cancelarlo limpiamente
-          breathRef.current = gsap.to(state, {
-            scale: 10,
-            glow:  3,
-            freq:  0.010,
-            duration: 2.4,
-            ease: "sine.inOut",
-            yoyo: true,
-            repeat: -1,
-            overwrite: false,
-            onUpdate: update,
-          });
-        },
-      });
-
-    } else {
-      gsap.to(state, {
-        scale: 0,
-        blur:  0,
-        glow:  0,
-        freq:  0.008,
-        duration: 0.55,
-        ease: "sine.inOut",
-        overwrite: "auto",
-        onUpdate: update,
-        onComplete() {
-          el.style.filter = "none";
-        },
-      });
-    }
-  }, [hovered]);
+  // SVG hover — manejado imperativamente por applyHover, no hay useEffect aquí
 
   // ── Three.js ──────────────────────────────────────────────────────────────
   useEffect(() => {
@@ -502,11 +497,11 @@ export default function HeaderFooter13({ children }) {
           <h1
             ref={h1Ref}
             className="text-[4rem] tracking-[-0.04em] text-black select-none whitespace-nowrap cursor-pointer"
-            onMouseEnter={() => setHovered(true)}
-            onMouseLeave={() => setHovered(false)}
-            onTouchStart={() => setHovered(true)}
-            onTouchEnd={() => setHovered(false)}
-            onTouchCancel={() => setHovered(false)}
+            onMouseEnter={() => applyHover(true)}
+            onMouseLeave={() => applyHover(false)}
+            onTouchStart={() => applyHover(true)}
+            onTouchEnd={() => applyHover(false)}
+            onTouchCancel={() => applyHover(false)}
           >
             allthatjazz
           </h1>

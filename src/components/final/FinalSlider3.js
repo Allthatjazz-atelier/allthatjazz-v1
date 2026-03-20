@@ -43,7 +43,6 @@ const VIDEO_NAMES = [
   "ATJ_AboutMotion 02",
   "Playground_Carhartt-WIP_24012026 (1)_1",
   "Portfolio-Gallery-4-5",
-  "JC_Reel 4_5_1.mp4"
 ];
 
 // ── Etiquetas ─────────────────────────────────────────────────────────────────
@@ -163,11 +162,11 @@ const FinalSlider3 = () => {
     camera.position.z = isMobile ? 8.0 : 5;
 
     // ── Dimensions ───────────────────────────────────────────────────
-    const slideWidth  = isMobile ? 3.0 : 2.0;
-    const slideHeight = isMobile ? 3.375 : 2.5;  // aspect ratio 4/4.5 mantenido
+    const slideWidth  = isMobile ? 3.2 : 2.0;
+    const slideHeight = isMobile ? 3.6 : 2.5;
     const slideAspect = slideWidth / slideHeight;
     const isVertical  = false; // horizontal en ambos
-    const slideGap    = isMobile ? 0.00 : 0.05;
+    const slideGap    = isMobile ? 0.05 : 0.05;
 
     const BORDER_RADIUS = 0;
 
@@ -501,6 +500,7 @@ const FinalSlider3 = () => {
     let peakVelocity = 0, velocityHistory = [0, 0, 0, 0, 0];
     let isDragging = false, dragStartAxis = 0;
     let suppressNextClick = false;
+    let touchStartPosition = 0; // posición al inicio del touch — para snap de origen
 
     // ── Móvil: caption visible al tocar, se oculta tras 2s ───────────
     let mobileCaptionUid = -1;
@@ -609,6 +609,8 @@ const FinalSlider3 = () => {
       touchStartClient = { x: e.touches[0].clientX, y: e.touches[0].clientY };
       touchStart = isVertical ? e.touches[0].clientY : e.touches[0].clientX;
       touchLast  = touchStart; isScrolling = false;
+      // Guardar posición exacta al inicio — para calcular el slide de origen
+      touchStartPosition = currentPosition;
     };
     const handleTouchMove = (e) => {
       e.preventDefault();
@@ -635,40 +637,49 @@ const FinalSlider3 = () => {
       }
 
       if (isMobile) {
-        // ── Snap al slide más cercano con inercia ────────────────────
-        const vel = (touchLast - touchStart) * 0.005;
+        // ── Pull & snap — 1 slide a la vez ──────────────────────────
+        // touchStart y touchLast son coordenadas de pantalla en px
+        const swipePx    = touchStart - touchLast; // px totales arrastrados
+        const swipeWorld = swipePx * settings.touchSensitivity; // en unidades de mundo
+        const threshold  = slideUnit * 0.33; // 33% del slide para confirmar cambio
+        const vel        = (touchLast - touchStart) * 0.005;
+        const fastSwipe  = Math.abs(vel) > 0.3; // gesto rápido = confirmar siempre
 
-        // Aplicar un poco de inercia primero
-        let projectedPos = currentPosition - vel * settings.momentumMultiplier * 0.8;
-
-        // Encontrar el slide más cercano a la posición proyectada
-        let bestDist = Infinity;
-        let snapPos  = currentPosition;
+        // Encontrar el slide de origen — el que estaba centrado ANTES del swipe
+        // touchStartPosition es la posición exacta cuando el dedo tocó la pantalla
+        let originBestDist = Infinity;
+        let originSnapPos  = touchStartPosition;
         slides.forEach((s) => {
-          // Posición canónica del slide en el loop
-          let basePos = s.userData.index * slideUnit - projectedPos;
+          let basePos = s.userData.index * slideUnit - touchStartPosition;
           basePos = ((basePos % totalSize) + totalSize) % totalSize;
           if (basePos > totalSize / 2) basePos -= totalSize;
-          const dist = Math.abs(basePos);
-          if (dist < bestDist) {
-            bestDist = dist;
-            // El snap target es la posición que centraría este slide
-            snapPos = s.userData.index * slideUnit;
-            // Ajustar al ciclo más cercano al currentPosition
-            while (snapPos - currentPosition > totalSize / 2)  snapPos -= totalSize;
-            while (snapPos - currentPosition < -totalSize / 2) snapPos += totalSize;
+          if (Math.abs(basePos) < originBestDist) {
+            originBestDist = Math.abs(basePos);
+            originSnapPos  = s.userData.index * slideUnit;
+            while (originSnapPos - touchStartPosition > totalSize / 2)  originSnapPos -= totalSize;
+            while (originSnapPos - touchStartPosition < -totalSize / 2) originSnapPos += totalSize;
           }
         });
 
-        // Animar suavemente al snap con gsap
-        const snapObj = { v: currentPosition };
+        // Decidir destino: origen (rebote) o siguiente/anterior (avance)
+        let snapPos = originSnapPos; // por defecto, vuelve al slide actual centrado
+
+        if (Math.abs(swipeWorld) > threshold || fastSwipe) {
+          const direction = swipePx > 0 ? 1 : -1; // px>0 = arrastró izq = avanza
+          snapPos = originSnapPos + direction * slideUnit;
+          while (snapPos - targetPosition > totalSize / 2)  snapPos -= totalSize;
+          while (snapPos - targetPosition < -totalSize / 2) snapPos += totalSize;
+        }
+
+        // Animar tanto currentPosition como targetPosition al destino
         isScrolling = false;
+        const snapObj = { v: currentPosition };
         gsap.to(snapObj, {
           v:        snapPos,
-          duration: 0.5,
+          duration: 0.42,
           ease:     "power3.out",
-          onUpdate() { targetPosition = snapObj.v; currentPosition = snapObj.v; },
-          onComplete() { targetPosition = snapPos; currentPosition = snapPos; },
+          onUpdate()  { currentPosition = snapObj.v; targetPosition = snapObj.v; },
+          onComplete(){ currentPosition = snapPos;   targetPosition = snapPos;   },
         });
       } else {
         // Desktop: inercia libre original
@@ -685,7 +696,33 @@ const FinalSlider3 = () => {
       camera.updateProjectionMatrix();
       renderer.setSize(window.innerWidth, window.innerHeight);
     };
-    const handleVisibility = () => { if (document.hidden) videos.forEach((v) => v.pause()); };
+    const handleVisibility = () => {
+      if (document.hidden) {
+        // Pausar todos al salir de la pestaña
+        videos.forEach((v) => v.pause());
+      } else {
+        // Al volver: reanudar según dispositivo
+        if (!isMobile) {
+          // Desktop — todos los vídeos deben estar siempre en play
+          videos.forEach((v) => {
+            if (v.src) v.play().catch(() => {});
+          });
+        } else {
+          // Móvil — solo reanudar los que están cargados y en rango visible
+          slides.forEach((s) => {
+            if (s.userData.isAqua) return;
+            const vi  = s.userData.videoIndex;
+            const vid2 = videos[vi];
+            if (!vid2 || !videoLoaded[vi]) return;
+            let basePos = s.userData.index * slideUnit - currentPosition;
+            basePos = ((basePos % totalSize) + totalSize) % totalSize;
+            if (basePos > totalSize / 2) basePos -= totalSize;
+            if (Math.abs(basePos) <= slideUnit * 1.5)
+              vid2.play().catch(() => {});
+          });
+        }
+      }
+    };
 
     canvas.addEventListener("mousedown",  handleMouseDown);
     canvas.addEventListener("mousemove",  handleMouseMove);
