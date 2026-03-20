@@ -24,7 +24,7 @@ export default function BerlinClock() {
   }, []);
 
   return (
-    <div className="flex items-center gap-1 text-[0.875rem] text-black">
+    <div className="flex items-center gap-1 text-[0.875rem] tracking-[-0.04em] text-black">
       <span>Berlin, {time}</span>
       <img
         src="/avatar/✦.svg"

@@ -53,7 +53,7 @@ import HeroCarousel6 from "@/components/threeslider/index7";
 import VerticalSlider from "@/components/verticalslider";
 import VerticalSlider2 from "@/components/verticalslider/index2";
 import FinalSlider from "@/components/final/FinalSlider";
-import FinalSlider2 from "@/components/final/FinalSlider2";
+import FinalSlider3 from "@/components/final/FinalSlider3";
 
 export default function Home() {
 
@@ -100,7 +100,7 @@ export default function Home() {
         {/* <HeroCarousel_Responsive4 /> */}
         {/* <AquaSlider /> */}
         {/* <AquaSliderWithHero7  /> */}
-        <FinalSlider2 />
+        <FinalSlider3 />
         {/* <HeroCarousel /> */}
         {/* <Content4 /> */}
       </HeaderFooter11>
