@@ -153,6 +153,7 @@ export default function HeaderFooter13({ children }) {
   const materialRef  = useRef(null);
   const loopIdRef    = useRef(null);
   const animRef      = useRef(false);
+  const breathRef    = useRef(null); // tween de respiración del hover
 
   // ── Hover SVG effect ─────────────────────────────────────────────────────
   const [hovered, setHovered] = useState(false);
@@ -187,11 +188,17 @@ export default function HeaderFooter13({ children }) {
     const turb = document.getElementById("atj-turb");
     const disp = document.getElementById("atj-disp");
     const blur = document.getElementById("atj-blur");
-    const el   = h1Ref.current;
-
     const glow = document.getElementById("atj-glow");
+    const el   = h1Ref.current;
     if (!turb || !disp || !blur || !glow || !el) return;
 
+    // Cancelar SIEMPRE el tween de respiración antes de cualquier otra cosa
+    if (breathRef.current) {
+      breathRef.current.kill();
+      breathRef.current = null;
+    }
+
+    // Leer el estado actual de los atributos para arrancar desde donde estamos
     const state = {
       scale: parseFloat(disp.getAttribute("scale") || "0"),
       blur:  parseFloat(blur.getAttribute("stdDeviation") || "0"),
@@ -199,29 +206,32 @@ export default function HeaderFooter13({ children }) {
       freq:  parseFloat((turb.getAttribute("baseFrequency") || "0.008").split(" ")[0]),
     };
 
-    gsap.killTweensOf([turb, disp, blur, glow, state]);
+    // Matar todos los tweens activos sobre state
+    gsap.killTweensOf(state);
+
+    const update = () => {
+      disp.setAttribute("scale", state.scale.toFixed(3));
+      blur.setAttribute("stdDeviation", state.blur.toFixed(3));
+      glow.setAttribute("stdDeviation", state.glow.toFixed(3));
+      turb.setAttribute("baseFrequency",
+        `${state.freq.toFixed(4)} ${(state.freq * 1.6).toFixed(4)}`);
+    };
 
     if (hovered) {
       el.style.filter = "url(#atj-filter)";
 
       gsap.to(state, {
-        scale: 14,   // morph moderado — perceptible pero fino
-        blur:  0.7,  // bordes suaves
-        glow:  5,    // halo contenido
+        scale: 14,
+        blur:  0.7,
+        glow:  5,
         freq:  0.015,
-        duration: 1.1,            // un poco más largo para que entre gradualmente
-        ease: "sine.out",         // arranque muy suave, sin impacto
-        delay: 0.05,              // pequeño delay para evitar activaciones accidentales
-        onUpdate() {
-          disp.setAttribute("scale", state.scale.toFixed(3));
-          blur.setAttribute("stdDeviation", state.blur.toFixed(3));
-          glow.setAttribute("stdDeviation", state.glow.toFixed(3));
-          turb.setAttribute("baseFrequency",
-            `${state.freq.toFixed(4)} ${(state.freq * 1.6).toFixed(4)}`);
-        },
+        duration: 1.0,
+        ease: "sine.out",   // entrada suave sin delay — más fiable
+        overwrite: "auto",  // cancela automáticamente tweens conflictivos
+        onUpdate: update,
         onComplete() {
-          // Respiración lenta — el glow late levemente
-          gsap.to(state, {
+          // Guardar ref del tween de respiración para poder cancelarlo limpiamente
+          breathRef.current = gsap.to(state, {
             scale: 10,
             glow:  3,
             freq:  0.010,
@@ -229,12 +239,8 @@ export default function HeaderFooter13({ children }) {
             ease: "sine.inOut",
             yoyo: true,
             repeat: -1,
-            onUpdate() {
-              disp.setAttribute("scale", state.scale.toFixed(3));
-              glow.setAttribute("stdDeviation", state.glow.toFixed(3));
-              turb.setAttribute("baseFrequency",
-                `${state.freq.toFixed(4)} ${(state.freq * 1.6).toFixed(4)}`);
-            },
+            overwrite: false,
+            onUpdate: update,
           });
         },
       });
@@ -245,15 +251,10 @@ export default function HeaderFooter13({ children }) {
         blur:  0,
         glow:  0,
         freq:  0.008,
-        duration: 0.6,
-        ease: "sine.inOut",   // salida igual de suave que la entrada
-        onUpdate() {
-          disp.setAttribute("scale", state.scale.toFixed(3));
-          blur.setAttribute("stdDeviation", state.blur.toFixed(3));
-          glow.setAttribute("stdDeviation", state.glow.toFixed(3));
-          turb.setAttribute("baseFrequency",
-            `${state.freq.toFixed(4)} ${(state.freq * 1.6).toFixed(4)}`);
-        },
+        duration: 0.55,
+        ease: "sine.inOut",
+        overwrite: "auto",
+        onUpdate: update,
         onComplete() {
           el.style.filter = "none";
         },
@@ -321,6 +322,10 @@ export default function HeaderFooter13({ children }) {
       const tex2 = capturePageTexture();
       if (!tex1 || !tex2) { setModalState("open"); animRef.current = false; return; }
 
+      // Safari fix: NO animar clipPath en el blurLayer durante la transición.
+      // Safari no renderiza backdropFilter mientras clipPath está en transición.
+      // El blur visual durante la animación lo provee el shader (tex1=blurred).
+      // El blurLayerRef aparece con opacity fade al final, sin clip-path nunca.
       if (blurLayerRef.current) {
         blurLayerRef.current.style.transition = "none";
         blurLayerRef.current.style.opacity    = "0";
@@ -345,16 +350,23 @@ export default function HeaderFooter13({ children }) {
         v: 0, duration: 2.0, ease: "power2.out",
         onUpdate() {
           mat.uniforms.uProgress.value = prog.v;
+          // Clip-path solo en contentRef — no en blurLayerRef (Safari bug)
           const r = ((0.667 - prog.v) / 0.667) * maxR * 1.06;
           if (contentRef.current)
             contentRef.current.style.clipPath = `circle(${r}px at 50% 50%)`;
+          // blurLayer aparece gradualmente en la segunda mitad de la animación
+          // usando opacity pura — sin clip-path, compatible con Safari
+          const blurOpacity = Math.max(0, (0.667 - prog.v) / 0.667);
+          if (blurLayerRef.current)
+            blurLayerRef.current.style.opacity = String(blurOpacity.toFixed(3));
         },
         onComplete() {
           mat.uniforms.uProgress.value = 0;
           tex1.dispose(); tex2.dispose();
           if (blurLayerRef.current) {
-            blurLayerRef.current.style.opacity  = "1";
-            blurLayerRef.current.style.clipPath = "none";
+            blurLayerRef.current.style.transition = "none";
+            blurLayerRef.current.style.opacity    = "1";
+            blurLayerRef.current.style.clipPath   = "none";
           }
           if (contentRef.current) {
             contentRef.current.style.zIndex   = "1001";
@@ -492,6 +504,9 @@ export default function HeaderFooter13({ children }) {
             className="text-[4rem] tracking-[-0.04em] text-black select-none whitespace-nowrap cursor-pointer"
             onMouseEnter={() => setHovered(true)}
             onMouseLeave={() => setHovered(false)}
+            onTouchStart={() => setHovered(true)}
+            onTouchEnd={() => setHovered(false)}
+            onTouchCancel={() => setHovered(false)}
           >
             allthatjazz
           </h1>
