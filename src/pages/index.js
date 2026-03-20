@@ -54,6 +54,7 @@ import VerticalSlider from "@/components/verticalslider";
 import VerticalSlider2 from "@/components/verticalslider/index2";
 import FinalSlider from "@/components/final/FinalSlider";
 import FinalSlider3 from "@/components/final/FinalSlider3";
+import FinalSlider4 from "@/components/final/FinalSlider4";
 
 export default function Home() {
 
@@ -100,7 +101,7 @@ export default function Home() {
         {/* <HeroCarousel_Responsive4 /> */}
         {/* <AquaSlider /> */}
         {/* <AquaSliderWithHero7  /> */}
-        <FinalSlider3 />
+        <FinalSlider4 />
         {/* <HeroCarousel /> */}
         {/* <Content4 /> */}
       </HeaderFooter13>
