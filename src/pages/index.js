@@ -55,6 +55,7 @@ import VerticalSlider2 from "@/components/verticalslider/index2";
 import FinalSlider from "@/components/final/FinalSlider";
 import FinalSlider3 from "@/components/final/FinalSlider3";
 import FinalSlider4 from "@/components/final/FinalSlider4";
+import HeaderFooter14 from "@/components/menu/index14";
 
 export default function Home() {
 
@@ -82,7 +83,7 @@ export default function Home() {
 
   return (
     <div className="h-full w-full overflow-hidden">
-      <HeaderFooter13>
+      <HeaderFooter14>
         {/* <RoundedAnimatedSlider2 images={images} /> */}
         {/* <AnimatedCursor /> */}
         {/* <TrailWrapper /> */}
@@ -104,7 +105,7 @@ export default function Home() {
         <FinalSlider4 />
         {/* <HeroCarousel /> */}
         {/* <Content4 /> */}
-      </HeaderFooter13>
+      </HeaderFooter14>
     </div>
   );
 }
