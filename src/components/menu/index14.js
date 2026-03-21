@@ -358,14 +358,16 @@ export default function HeaderFooter14({ children }) {
   }, []);
 
   const handleOpen  = useCallback(() => {
+    applyHover(false); // siempre limpiar, antes de cualquier guard
     if (modalState !== "closed" || animRef.current) return;
     setModalState("opening");
-  }, [modalState]);
+  }, [modalState, applyHover]);
 
   const handleClose = useCallback(() => {
+    applyHover(false); // siempre limpiar, antes de cualquier guard
     if (modalState !== "open" || animRef.current) return;
     setModalState("closing");
-  }, [modalState]);
+  }, [modalState, applyHover]);
 
   // ── Transiciones ──────────────────────────────────────────────────────────
   useEffect(() => {
@@ -556,15 +558,29 @@ export default function HeaderFooter14({ children }) {
           </defs>
         </svg>
 
-        <div className="flex" onClick={isVisible ? handleClose : handleOpen}>
+        <div className="flex">
           <h1
             ref={h1Ref}
             className="text-[4rem] tracking-[-0.04em] text-black select-none whitespace-nowrap cursor-pointer"
+            // Desktop: hover activa/desactiva el efecto. Click abre/cierra el about.
             onMouseEnter={() => applyHover(true)}
             onMouseLeave={() => applyHover(false)}
-            onTouchStart={(e) => { e.preventDefault(); pulseMobile(); }}
-            onTouchEnd={() => {}}
-            onTouchCancel={() => {}}
+            onClick={() => {
+              // Desktop: limpiar hover antes de abrir/cerrar
+              applyHover(false);
+              (isVisible ? handleClose : handleOpen)();
+            }}
+            // Móvil: touch lanza el pulso visual Y abre/cierra el about
+            onTouchStart={(e) => {
+              e.preventDefault();
+              // Solo lanzar pulso si NO hay ya una animación corriendo
+              if (!mainTweenRef.current) pulseMobile();
+            }}
+            onTouchEnd={(e) => {
+              e.preventDefault();
+              // Abrir/cerrar el about al soltar el dedo
+              (isVisible ? handleClose : handleOpen)();
+            }}
           >
             allthatjazz
           </h1>
