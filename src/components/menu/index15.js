@@ -130,7 +130,7 @@ function createTransparentTexture() {
   return tex;
 }
 
-export default function HeaderFooter14({ children }) {
+export default function HeaderFooter15({ children }) {
   const [modalState, setModalState] = useState("closed");
 
   const h1Ref        = useRef(null);
@@ -289,8 +289,69 @@ export default function HeaderFooter14({ children }) {
     (async () => {
       el.textContent = "allthatjazz";
       await new Promise(r => setTimeout(r, 800));
+
+      // Activar efecto SVG durante el scramble
+      hoveredRef.current = true;
+      const turbS = document.getElementById("atj-turb");
+      const dispS = document.getElementById("atj-disp");
+      const blurS = document.getElementById("atj-blur");
+      const glowS = document.getElementById("atj-glow");
+      if (turbS && dispS && blurS && glowS) {
+        el.style.filter = "url(#atj-filter)";
+        const s = svgStateRef.current;
+        s.scale = 0; s.blur = 0; s.glow = 0; s.freq = 0.008;
+        const upd = () => {
+          dispS.setAttribute("scale",         s.scale.toFixed(3));
+          blurS.setAttribute("stdDeviation",  s.blur.toFixed(3));
+          glowS.setAttribute("stdDeviation",  s.glow.toFixed(3));
+          turbS.setAttribute("baseFrequency", `${s.freq.toFixed(4)} ${(s.freq * 1.6).toFixed(4)}`);
+        };
+        // Entrada suave
+        mainTweenRef.current = gsap.to(s, {
+          scale: 9, blur: 0.45, glow: 3.5, freq: 0.012,
+          duration: 1.1, ease: "sine.out",
+          onUpdate: upd,
+          onComplete() {
+            // Respiración continua durante el scramble
+            breathRef.current = gsap.to(s, {
+              scale: 7, glow: 2, freq: 0.008,
+              duration: 2.8, ease: "sine.inOut",
+              yoyo: true, repeat: -1, onUpdate: upd,
+            });
+          },
+        });
+      }
+
       for (const w of words) { await scramble(w); await new Promise(r => setTimeout(r, 500)); }
       el.textContent = "allthatjazz";
+
+      // Apagar efecto al terminar el scramble
+      hoveredRef.current = false;
+      if (breathRef.current)    { breathRef.current.kill();    breathRef.current    = null; }
+      if (mainTweenRef.current) { mainTweenRef.current.kill(); mainTweenRef.current = null; }
+      const turbE = document.getElementById("atj-turb");
+      const dispE = document.getElementById("atj-disp");
+      const blurE = document.getElementById("atj-blur");
+      const glowE = document.getElementById("atj-glow");
+      if (turbE && dispE && blurE && glowE) {
+        const s = svgStateRef.current;
+        const upd = () => {
+          dispE.setAttribute("scale",         s.scale.toFixed(3));
+          blurE.setAttribute("stdDeviation",  s.blur.toFixed(3));
+          glowE.setAttribute("stdDeviation",  s.glow.toFixed(3));
+          turbE.setAttribute("baseFrequency", `${s.freq.toFixed(4)} ${(s.freq * 1.6).toFixed(4)}`);
+        };
+        gsap.to(s, {
+          scale: 0, blur: 0, glow: 0, freq: 0.008,
+          duration: 0.7, ease: "sine.inOut",
+          onUpdate: upd,
+          onComplete() {
+            el.style.filter = "none";
+            s.scale = 0; s.blur = 0; s.glow = 0; s.freq = 0.008;
+            upd();
+          },
+        });
+      }
     })();
   }, []);
 
