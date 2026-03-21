@@ -143,7 +143,7 @@ function createTransparentTexture() {
 }
 
 // ── Componente ────────────────────────────────────────────────────────────────
-export default function HeaderFooter14({ children }) {
+export default function HeaderFooter13({ children }) {
   const [modalState, setModalState] = useState("closed");
 
   const h1Ref        = useRef(null);
@@ -222,8 +222,10 @@ export default function HeaderFooter14({ children }) {
   }, []);
 
   // ── Móvil: pulso único in→breath→out al tocar ────────────────────────────
+  const pulsingRef = useRef(false); // evita múltiples ciclos simultáneos
+
   const pulseMobile = useCallback(() => {
-    if (animRef.current) return;
+    if (pulsingRef.current) return; // ya hay un ciclo corriendo
     const turb = document.getElementById("atj-turb");
     const disp = document.getElementById("atj-disp");
     const blur = document.getElementById("atj-blur");
@@ -231,13 +233,10 @@ export default function HeaderFooter14({ children }) {
     const el   = h1Ref.current;
     if (!turb || !disp || !blur || !glow || !el) return;
 
-    // Cancelar cualquier animación previa
-    if (mainTweenRef.current)  { mainTweenRef.current.kill();  mainTweenRef.current  = null; }
-    if (breathRef.current)     { breathRef.current.kill();     breathRef.current     = null; }
+    pulsingRef.current = true;
 
     const s = svgStateRef.current;
     s.scale = 0; s.blur = 0; s.glow = 0; s.freq = 0.008;
-
     el.style.filter = "url(#atj-filter)";
 
     const update = () => {
@@ -247,38 +246,38 @@ export default function HeaderFooter14({ children }) {
       turb.setAttribute("baseFrequency", `${s.freq.toFixed(4)} ${(s.freq * 1.6).toFixed(4)}`);
     };
 
-    // Timeline: IN → breath → OUT
-    const tl = gsap.timeline();
-
-    // IN — aparece rápido
-    tl.to(s, {
-      scale: 11, blur: 0.5, glow: 4, freq: 0.014,
-      duration: 0.5, ease: "power2.out",
-      onUpdate: update,
-    });
-
-    // BREATH — late una vez suavemente
-    tl.to(s, {
-      scale: 7, glow: 2, freq: 0.009,
-      duration: 0.6, ease: "sine.inOut",
-      onUpdate: update,
-    });
-    tl.to(s, {
-      scale: 10, glow: 3.5, freq: 0.013,
-      duration: 0.5, ease: "sine.inOut",
-      onUpdate: update,
-    });
-
-    // OUT — desaparece suave
-    tl.to(s, {
-      scale: 0, blur: 0, glow: 0, freq: 0.008,
-      duration: 0.55, ease: "sine.inOut",
-      onUpdate: update,
+    const tl = gsap.timeline({
       onComplete() {
         el.style.filter = "none";
         s.scale = 0; s.blur = 0; s.glow = 0; s.freq = 0.008;
         update();
+        pulsingRef.current  = false;
+        mainTweenRef.current = null;
       },
+    });
+
+    // IN — entra lento y suave
+    tl.to(s, {
+      scale: 10, blur: 0.5, glow: 4, freq: 0.013,
+      duration: 0.9, ease: "sine.out",
+      onUpdate: update,
+    });
+    // BREATH — respira una vez
+    tl.to(s, {
+      scale: 6, glow: 1.5, freq: 0.009,
+      duration: 0.9, ease: "sine.inOut",
+      onUpdate: update,
+    });
+    tl.to(s, {
+      scale: 9, glow: 3, freq: 0.012,
+      duration: 0.8, ease: "sine.inOut",
+      onUpdate: update,
+    });
+    // OUT — desaparece lento
+    tl.to(s, {
+      scale: 0, blur: 0, glow: 0, freq: 0.008,
+      duration: 0.9, ease: "sine.inOut",
+      onUpdate: update,
     });
 
     mainTweenRef.current = tl;
@@ -573,8 +572,7 @@ export default function HeaderFooter14({ children }) {
             // Móvil: touch lanza el pulso visual Y abre/cierra el about
             onTouchStart={(e) => {
               e.preventDefault();
-              // Solo lanzar pulso si NO hay ya una animación corriendo
-              if (!mainTweenRef.current) pulseMobile();
+              pulseMobile();
             }}
             onTouchEnd={(e) => {
               e.preventDefault();
