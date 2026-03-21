@@ -221,11 +221,10 @@ export default function HeaderFooter13({ children }) {
     }
   }, []);
 
-  // ── Móvil: pulso único in→breath→out al tocar ────────────────────────────
-  const pulsingRef = useRef(false); // evita múltiples ciclos simultáneos
+  // ── Móvil: efecto durante 3s al tocar ───────────────────────────────────
+  const mobileTimerRef = useRef(null);
 
   const pulseMobile = useCallback(() => {
-    if (pulsingRef.current) return; // ya hay un ciclo corriendo
     const turb = document.getElementById("atj-turb");
     const disp = document.getElementById("atj-disp");
     const blur = document.getElementById("atj-blur");
@@ -233,7 +232,12 @@ export default function HeaderFooter13({ children }) {
     const el   = h1Ref.current;
     if (!turb || !disp || !blur || !glow || !el) return;
 
-    pulsingRef.current = true;
+    // Cancelar timer anterior si había uno
+    if (mobileTimerRef.current) clearTimeout(mobileTimerRef.current);
+
+    // Matar tweens previos y arrancar desde 0
+    if (mainTweenRef.current) { mainTweenRef.current.kill(); mainTweenRef.current = null; }
+    if (breathRef.current)    { breathRef.current.kill();    breathRef.current    = null; }
 
     const s = svgStateRef.current;
     s.scale = 0; s.blur = 0; s.glow = 0; s.freq = 0.008;
@@ -246,44 +250,39 @@ export default function HeaderFooter13({ children }) {
       turb.setAttribute("baseFrequency", `${s.freq.toFixed(4)} ${(s.freq * 1.6).toFixed(4)}`);
     };
 
-    const tl = gsap.timeline({
-      onComplete() {
-        el.style.filter = "none";
-        s.scale = 0; s.blur = 0; s.glow = 0; s.freq = 0.008;
-        update();
-        pulsingRef.current  = false;
-        mainTweenRef.current = null;
-      },
-    });
-
-    // IN — entra lento y suave
-    tl.to(s, {
+    // Entrar
+    mainTweenRef.current = gsap.to(s, {
       scale: 10, blur: 0.5, glow: 4, freq: 0.013,
       duration: 0.9, ease: "sine.out",
       onUpdate: update,
-    });
-    // BREATH — respira una vez
-    tl.to(s, {
-      scale: 6, glow: 1.5, freq: 0.009,
-      duration: 0.9, ease: "sine.inOut",
-      onUpdate: update,
-    });
-    tl.to(s, {
-      scale: 9, glow: 3, freq: 0.012,
-      duration: 0.8, ease: "sine.inOut",
-      onUpdate: update,
-    });
-    // OUT — desaparece lento
-    tl.to(s, {
-      scale: 0, blur: 0, glow: 0, freq: 0.008,
-      duration: 0.9, ease: "sine.inOut",
-      onUpdate: update,
+      onComplete() {
+        // Respiración continua
+        breathRef.current = gsap.to(s, {
+          scale: 6, glow: 2, freq: 0.009,
+          duration: 1.2, ease: "sine.inOut",
+          yoyo: true, repeat: -1,
+          onUpdate: update,
+        });
+      },
     });
 
-    mainTweenRef.current = tl;
+    // Después de 3s, salir
+    mobileTimerRef.current = setTimeout(() => {
+      if (breathRef.current) { breathRef.current.kill(); breathRef.current = null; }
+      gsap.to(s, {
+        scale: 0, blur: 0, glow: 0, freq: 0.008,
+        duration: 0.7, ease: "sine.inOut",
+        onUpdate: update,
+        onComplete() {
+          el.style.filter = "none";
+          s.scale = 0; s.blur = 0; s.glow = 0; s.freq = 0.008;
+          update();
+        },
+      });
+    }, 3000);
   }, []);
 
-  // ── Visibilidad: resetear hover al cambiar pestaña ──────────────────────
+    // ── Visibilidad: resetear hover al cambiar pestaña ──────────────────────
   useEffect(() => {
     const onVisibility = () => {
       if (document.hidden) applyHover(false);
@@ -561,22 +560,17 @@ export default function HeaderFooter13({ children }) {
           <h1
             ref={h1Ref}
             className="text-[4rem] tracking-[-0.04em] text-black select-none whitespace-nowrap cursor-pointer"
-            // Desktop: hover activa/desactiva el efecto. Click abre/cierra el about.
             onMouseEnter={() => applyHover(true)}
             onMouseLeave={() => applyHover(false)}
-            onClick={() => {
-              // Desktop: limpiar hover antes de abrir/cerrar
-              applyHover(false);
-              (isVisible ? handleClose : handleOpen)();
-            }}
-            // Móvil: touch lanza el pulso visual Y abre/cierra el about
-            onTouchStart={(e) => {
-              e.preventDefault();
-              pulseMobile();
-            }}
-            onTouchEnd={(e) => {
-              e.preventDefault();
-              // Abrir/cerrar el about al soltar el dedo
+            onClick={(e) => {
+              const isTouch = e.sourceCapabilities?.firesTouchEvents || window.matchMedia("(pointer: coarse)").matches;
+              if (isTouch) {
+                // Móvil: lanzar pulso visual
+                pulseMobile();
+              } else {
+                // Desktop: limpiar hover
+                applyHover(false);
+              }
               (isVisible ? handleClose : handleOpen)();
             }}
           >
