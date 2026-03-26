@@ -80,41 +80,51 @@ const fragmentShader = `
   }
 `;
 
-function capturePageTexture() {
-  const aquaCanvas = document.querySelector("[data-aqua-canvas='true']");
-  if (!aquaCanvas) return null;
+/** Canvas WebGL que está en primer plano (Final vs anillo) — HeaderFooter15 captura para el modal About */
+function getHeroCaptureCanvas() {
+  const mode = document.documentElement?.dataset?.atjHeroMode;
+  if (mode === "ring") {
+    const ring = document.querySelector("[data-ring-canvas='true']");
+    if (ring) return ring;
+  }
+  return document.querySelector("[data-aqua-canvas='true']");
+}
+
+/** Compone el WebGL sobre blanco para que zonas α=0 (p. ej. hueco del anillo) no disparen el fallback que borraba toda la escena. */
+function rasterizeHeroTo2D(heroCanvas) {
   const w = window.innerWidth, h = window.innerHeight;
-  const off = document.createElement("canvas");
-  off.width = w; off.height = h;
-  const ctx = off.getContext("2d");
-  ctx.drawImage(aquaCanvas, 0, 0, w, h);
-  const px = ctx.getImageData(w >> 1, h >> 1, 1, 1).data;
-  if (px[3] < 10) { ctx.fillStyle = "#ffffff"; ctx.fillRect(0, 0, w, h); }
+  const c = document.createElement("canvas");
+  c.width = w; c.height = h;
+  const ctx = c.getContext("2d");
+  ctx.fillStyle = "#ffffff";
+  ctx.fillRect(0, 0, w, h);
+  ctx.drawImage(heroCanvas, 0, 0, w, h);
+  return c;
+}
+
+function capturePageTexture() {
+  const heroCanvas = getHeroCaptureCanvas();
+  if (!heroCanvas) return null;
+  const off = rasterizeHeroTo2D(heroCanvas);
   const tex = new THREE.CanvasTexture(off);
   tex.minFilter = tex.magFilter = THREE.LinearFilter;
-  tex.userData  = { size: new THREE.Vector2(w, h) };
+  tex.userData  = { size: new THREE.Vector2(off.width, off.height) };
   return tex;
 }
 
 function captureBlurredPageTexture() {
-  const aquaCanvas = document.querySelector("[data-aqua-canvas='true']");
-  if (!aquaCanvas) return null;
+  const heroCanvas = getHeroCaptureCanvas();
+  if (!heroCanvas) return null;
   const w = window.innerWidth, h = window.innerHeight;
-  const src = document.createElement("canvas");
-  src.width = w; src.height = h;
-  const sCtx = src.getContext("2d");
-  sCtx.drawImage(aquaCanvas, 0, 0, w, h);
-  const px = sCtx.getImageData(w >> 1, h >> 1, 1, 1).data;
+  const src = rasterizeHeroTo2D(heroCanvas);
   const off = document.createElement("canvas");
   off.width = w; off.height = h;
   const ctx = off.getContext("2d");
-  if (px[3] < 10) {
-    ctx.fillStyle = "#ffffff"; ctx.fillRect(0, 0, w, h);
-    ctx.filter = "blur(20px)"; ctx.fillRect(0, 0, w, h); ctx.filter = "none";
-  } else {
-    ctx.filter = "blur(20px)"; ctx.drawImage(aquaCanvas, 0, 0, w, h); ctx.filter = "none";
-  }
-  ctx.fillStyle = "rgba(255, 255, 255, 0.15)"; ctx.fillRect(0, 0, w, h);
+  ctx.filter = "blur(20px)";
+  ctx.drawImage(src, 0, 0, w, h);
+  ctx.filter = "none";
+  ctx.fillStyle = "rgba(255, 255, 255, 0.15)";
+  ctx.fillRect(0, 0, w, h);
   const tex = new THREE.CanvasTexture(off);
   tex.minFilter = tex.magFilter = THREE.LinearFilter;
   tex.userData  = { size: new THREE.Vector2(w, h) };
