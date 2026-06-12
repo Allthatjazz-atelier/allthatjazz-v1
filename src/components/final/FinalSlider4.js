@@ -739,6 +739,7 @@ const FinalSlider4 = () => {
 
     // ── Render loop ───────────────────────────────────────────────────
     let animId;
+    let readyDispatched = false;
     const animate = (time) => {
       animId = requestAnimationFrame(animate);
       if (document.hidden) return;
@@ -882,6 +883,13 @@ const FinalSlider4 = () => {
       }
 
       renderer.render(scene, camera);
+
+      // 2b: avisar a RouteTransition de que la escena ya pintó su primer frame.
+      // (El efecto solo llega aquí cuando la media está resuelta, ver guard arriba.)
+      if (!readyDispatched) {
+        readyDispatched = true;
+        window.dispatchEvent(new CustomEvent("atj-scene-ready"));
+      }
     };
 
     animate(0);

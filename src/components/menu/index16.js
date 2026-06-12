@@ -2,13 +2,7 @@
 import { useState, useEffect, useRef, useCallback } from "react";
 import * as THREE from "three";
 import gsap from "gsap";
-import BerlinClock from "../tools/BerlinClock";
 import AboutSection7 from "../about/index7";
-import BerlinClock3 from "../tools/BerlinClock3";
-import BerlinClock2 from "../tools/BerlinClock2";
-import BerlinClock4 from "../tools/BerlinClock4";
-import BerlinClock5 from "../tools/BerlinClock5";
-import BerlinClockNav from "../tools/BerlinClockNav";
 import BerlinClockNav2 from "../tools/BerlinClockNav2";
 
 const vertexShader = `
@@ -82,14 +76,45 @@ const fragmentShader = `
   }
 `;
 
-/** Canvas WebGL que está en primer plano (Final vs anillo) — HeaderFooter15 captura para el modal About */
+/**
+ * Canvas WebGL de la escena activa — HeaderFooter15 lo captura para el modal About.
+ *
+ * Contrato (ver skill immersive-architecture):
+ *   <html data-atj-hero-mode> indica la escena activa ("final" | "ring" | "space")
+ *   y cada escena marca su canvas con un data-* propio.
+ *
+ * En las rutas dedicadas (slider/ring/space) solo existe un canvas de escena. Por eso,
+ * además de resolver por modo, hacemos un fallback que escanea los selectores conocidos
+ * y devuelve el primero presente y con buffer válido. Esto cubre también la navegación
+ * cliente, donde `data-atj-hero-mode` puede quedar "pegado" de una ruta anterior.
+ */
+const HERO_CANVAS_SELECTORS = {
+  final: "[data-aqua-canvas='true']",
+  ring:  "[data-ring-canvas='true']",
+  space: "[data-space3d-canvas='true']",
+};
+
+function isUsableCanvas(el) {
+  return !!el && el.width > 0 && el.height > 0;
+}
+
 function getHeroCaptureCanvas() {
   const mode = document.documentElement?.dataset?.atjHeroMode;
-  if (mode === "ring") {
-    const ring = document.querySelector("[data-ring-canvas='true']");
-    if (ring) return ring;
+
+  // 1) Resolución explícita por modo declarado.
+  const bySelector = HERO_CANVAS_SELECTORS[mode];
+  if (bySelector) {
+    const el = document.querySelector(bySelector);
+    if (isUsableCanvas(el)) return el;
   }
-  return document.querySelector("[data-aqua-canvas='true']");
+
+  // 2) Fallback robusto: primer canvas de escena conocido presente en el DOM.
+  for (const sel of Object.values(HERO_CANVAS_SELECTORS)) {
+    const el = document.querySelector(sel);
+    if (isUsableCanvas(el)) return el;
+  }
+
+  return null;
 }
 
 /** Compone el WebGL sobre blanco para que zonas α=0 (p. ej. hueco del anillo) no disparen el fallback que borraba toda la escena. */
@@ -142,8 +167,18 @@ function createTransparentTexture() {
   return tex;
 }
 
-export default function HeaderFooter15({ children }) {
+export default function HeaderFooter16({ children, heroMode }) {
   const [modalState, setModalState] = useState("closed");
+
+  // ── Contrato de escena activa ─────────────────────────────────────────────
+  // Como shell persistente (getLayout), HeaderFooter16 sobrevive al cambio de
+  // ruta y los hijos (la escena) se intercambian debajo. Cada ruta declara su
+  // `heroMode` ("final" | "ring" | "space") para que getHeroCaptureCanvas capture
+  // el canvas correcto en el modal About sin depender de un modo "pegado" previo.
+  useEffect(() => {
+    if (!heroMode || typeof document === "undefined") return;
+    document.documentElement.dataset.atjHeroMode = heroMode;
+  }, [heroMode]);
 
   const h1Ref        = useRef(null);
   const canvasRef    = useRef(null);

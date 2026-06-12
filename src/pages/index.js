@@ -1,17 +1,20 @@
+import HeaderFooter16 from "@/components/menu/index16";
+import FinalSlider4 from "@/components/final/FinalSlider4";
 
-import HeaderFooter15 from "@/components/menu/index15";
-import { HomeSliderProvider } from "@/components/HomeSlidersWrapper/HomeSliderWrapper";
-import HomeSliderWrapper from "@/components/HomeSlidersWrapper/HomeSliderWrapper";
-
+// La home ES la vista slider. Se elimina el dual-slider anterior
+// (HomeSliderProvider + HomeSliderWrapper montaban FinalSlider4 + RingSlider4 a la
+// vez → el caso más pesado de GPU). Ahora `/` monta una sola escena, igual que el
+// resto de rutas, bajo el shell persistente.
 export default function Home() {
+  return <FinalSlider4 />;
+}
+
+// Wrapper ESTRUCTURALMENTE IDÉNTICO al de /ring y /space (mismo div + mismo
+// HeaderFooter16) para que React preserve la instancia del shell al navegar.
+Home.getLayout = function getLayout(page) {
   return (
     <div className="h-full w-full overflow-hidden">
-      <HomeSliderProvider>
-        <HeaderFooter15>
-          {/* Sliders: avatar Berlin (arriba) alterna FinalSlider4 ↔ RingSlider3 con transición */}
-          <HomeSliderWrapper />
-        </HeaderFooter15>
-      </HomeSliderProvider>
+      <HeaderFooter16 heroMode="final">{page}</HeaderFooter16>
     </div>
   );
-}
+};

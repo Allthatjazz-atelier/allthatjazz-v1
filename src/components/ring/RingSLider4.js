@@ -417,6 +417,7 @@ export default function RingSLider4({
       const wp = new T.Vector3();
       let totalRY = 0;
       let smoothTilt = tiltState.current;
+      let readyDispatched = false;
 
       const tick = ts => {
         raf = requestAnimationFrame(tick);
@@ -456,6 +457,12 @@ export default function RingSLider4({
           progressRef.current.style.transform = `scaleX(${(frontIdx + 1) / N})`;
 
         renderer.render(scene, camera);
+
+        // 2b: avisar a RouteTransition de que la escena ya pintó su primer frame.
+        if (!readyDispatched) {
+          readyDispatched = true;
+          window.dispatchEvent(new CustomEvent("atj-scene-ready"));
+        }
       };
       tick(0);
 
@@ -477,9 +484,21 @@ export default function RingSLider4({
       };
     };
 
-    let destroyFn;
-    boot().then(fn => { destroyFn = fn; });
-    return () => destroyFn?.();
+    let cancelled = false;
+    let destroyFn = null;
+    boot().then((fn) => {
+      // StrictMode (dev) hace mount→unmount→mount: el cleanup corre ANTES de que
+      // boot() resuelva, así que destroyFn aún era undefined y ese primer arranque
+      // no se limpiaba → quedaban DOS render loops vivos compartiendo el mismo
+      // rebuildRef y el anillo no se reconstruía al mover los knobs. Con el flag
+      // `cancelled` disponemos de inmediato el arranque ya obsoleto.
+      if (cancelled) fn?.();
+      else destroyFn = fn;
+    });
+    return () => {
+      cancelled = true;
+      destroyFn?.();
+    };
   }, [images, videos, friction, sensitivity]);
 
   return (

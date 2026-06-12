@@ -13,6 +13,7 @@ import HeaderFooter2 from "@/components/menu/index2";
 import HeaderFooter3 from "@/components/menu/index3";
 import CustomCursor from "@/components/tools/CustomCursor";
 import HeaderFooter5 from "@/components/menu/index5";
+import RouteTransition from "@/components/transition/RouteTransition";
 
 gsap.registerPlugin(ScrollTrigger);
 
@@ -39,6 +40,12 @@ export default function App({ Component, pageProps }) {
     };
   }, []);
 
+  // Patrón "persistent layout" de Pages Router: si la página define getLayout,
+  // su shell (HeaderFooter16) queda montado y persiste entre navegaciones —
+  // solo se intercambia la escena. Las páginas sin getLayout (p. ej. la home
+  // actual) caen al identity y se comportan como antes.
+  const getLayout = Component.getLayout ?? ((page) => page);
+
   return (
     <>
       {/* <div id="header-footer-wrapper" style={{ opacity: 0 }}> */}
@@ -47,7 +54,8 @@ export default function App({ Component, pageProps }) {
       </div> */}
       {/* </div> */}
       <CustomCursor />
-      <Component {...pageProps} />
+      <RouteTransition />
+      {getLayout(<Component {...pageProps} />)}
     </>
   );
 }
