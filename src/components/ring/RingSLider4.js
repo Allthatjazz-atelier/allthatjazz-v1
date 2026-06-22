@@ -240,6 +240,16 @@ export default function RingSLider4({
   const rebuildRef = useRef(false);
   useEffect(() => { rebuildRef.current = true; }, [R, H, C]);
 
+  // Layout responsivo de los controles: derecha (desktop) → arriba bajo el nav (móvil)
+  const [isMobile, setIsMobile] = useState(false);
+  useEffect(() => {
+    const mq = window.matchMedia('(max-width: 768px)');
+    const sync = () => setIsMobile(mq.matches);
+    sync();
+    mq.addEventListener('change', sync);
+    return () => mq.removeEventListener('change', sync);
+  }, []);
+
   useEffect(() => {
     // Mezclar imágenes y vídeos
     const allMedia = [];
@@ -509,25 +519,7 @@ export default function RingSLider4({
         style={{ display:'block', width:'100%', height:'100%', outline:'none', cursor:'grab' }}
       />
 
-      <p ref={hintRef} style={{
-        position:'absolute', bottom:'6.5rem', left:'50%',
-        transform:'translateX(-50%)', margin:0,
-        color:'rgba(0,0,0,0.18)', fontFamily:'"Courier New",Courier,monospace',
-        fontSize:'0.52rem', letterSpacing:'0.55em', textTransform:'uppercase',
-        whiteSpace:'nowrap', userSelect:'none', pointerEvents:'none',
-      }}>
-        scroll · drag to tilt
-      </p>
-
-      <p ref={counterRef} aria-live="polite" style={{
-        position:'absolute', bottom:'5rem', left:'50%',
-        transform:'translateX(-50%)', margin:0,
-        color:'rgba(0,0,0,0.26)', fontFamily:'"Courier New",Courier,monospace',
-        fontSize:'0.60rem', letterSpacing:'0.32em',
-        whiteSpace:'nowrap', userSelect:'none', pointerEvents:'none',
-      }}>
-        01 — {String(images.length + videos.length).padStart(2,'0')}
-      </p>
+      
 
       <div style={{
         position:'absolute', bottom:0, left:'10%',
@@ -541,12 +533,21 @@ export default function RingSLider4({
         }}/>
       </div>
 
-      {/* Ø · H · curvatura — derecha, centro vertical; z por encima del HeaderFooter (9999) */}
+      {/* Ø · H · curvatura — desktop: derecha, centro vertical · móvil: arriba, bajo el BerlinClockNav2 */}
       <div style={{
-        position:'fixed', top:'50%', right:'max(1rem, env(safe-area-inset-right))',
-        transform:'translateY(-50%)',
-        display:'flex', flexDirection:'row', alignItems:'flex-end', justifyContent:'flex-end',
-        gap:'1.1rem', zIndex:10050, pointerEvents:'auto',
+        position:'fixed', zIndex:10050, pointerEvents:'auto',
+        display:'flex', flexDirection:'row',
+        ...(isMobile
+          ? {
+              top:'calc(env(safe-area-inset-top, 0px) + 4.25rem)',
+              left:'50%', transform:'translateX(-50%)',
+              alignItems:'flex-end', justifyContent:'center', gap:'1.6rem',
+            }
+          : {
+              top:'50%', right:'max(1rem, env(safe-area-inset-right))',
+              transform:'translateY(-50%)',
+              alignItems:'flex-end', justifyContent:'flex-end', gap:'1.1rem',
+            }),
       }}>
         <Knob value={R} min={2.0} max={9.0} onChange={setR} label="Ø" size={52} />
         <VerticalFader value={H} min={0.8} max={6.0} onChange={setH} label="H" size={52} />

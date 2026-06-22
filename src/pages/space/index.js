@@ -1,8 +1,8 @@
 import HeaderFooter16 from "@/components/menu/index16";
-import Space3D from "@/components/Space3D/Space3D";
+import Space3D_2 from "@/components/Space3D/Space3D_2";
 
 export default function Space() {
-  return <Space3D />;
+  return <Space3D_2 />;
 }
 
 // Shell persistente: el wrapper debe ser ESTRUCTURALMENTE IDÉNTICO en las 3

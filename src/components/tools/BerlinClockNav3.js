@@ -26,16 +26,16 @@ const STAR_ORIGIN = "6.144 6.144";
 
 // ─── Morph "allthatjazz" escalado al tamaño del link ─────────────────────────────
 // El título original es 64px y usa { scale: 9, blur: 0.45, glow: 3.5, freq: 0.012 }.
-// Aquí los links son 24px (~0.375×). Para que el gesto se vea IGUAL en proporción
-// (y no colapse en una mancha negra) escalamos displacement/blur/glow ×0.375 y la
-// frecuencia de la turbulencia ÷0.375 (más densa sobre un glifo más pequeño).
-// Los ratios de la respiración (pico→bucle) se conservan idénticos al original.
-const MORPH_ON      = { scale: 3.4, blur: 0.17, glow: 1.3,  freq: 0.032 }; // pico de entrada
-const MORPH_BREATH  = { scale: 2.6, glow: 0.75, freq: 0.021 };            // bucle yoyo
-const MORPH_FREQ_0  = 0.021;                                              // freq en reposo
+// Aquí los links del pill son 18px (~0.28×). Para que el gesto se vea IGUAL en
+// proporción (y no colapse en una mancha negra) escalamos displacement/blur/glow
+// ×0.28 y la frecuencia de la turbulencia ÷0.28 (más densa sobre un glifo más
+// pequeño). Los ratios de la respiración (pico→bucle) se conservan del original.
+const MORPH_ON      = { scale: 2.5, blur: 0.13, glow: 1.0,  freq: 0.043 }; // pico de entrada
+const MORPH_BREATH  = { scale: 1.9, glow: 0.55, freq: 0.028 };           // bucle yoyo
+const MORPH_FREQ_0  = 0.028;                                             // freq en reposo
 
 // ─── Componente ────────────────────────────────────────────────────────────────
-export default function BerlinClockNav2() {
+export default function BerlinClockNav3() {
   const router = useRouter();
   const [time, setTime] = useState("");
   const [open, setOpen] = useState(false);
@@ -378,15 +378,16 @@ export default function BerlinClockNav2() {
         .bcn-paper {
           position: relative;
           overflow: hidden;
-          min-width: 380px;
           max-width: 90vw;
-          padding: 52px 80px;
+          padding: 12px 26px;
+          /* Pill: border-radius completo */
+          border-radius: 999px;
           /* Velo blanco translúcido + difusión del fondo (papel de calco) */
           background-color: rgba(255, 255, 255, 0.28);
           -webkit-backdrop-filter: blur(10px) saturate(0.85) brightness(1.06) contrast(1.02);
           backdrop-filter: blur(10px) saturate(0.85) brightness(1.06) contrast(1.02);
           border: none;
-          box-shadow: 0 26px 70px -22px rgba(0, 0, 0, 0.14);
+          box-shadow: 0 18px 50px -20px rgba(0, 0, 0, 0.16);
         }
         /* Grano de fibra de papel — textura monocroma multiplicada */
         .bcn-paper::before {
@@ -417,18 +418,18 @@ export default function BerlinClockNav2() {
           margin: 0;
           padding: 0;
           display: flex;
-          flex-direction: column;
+          flex-direction: row;
           align-items: center;
-          gap: 6px;
+          gap: 26px;
         }
 
         .bcn-paper-link {
           background: transparent;
           border: 0;
-          padding: 2px 4px;
+          padding: 2px 2px;
           cursor: pointer;
           color: #000;
-          font: 800 24px/1.05 -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+          font: 800 18px/1 -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
           letter-spacing: -0.03em;
           white-space: nowrap;
           opacity: 0.82;

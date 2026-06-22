@@ -4,6 +4,7 @@ import * as THREE from "three";
 import gsap from "gsap";
 import AboutSection7 from "../about/index7";
 import BerlinClockNav2 from "../tools/BerlinClockNav2";
+import BerlinClockNav3 from "../tools/BerlinClockNav3";
 
 const vertexShader = `
   varying vec2 vUv;
@@ -552,7 +553,7 @@ export default function HeaderFooter16({ children, heroMode }) {
   return (
     <>
       <div className="fixed top-0 left-0 w-full flex justify-center pt-[16px] z-[9999] pointer-events-none">
-        <BerlinClockNav2 />
+        <BerlinClockNav3 />
       </div>
 
       <div className="fixed bottom-0 left-0 w-full flex flex-col justify-center items-center pb-2 leading-[2.75rem] z-[9999] HeaderFooter select-none pointer-events-auto">
