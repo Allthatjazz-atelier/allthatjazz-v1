@@ -83,44 +83,49 @@ export default function ClockAndNavGooey() {
 
   return (
     <div
-      className="bcn relative flex items-start text-[0.875rem] tracking-[-0.04em] text-black"
+      className="bcn relative text-[0.875rem] tracking-[-0.04em] text-black"
       style={{ pointerEvents: "auto" }}
     >
-      <div className="bcn-left">
-        <BerlinClock />
-        <GooeyMark letterIndex={activeIndex} />
+      <div className="bcn-bar">
+        <div className="bcn-pill bcn-clock" aria-live="polite">
+          <BerlinClock />
+        </div>
+        <NavPills activeIndex={activeIndex} onNavigate={handleNavigate} />
       </div>
-      <NavPills activeIndex={activeIndex} onNavigate={handleNavigate} />
+      <GooeyMark letterIndex={activeIndex} />
 
       <style>{`
         .bcn {
           --bcn-pill: 1.5em;
-          --bcn-gap: 0.28em;
-          --bcn-rest: calc(2 * var(--bcn-pill) + var(--bcn-gap));
-          gap: 0.55em;
+          --bcn-cut: 2px;
+          --bcn-gooey: 2.55em;
+          display: flex;
+          flex-direction: column;
+          align-items: center;
+          gap: 0.18em;
           contain: layout style;
           isolation: isolate;
         }
 
-        .bcn-left {
+        /* Una cápsula; los huecos blancos la cortan en minipills. */
+        .bcn-bar {
           display: flex;
-          flex-direction: column;
           align-items: stretch;
-          gap: var(--bcn-gap);
-        }
-
-        .bcn-clock {
-          white-space: nowrap;
-          line-height: var(--bcn-pill);
+          height: var(--bcn-pill);
+          gap: var(--bcn-cut);
+          border-radius: 999px;
+          overflow: hidden;
         }
 
         .bcn-nav {
-          display: flex;
-          flex-direction: column;
-          align-items: flex-start;
-          gap: var(--bcn-gap);
-          min-width: 4.8em;
-          contain: layout;
+          display: contents;
+        }
+
+        .bcn-gooey {
+          width: var(--bcn-gooey);
+          height: var(--bcn-gooey);
+          overflow: visible;
+          pointer-events: none;
         }
 
         .bcn-pill {
@@ -131,7 +136,7 @@ export default function ClockAndNavGooey() {
           min-width: var(--bcn-pill);
           padding: 0;
           border: 0;
-          border-radius: 999px;
+          border-radius: 0;
           background: rgba(17, 17, 17, 0.06);
           color: inherit;
           font: inherit;
@@ -148,6 +153,17 @@ export default function ClockAndNavGooey() {
           outline: none;
         }
         .bcn-pill.is-active { opacity: 1; }
+
+        .bcn-pill.bcn-clock {
+          padding: 0 0.7em;
+          opacity: 1;
+          cursor: default;
+          white-space: nowrap;
+        }
+        .bcn-pill.bcn-clock:hover,
+        .bcn-pill.bcn-clock:focus-visible {
+          opacity: 1;
+        }
 
         .bcn-pill__key {
           position: relative;
@@ -180,12 +196,6 @@ export default function ClockAndNavGooey() {
           pointer-events: none;
         }
 
-        .bcn-gooey {
-          width: 100%;
-          height: var(--bcn-rest);
-          overflow: visible;
-          pointer-events: none;
-        }
         .bcn-gooey svg {
           display: block;
           width: 100%;
@@ -216,7 +226,7 @@ const BerlinClock = memo(function BerlinClock() {
     return () => clearInterval(id);
   }, []);
   return (
-    <span className="bcn-clock" style={{ fontVariantNumeric: "tabular-nums" }}>
+    <span style={{ fontVariantNumeric: "tabular-nums" }}>
       Berlin, <span ref={ref} />
     </span>
   );
