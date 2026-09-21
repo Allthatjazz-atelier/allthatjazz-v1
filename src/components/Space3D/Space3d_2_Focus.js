@@ -48,7 +48,7 @@ const FRAG = /* glsl */ `
 `;
 
 // ─── Componente ────────────────────────────────────────────────────────────────
-export default function Space3D_2({
+export default function Space3D_2_Focus({
   count,
   box     = { x: 30, y: 18, z: 42 },
   damping = 0.085,

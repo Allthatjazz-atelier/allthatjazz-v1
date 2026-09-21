@@ -82,22 +82,20 @@ export const SPACE_IMAGES = [
   "img-5447",
 ];
 
-export const SPACE_VIDEOS = [
+/** Unión editorial de todos los vídeos del manifiesto, en orden de lectura. */
+export const ALL_VIDEOS = [
+  ...SLIDER_VIDEOS,
+  ...RING_VIDEOS,
   "socarrat-video-reel0826-nosound",
   "dfny-explo01",
   "test09",
   "test02-2",
   "movo-1080p-1536x1920-8",
   "img-3612",
-];
-
-/** Unión editorial de todos los vídeos del manifiesto, en orden de lectura. */
-export const ALL_VIDEOS = [
-  ...SLIDER_VIDEOS,
-  ...RING_VIDEOS,
-  ...SPACE_VIDEOS,
   "img-3614",
 ];
+
+export const SPACE_VIDEOS = ALL_VIDEOS;
 
 export const VIDEO_LABEL_BY_NAME = {
   "atj-aboutmotion-01": "ATJ Motion",
