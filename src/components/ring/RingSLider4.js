@@ -1,6 +1,8 @@
 'use client';
 
 import { useEffect, useRef, useState } from 'react';
+import { useOptimizedMedia } from '@/hooks/useOptimizedMedia';
+import { RING_IMAGES, RING_VIDEOS } from '@/data/mediaCatalog';
 
 const VERT = /* glsl */ `
   varying vec2  vUv;
@@ -31,17 +33,6 @@ const FRAG = /* glsl */ `
   }
 `;
 
-const DEFAULT_IMAGES = Array.from({ length: 15 }, (_, i) => `/story/story${i + 1}.png`);
-const DEFAULT_VIDEOS = [
-  '/motion/Allthatjazz cinematic©Feb26.mp4',
-  '/motion/ATJ About Cuaderno.mp4',
-  '/motion/ATJ_AboutMotion 02.mp4',
-  '/motion/JC_Reel 4_5_1.mp4',
-  '/motion/motionatj.mp4',
-  '/motion/Playground_Carhartt-WIP_24012026 (1)_1.mp4',
-  '/motion/Portfolio-Gallery-4-5.mp4',
-  '/motion/promojohnny.mp4',
-];
 
 // ── Geometría: parche curvo que cubre exactamente dTheta en el ecuador ────────
 // Con phi=0, la normal es exactamente radial — sin distorsión trapezoidal.
@@ -217,8 +208,6 @@ function VerticalFader({ value, min, max, onChange, label, size = 64, decimals =
 
 // ─────────────────────────────────────────────────────────────────────────────
 export default function RingSLider4({
-  images      = DEFAULT_IMAGES,
-  videos      = DEFAULT_VIDEOS,
   friction    = 0.92,
   sensitivity = 0.0010,
 }) {
@@ -226,6 +215,12 @@ export default function RingSLider4({
   const counterRef  = useRef(null);
   const progressRef = useRef(null);
   const hintRef     = useRef(null);
+
+  const { getImage, getVideo, isLoaded } = useOptimizedMedia();
+  const getImageRef = useRef(getImage);
+  const getVideoRef = useRef(getVideo);
+  getImageRef.current = getImage;
+  getVideoRef.current = getVideo;
 
   // R = radio   H = altura   C = curvatura (concavo / convexo)
   const [R, setR] = useState(5.0);
@@ -251,19 +246,24 @@ export default function RingSLider4({
   }, []);
 
   useEffect(() => {
-    // Mezclar imágenes y vídeos
+    if (!isLoaded) return;
+
+    const imageUrls = RING_IMAGES.map((n) => getImageRef.current(n).src).filter(Boolean);
+    const videoUrls = RING_VIDEOS.map((n) => getVideoRef.current(n).src).filter(Boolean);
+
     const allMedia = [];
-    const total = images.length + videos.length;
-    const step  = Math.max(1, Math.floor(total / (videos.length || 1)));
+    const total = imageUrls.length + videoUrls.length;
+    const step  = Math.max(1, Math.floor(total / (videoUrls.length || 1)));
     let vi = 0, ii = 0;
     for (let i = 0; i < total; i++) {
-      if (vi < videos.length && i % step === Math.floor(step / 2)) {
-        allMedia.push({ url: videos[vi++], type: 'video' });
-      } else if (ii < images.length) {
-        allMedia.push({ url: images[ii++], type: 'image' });
+      if (vi < videoUrls.length && i % step === Math.floor(step / 2)) {
+        allMedia.push({ url: videoUrls[vi++], type: 'video' });
+      } else if (ii < imageUrls.length) {
+        allMedia.push({ url: imageUrls[ii++], type: 'image' });
       }
     }
     const N = allMedia.length;
+    if (!N) return;
 
     let raf;
 
@@ -275,9 +275,8 @@ export default function RingSLider4({
         canvas: canvasRef.current,
         antialias: true,
         alpha: true,
-        // Necesario para capturas 2D (About en HeaderFooter15): sin esto el buffer se limpia
-        // tras el frame y drawImage devuelve vacío / blanco — distinto efecto que FinalSlider4.
         preserveDrawingBuffer: true,
+        powerPreference: 'high-performance',
       });
       renderer.outputColorSpace = T.SRGBColorSpace;
       renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
@@ -298,7 +297,6 @@ export default function RingSLider4({
       const dTheta   = (Math.PI * 2) / N;
 
       const sectors = allMedia.map(({ url, type }, i) => {
-        // thetaC centrado en el sector — empezamos desde la parte delantera
         const thetaC = i * dTheta;
 
         const uniforms = {
@@ -317,24 +315,26 @@ export default function RingSLider4({
         if (type === 'video') {
           const vid = document.createElement('video');
           Object.assign(vid, {
-            src: url, crossOrigin: 'anonymous',
-            loop: true, muted: true, playsInline: true, autoplay: true,
+            src: encodeURI(url), crossOrigin: 'anonymous',
+            loop: true, muted: true, playsInline: true, preload: 'metadata',
           });
           vid.style.display = 'none';
           document.body.appendChild(vid);
           const tex = new T.VideoTexture(vid);
           tex.colorSpace = T.SRGBColorSpace;
+          tex.generateMipmaps = false;
+          tex.minFilter = tex.magFilter = T.LinearFilter;
           uniforms.uTex.value = tex;
-          videoEls.push(vid);
-          vid.play().catch(() => {});
+          videoEls.push({ vid, index: i });
         } else {
           loader.load(url, tex => {
             tex.colorSpace = T.SRGBColorSpace;
+            tex.minFilter = tex.magFilter = T.LinearFilter;
             uniforms.uTex.value = tex;
           });
         }
 
-        return { mesh, uniforms, thetaC };
+        return { mesh, uniforms, thetaC, type };
       });
 
       // ── Física ─────────────────────────────────────────────────────────
@@ -423,6 +423,11 @@ export default function RingSLider4({
       };
       window.addEventListener('resize', onResize);
 
+      const onVis = () => {
+        if (document.hidden) videoEls.forEach(({ vid }) => vid.pause());
+      };
+      document.addEventListener('visibilitychange', onVis);
+
       // ── Render loop ────────────────────────────────────────────────────
       const wp = new T.Vector3();
       let totalRY = 0;
@@ -466,6 +471,16 @@ export default function RingSLider4({
         if (progressRef.current)
           progressRef.current.style.transform = `scaleX(${(frontIdx + 1) / N})`;
 
+        // 1-2 vídeos concurrentes: el del sector frontal y su vecino. El resto pause.
+        videoEls.forEach(({ vid, index }) => {
+          const dist = Math.min(Math.abs(index - frontIdx), N - Math.abs(index - frontIdx));
+          if (dist <= 1) {
+            if (vid.paused) vid.play().catch(() => {});
+          } else if (!vid.paused) {
+            vid.pause();
+          }
+        });
+
         renderer.render(scene, camera);
 
         // 2b: avisar a RouteTransition de que la escena ya pintó su primer frame.
@@ -488,8 +503,9 @@ export default function RingSLider4({
         window.removeEventListener('mouseup',   onMouseUp);
         window.removeEventListener('keydown',   onKey);
         window.removeEventListener('resize',    onResize);
+        document.removeEventListener('visibilitychange', onVis);
         sectors.forEach(({ mesh }) => { mesh.geometry.dispose(); mesh.material.dispose(); });
-        videoEls.forEach(v => { v.pause(); v.remove(); });
+        videoEls.forEach(({ vid }) => { vid.pause(); vid.remove(); });
         renderer.dispose();
       };
     };
@@ -509,7 +525,7 @@ export default function RingSLider4({
       cancelled = true;
       destroyFn?.();
     };
-  }, [images, videos, friction, sensitivity]);
+  }, [isLoaded, friction, sensitivity]);
 
   return (
     <div style={{ position:'fixed', inset:0, background:'#ffffff', overflow:'hidden' }}>
@@ -528,7 +544,7 @@ export default function RingSLider4({
         <div ref={progressRef} style={{
           width:'100%', height:'100%', background:'rgba(0,0,0,0.30)',
           transformOrigin:'left center',
-          transform:`scaleX(${1 / (images.length + videos.length)})`,
+          transform:`scaleX(${1 / (RING_IMAGES.length + RING_VIDEOS.length)})`,
           transition:'transform 0.3s cubic-bezier(0.16,1,0.3,1)',
         }}/>
       </div>

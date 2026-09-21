@@ -1,190 +1,936 @@
 {
+  "source": "new-assets",
   "videos": [
     {
-      "original": "/motion/ATJ About Cuaderno.mp4",
-      "mobile_mp4": "/motion/optimized/ATJ About Cuaderno.mobile.mp4",
-      "mobile_webm": "/motion/optimized/ATJ About Cuaderno.mobile.webm",
-      "desktop_mp4": "/motion/optimized/ATJ About Cuaderno.desktop.mp4",
-      "desktop_webm": "/motion/optimized/ATJ About Cuaderno.desktop.webm",
-      "poster": "/motion/optimized/ATJ About Cuaderno.poster.jpg",
-      "name": "ATJ About Cuaderno"
+      "original": "/new-assets/ATJ About Cuaderno.mp4",
+      "name": "atj-about-cuaderno",
+      "aliases": [
+        "ATJ About Cuaderno"
+      ],
+      "mobile_mp4": "/media/optimized/videos/atj-about-cuaderno.mobile.mp4",
+      "mobile_webm": "/media/optimized/videos/atj-about-cuaderno.mobile.webm",
+      "desktop_mp4": "/media/optimized/videos/atj-about-cuaderno.desktop.mp4",
+      "desktop_webm": "/media/optimized/videos/atj-about-cuaderno.desktop.webm",
+      "poster": "/media/optimized/videos/atj-about-cuaderno.poster.jpg"
     },
     {
-      "original": "/motion/ATJ_AboutMotion 02.mp4",
-      "mobile_mp4": "/motion/optimized/ATJ_AboutMotion 02.mobile.mp4",
-      "mobile_webm": "/motion/optimized/ATJ_AboutMotion 02.mobile.webm",
-      "desktop_mp4": "/motion/optimized/ATJ_AboutMotion 02.desktop.mp4",
-      "desktop_webm": "/motion/optimized/ATJ_AboutMotion 02.desktop.webm",
-      "poster": "/motion/optimized/ATJ_AboutMotion 02.poster.jpg",
-      "name": "ATJ_AboutMotion 02"
+      "original": "/new-assets/ATJ_AboutMotion 01.mp4",
+      "name": "atj-aboutmotion-01",
+      "aliases": [
+        "ATJ_AboutMotion 01"
+      ],
+      "mobile_mp4": "/media/optimized/videos/atj-aboutmotion-01.mobile.mp4",
+      "mobile_webm": "/media/optimized/videos/atj-aboutmotion-01.mobile.webm",
+      "desktop_mp4": "/media/optimized/videos/atj-aboutmotion-01.desktop.mp4",
+      "desktop_webm": "/media/optimized/videos/atj-aboutmotion-01.desktop.webm",
+      "poster": "/media/optimized/videos/atj-aboutmotion-01.poster.jpg"
     },
     {
-      "original": "/motion/Allthatjazz cinematic©Feb26.mp4",
-      "mobile_mp4": "/motion/optimized/Allthatjazz cinematic©Feb26.mobile.mp4",
-      "mobile_webm": "/motion/optimized/Allthatjazz cinematic©Feb26.mobile.webm",
-      "desktop_mp4": "/motion/optimized/Allthatjazz cinematic©Feb26.desktop.mp4",
-      "desktop_webm": "/motion/optimized/Allthatjazz cinematic©Feb26.desktop.webm",
-      "poster": "/motion/optimized/Allthatjazz cinematic©Feb26.poster.jpg",
-      "name": "Allthatjazz cinematic©Feb26"
+      "original": "/new-assets/ATJ_AboutMotion 02.mp4",
+      "name": "atj-aboutmotion-02",
+      "aliases": [
+        "ATJ_AboutMotion 02"
+      ],
+      "mobile_mp4": "/media/optimized/videos/atj-aboutmotion-02.mobile.mp4",
+      "mobile_webm": "/media/optimized/videos/atj-aboutmotion-02.mobile.webm",
+      "desktop_mp4": "/media/optimized/videos/atj-aboutmotion-02.desktop.mp4",
+      "desktop_webm": "/media/optimized/videos/atj-aboutmotion-02.desktop.webm",
+      "poster": "/media/optimized/videos/atj-aboutmotion-02.poster.jpg"
     },
     {
-      "original": "/motion/Playground_Carhartt-WIP_24012026 (1)_1.mp4",
-      "mobile_mp4": "/motion/optimized/Playground_Carhartt-WIP_24012026 (1)_1.mobile.mp4",
-      "mobile_webm": "/motion/optimized/Playground_Carhartt-WIP_24012026 (1)_1.mobile.webm",
-      "desktop_mp4": "/motion/optimized/Playground_Carhartt-WIP_24012026 (1)_1.desktop.mp4",
-      "desktop_webm": "/motion/optimized/Playground_Carhartt-WIP_24012026 (1)_1.desktop.webm",
-      "poster": "/motion/optimized/Playground_Carhartt-WIP_24012026 (1)_1.poster.jpg",
-      "name": "Playground_Carhartt-WIP_24012026 (1)_1"
+      "original": "/new-assets/BisBisMotion Portfolio JUN26.mp4",
+      "name": "bisbismotion-portfolio-jun26",
+      "aliases": [
+        "BisBisMotion Portfolio JUN26"
+      ],
+      "mobile_mp4": "/media/optimized/videos/bisbismotion-portfolio-jun26.mobile.mp4",
+      "mobile_webm": "/media/optimized/videos/bisbismotion-portfolio-jun26.mobile.webm",
+      "desktop_mp4": "/media/optimized/videos/bisbismotion-portfolio-jun26.desktop.mp4",
+      "desktop_webm": "/media/optimized/videos/bisbismotion-portfolio-jun26.desktop.webm",
+      "poster": "/media/optimized/videos/bisbismotion-portfolio-jun26.poster.jpg"
     },
     {
-      "original": "/motion/Portfolio-Gallery-4-5.mp4",
-      "mobile_mp4": "/motion/optimized/Portfolio-Gallery-4-5.mobile.mp4",
-      "mobile_webm": "/motion/optimized/Portfolio-Gallery-4-5.mobile.webm",
-      "desktop_mp4": "/motion/optimized/Portfolio-Gallery-4-5.desktop.mp4",
-      "desktop_webm": "/motion/optimized/Portfolio-Gallery-4-5.desktop.webm",
-      "poster": "/motion/optimized/Portfolio-Gallery-4-5.poster.jpg",
-      "name": "Portfolio-Gallery-4-5"
+      "original": "/new-assets/DFNY Explo01.mp4",
+      "name": "dfny-explo01",
+      "aliases": [
+        "DFNY Explo01"
+      ],
+      "mobile_mp4": "/media/optimized/videos/dfny-explo01.mobile.mp4",
+      "mobile_webm": "/media/optimized/videos/dfny-explo01.mobile.webm",
+      "desktop_mp4": "/media/optimized/videos/dfny-explo01.desktop.mp4",
+      "desktop_webm": "/media/optimized/videos/dfny-explo01.desktop.webm",
+      "poster": "/media/optimized/videos/dfny-explo01.poster.jpg"
     },
     {
-      "original": "/motion/motionatj.mp4",
-      "mobile_mp4": "/motion/optimized/motionatj.mobile.mp4",
-      "mobile_webm": "/motion/optimized/motionatj.mobile.webm",
-      "desktop_mp4": "/motion/optimized/motionatj.desktop.mp4",
-      "desktop_webm": "/motion/optimized/motionatj.desktop.webm",
-      "poster": "/motion/optimized/motionatj.poster.jpg",
-      "name": "motionatj"
+      "original": "/new-assets/DFNY_InstaReel 02.mp4",
+      "name": "dfny-instareel-02",
+      "aliases": [
+        "DFNY_InstaReel 02"
+      ],
+      "mobile_mp4": "/media/optimized/videos/dfny-instareel-02.mobile.mp4",
+      "mobile_webm": "/media/optimized/videos/dfny-instareel-02.mobile.webm",
+      "desktop_mp4": "/media/optimized/videos/dfny-instareel-02.desktop.mp4",
+      "desktop_webm": "/media/optimized/videos/dfny-instareel-02.desktop.webm",
+      "poster": "/media/optimized/videos/dfny-instareel-02.poster.jpg"
     },
     {
-      "original": "/motion/promojohnny.mp4",
-      "mobile_mp4": "/motion/optimized/promojohnny.mobile.mp4",
-      "mobile_webm": "/motion/optimized/promojohnny.mobile.webm",
-      "desktop_mp4": "/motion/optimized/promojohnny.desktop.mp4",
-      "desktop_webm": "/motion/optimized/promojohnny.desktop.webm",
-      "poster": "/motion/optimized/promojohnny.poster.jpg",
-      "name": "promojohnny"
+      "original": "/new-assets/DFNY_InstaReel 03.mp4",
+      "name": "dfny-instareel-03",
+      "aliases": [
+        "DFNY_InstaReel 03"
+      ],
+      "mobile_mp4": "/media/optimized/videos/dfny-instareel-03.mobile.mp4",
+      "mobile_webm": "/media/optimized/videos/dfny-instareel-03.mobile.webm",
+      "desktop_mp4": "/media/optimized/videos/dfny-instareel-03.desktop.mp4",
+      "desktop_webm": "/media/optimized/videos/dfny-instareel-03.desktop.webm",
+      "poster": "/media/optimized/videos/dfny-instareel-03.poster.jpg"
+    },
+    {
+      "original": "/new-assets/DFNY-JAZZTHETICS-InstaReel-IntroTest01 (1).mp4",
+      "name": "dfny-jazzthetics-instareel-introtest01-1",
+      "aliases": [
+        "DFNY-JAZZTHETICS-InstaReel-IntroTest01 (1)"
+      ],
+      "mobile_mp4": "/media/optimized/videos/dfny-jazzthetics-instareel-introtest01-1.mobile.mp4",
+      "mobile_webm": "/media/optimized/videos/dfny-jazzthetics-instareel-introtest01-1.mobile.webm",
+      "desktop_mp4": "/media/optimized/videos/dfny-jazzthetics-instareel-introtest01-1.desktop.mp4",
+      "desktop_webm": "/media/optimized/videos/dfny-jazzthetics-instareel-introtest01-1.desktop.webm",
+      "poster": "/media/optimized/videos/dfny-jazzthetics-instareel-introtest01-1.poster.jpg"
+    },
+    {
+      "original": "/new-assets/DFNY-Sketches-Flicker-04.mp4",
+      "name": "dfny-sketches-flicker-04",
+      "aliases": [
+        "DFNY-Sketches-Flicker-04"
+      ],
+      "mobile_mp4": "/media/optimized/videos/dfny-sketches-flicker-04.mobile.mp4",
+      "mobile_webm": "/media/optimized/videos/dfny-sketches-flicker-04.mobile.webm",
+      "desktop_mp4": "/media/optimized/videos/dfny-sketches-flicker-04.desktop.mp4",
+      "desktop_webm": "/media/optimized/videos/dfny-sketches-flicker-04.desktop.webm",
+      "poster": "/media/optimized/videos/dfny-sketches-flicker-04.poster.jpg"
+    },
+    {
+      "original": "/new-assets/DFNY-VIZ-Raw-Final-Nobrand.mp4",
+      "name": "dfny-viz-raw-final-nobrand",
+      "aliases": [
+        "DFNY-VIZ-Raw-Final-Nobrand"
+      ],
+      "mobile_mp4": "/media/optimized/videos/dfny-viz-raw-final-nobrand.mobile.mp4",
+      "mobile_webm": "/media/optimized/videos/dfny-viz-raw-final-nobrand.mobile.webm",
+      "desktop_mp4": "/media/optimized/videos/dfny-viz-raw-final-nobrand.desktop.mp4",
+      "desktop_webm": "/media/optimized/videos/dfny-viz-raw-final-nobrand.desktop.webm",
+      "poster": "/media/optimized/videos/dfny-viz-raw-final-nobrand.poster.jpg"
+    },
+    {
+      "original": "/new-assets/IMG_3612.mov",
+      "name": "img-3612",
+      "aliases": [
+        "IMG_3612"
+      ],
+      "mobile_mp4": "/media/optimized/videos/img-3612.mobile.mp4",
+      "mobile_webm": "/media/optimized/videos/img-3612.mobile.webm",
+      "desktop_mp4": "/media/optimized/videos/img-3612.desktop.mp4",
+      "desktop_webm": "/media/optimized/videos/img-3612.desktop.webm",
+      "poster": "/media/optimized/videos/img-3612.poster.jpg"
+    },
+    {
+      "original": "/new-assets/IMG_3614.mov",
+      "name": "img-3614",
+      "aliases": [
+        "IMG_3614"
+      ],
+      "mobile_mp4": "/media/optimized/videos/img-3614.mobile.mp4",
+      "mobile_webm": "/media/optimized/videos/img-3614.mobile.webm",
+      "desktop_mp4": "/media/optimized/videos/img-3614.desktop.mp4",
+      "desktop_webm": "/media/optimized/videos/img-3614.desktop.webm",
+      "poster": "/media/optimized/videos/img-3614.poster.jpg"
+    },
+    {
+      "original": "/new-assets/Johnny Carretes_PR Reel.mp4",
+      "name": "johnny-carretes-pr-reel",
+      "aliases": [
+        "Johnny Carretes_PR Reel"
+      ],
+      "mobile_mp4": "/media/optimized/videos/johnny-carretes-pr-reel.mobile.mp4",
+      "mobile_webm": "/media/optimized/videos/johnny-carretes-pr-reel.mobile.webm",
+      "desktop_mp4": "/media/optimized/videos/johnny-carretes-pr-reel.desktop.mp4",
+      "desktop_webm": "/media/optimized/videos/johnny-carretes-pr-reel.desktop.webm",
+      "poster": "/media/optimized/videos/johnny-carretes-pr-reel.poster.jpg"
+    },
+    {
+      "original": "/new-assets/MMD040-Socarrat-PR-Motion-2-Comp.mp4",
+      "name": "mmd040-socarrat-pr-motion-2-comp",
+      "aliases": [
+        "MMD040-Socarrat-PR-Motion-2-Comp"
+      ],
+      "mobile_mp4": "/media/optimized/videos/mmd040-socarrat-pr-motion-2-comp.mobile.mp4",
+      "mobile_webm": "/media/optimized/videos/mmd040-socarrat-pr-motion-2-comp.mobile.webm",
+      "desktop_mp4": "/media/optimized/videos/mmd040-socarrat-pr-motion-2-comp.desktop.mp4",
+      "desktop_webm": "/media/optimized/videos/mmd040-socarrat-pr-motion-2-comp.desktop.webm",
+      "poster": "/media/optimized/videos/mmd040-socarrat-pr-motion-2-comp.poster.jpg"
+    },
+    {
+      "original": "/new-assets/movo-1080p-1536x1920 (8).mp4",
+      "name": "movo-1080p-1536x1920-8",
+      "aliases": [
+        "movo-1080p-1536x1920 (8)"
+      ],
+      "mobile_mp4": "/media/optimized/videos/movo-1080p-1536x1920-8.mobile.mp4",
+      "mobile_webm": "/media/optimized/videos/movo-1080p-1536x1920-8.mobile.webm",
+      "poster": "/media/optimized/videos/movo-1080p-1536x1920-8.poster.jpg",
+      "desktop_mp4": "/media/optimized/videos/movo-1080p-1536x1920-8.mobile.mp4",
+      "desktop_webm": "/media/optimized/videos/movo-1080p-1536x1920-8.mobile.webm"
+    },
+    {
+      "original": "/new-assets/Portfolio-Gallery-4-5.mp4",
+      "name": "portfolio-gallery-4-5",
+      "aliases": [
+        "Portfolio-Gallery-4-5"
+      ],
+      "mobile_mp4": "/media/optimized/videos/portfolio-gallery-4-5.mobile.mp4",
+      "mobile_webm": "/media/optimized/videos/portfolio-gallery-4-5.mobile.webm",
+      "desktop_mp4": "/media/optimized/videos/portfolio-gallery-4-5.desktop.mp4",
+      "desktop_webm": "/media/optimized/videos/portfolio-gallery-4-5.desktop.webm",
+      "poster": "/media/optimized/videos/portfolio-gallery-4-5.poster.jpg"
+    },
+    {
+      "original": "/new-assets/Socarrat Showcase Test04.mp4",
+      "name": "socarrat-showcase-test04",
+      "aliases": [
+        "Socarrat Showcase Test04"
+      ],
+      "mobile_mp4": "/media/optimized/videos/socarrat-showcase-test04.mobile.mp4",
+      "mobile_webm": "/media/optimized/videos/socarrat-showcase-test04.mobile.webm",
+      "desktop_mp4": "/media/optimized/videos/socarrat-showcase-test04.desktop.mp4",
+      "poster": "/media/optimized/videos/socarrat-showcase-test04.poster.jpg",
+      "desktop_webm": "/media/optimized/videos/socarrat-showcase-test04.mobile.webm"
+    },
+    {
+      "original": "/new-assets/Socarrat Video Reel0826_NoSound.mp4",
+      "name": "socarrat-video-reel0826-nosound",
+      "aliases": [
+        "Socarrat Video Reel0826_NoSound"
+      ],
+      "mobile_mp4": "/media/optimized/videos/socarrat-video-reel0826-nosound.mobile.mp4",
+      "mobile_webm": "/media/optimized/videos/socarrat-video-reel0826-nosound.mobile.webm",
+      "desktop_mp4": "/media/optimized/videos/socarrat-video-reel0826-nosound.desktop.mp4",
+      "desktop_webm": "/media/optimized/videos/socarrat-video-reel0826-nosound.desktop.webm",
+      "poster": "/media/optimized/videos/socarrat-video-reel0826-nosound.poster.jpg"
+    },
+    {
+      "original": "/new-assets/TEST02 2.mp4",
+      "name": "test02-2",
+      "aliases": [
+        "TEST02 2"
+      ],
+      "mobile_mp4": "/media/optimized/videos/test02-2.mobile.mp4",
+      "mobile_webm": "/media/optimized/videos/test02-2.mobile.webm",
+      "desktop_mp4": "/media/optimized/videos/test02-2.desktop.mp4",
+      "desktop_webm": "/media/optimized/videos/test02-2.desktop.webm",
+      "poster": "/media/optimized/videos/test02-2.poster.jpg"
+    },
+    {
+      "original": "/new-assets/TEST09.mp4",
+      "name": "test09",
+      "aliases": [
+        "TEST09"
+      ],
+      "mobile_mp4": "/media/optimized/videos/test09.mobile.mp4",
+      "mobile_webm": "/media/optimized/videos/test09.mobile.webm",
+      "desktop_mp4": "/media/optimized/videos/test09.desktop.mp4",
+      "desktop_webm": "/media/optimized/videos/test09.desktop.webm",
+      "poster": "/media/optimized/videos/test09.poster.jpg"
     }
   ],
   "images": [
     {
-      "original": "/story/story1.png",
-      "mobile_webp": "/story/optimized/story1.mobile.webp",
-      "mobile_jpg": "/story/optimized/story1.mobile.jpg",
-      "desktop_webp": "/story/optimized/story1.desktop.webp",
-      "desktop_jpg": "/story/optimized/story1.desktop.jpg",
-      "name": "story1"
+      "original": "/new-assets/AdeC_Scroll 11.png",
+      "name": "adec-scroll-11",
+      "aliases": [
+        "AdeC_Scroll 11"
+      ],
+      "hasAlpha": true,
+      "width": 2160,
+      "height": 2700,
+      "mobile_avif": "/media/optimized/images/adec-scroll-11.mobile.avif",
+      "mobile_webp": "/media/optimized/images/adec-scroll-11.mobile.webp",
+      "mobile_jpg": "/media/optimized/images/adec-scroll-11.mobile.jpg",
+      "desktop_avif": "/media/optimized/images/adec-scroll-11.desktop.avif",
+      "desktop_webp": "/media/optimized/images/adec-scroll-11.desktop.webp",
+      "desktop_jpg": "/media/optimized/images/adec-scroll-11.desktop.jpg"
     },
     {
-      "original": "/story/story10.png",
-      "mobile_webp": "/story/optimized/story10.mobile.webp",
-      "mobile_jpg": "/story/optimized/story10.mobile.jpg",
-      "desktop_webp": "/story/optimized/story10.desktop.webp",
-      "desktop_jpg": "/story/optimized/story10.desktop.jpg",
-      "name": "story10"
+      "original": "/new-assets/AdeC_Scroll 12.png",
+      "name": "adec-scroll-12",
+      "aliases": [
+        "AdeC_Scroll 12"
+      ],
+      "hasAlpha": true,
+      "width": 2160,
+      "height": 2700,
+      "mobile_avif": "/media/optimized/images/adec-scroll-12.mobile.avif",
+      "mobile_webp": "/media/optimized/images/adec-scroll-12.mobile.webp",
+      "mobile_jpg": "/media/optimized/images/adec-scroll-12.mobile.jpg",
+      "desktop_avif": "/media/optimized/images/adec-scroll-12.desktop.avif",
+      "desktop_webp": "/media/optimized/images/adec-scroll-12.desktop.webp",
+      "desktop_jpg": "/media/optimized/images/adec-scroll-12.desktop.jpg"
     },
     {
-      "original": "/story/story11.png",
-      "mobile_webp": "/story/optimized/story11.mobile.webp",
-      "mobile_jpg": "/story/optimized/story11.mobile.jpg",
-      "desktop_webp": "/story/optimized/story11.desktop.webp",
-      "desktop_jpg": "/story/optimized/story11.desktop.jpg",
-      "name": "story11"
+      "original": "/new-assets/AdeC_Scroll 13.png",
+      "name": "adec-scroll-13",
+      "aliases": [
+        "AdeC_Scroll 13"
+      ],
+      "hasAlpha": true,
+      "width": 2160,
+      "height": 2700,
+      "mobile_avif": "/media/optimized/images/adec-scroll-13.mobile.avif",
+      "mobile_webp": "/media/optimized/images/adec-scroll-13.mobile.webp",
+      "mobile_jpg": "/media/optimized/images/adec-scroll-13.mobile.jpg",
+      "desktop_avif": "/media/optimized/images/adec-scroll-13.desktop.avif",
+      "desktop_webp": "/media/optimized/images/adec-scroll-13.desktop.webp",
+      "desktop_jpg": "/media/optimized/images/adec-scroll-13.desktop.jpg"
     },
     {
-      "original": "/story/story12.png",
-      "mobile_webp": "/story/optimized/story12.mobile.webp",
-      "mobile_jpg": "/story/optimized/story12.mobile.jpg",
-      "desktop_webp": "/story/optimized/story12.desktop.webp",
-      "desktop_jpg": "/story/optimized/story12.desktop.jpg",
-      "name": "story12"
+      "original": "/new-assets/ATJ Paper Mockup 02 NoBG.png",
+      "name": "atj-paper-mockup-02-nobg",
+      "aliases": [
+        "ATJ Paper Mockup 02 NoBG"
+      ],
+      "hasAlpha": true,
+      "width": 2436,
+      "height": 3044,
+      "mobile_avif": "/media/optimized/images/atj-paper-mockup-02-nobg.mobile.avif",
+      "mobile_webp": "/media/optimized/images/atj-paper-mockup-02-nobg.mobile.webp",
+      "mobile_jpg": "/media/optimized/images/atj-paper-mockup-02-nobg.mobile.jpg",
+      "desktop_avif": "/media/optimized/images/atj-paper-mockup-02-nobg.desktop.avif",
+      "desktop_webp": "/media/optimized/images/atj-paper-mockup-02-nobg.desktop.webp",
+      "desktop_jpg": "/media/optimized/images/atj-paper-mockup-02-nobg.desktop.jpg"
     },
     {
-      "original": "/story/story13.png",
-      "mobile_webp": "/story/optimized/story13.mobile.webp",
-      "mobile_jpg": "/story/optimized/story13.mobile.jpg",
-      "desktop_webp": "/story/optimized/story13.desktop.webp",
-      "desktop_jpg": "/story/optimized/story13.desktop.jpg",
-      "name": "story13"
+      "original": "/new-assets/ATJ WebContent_001.png",
+      "name": "atj-webcontent-001",
+      "aliases": [
+        "ATJ WebContent_001"
+      ],
+      "hasAlpha": true,
+      "width": 3600,
+      "height": 2700,
+      "mobile_avif": "/media/optimized/images/atj-webcontent-001.mobile.avif",
+      "mobile_webp": "/media/optimized/images/atj-webcontent-001.mobile.webp",
+      "mobile_jpg": "/media/optimized/images/atj-webcontent-001.mobile.jpg",
+      "desktop_avif": "/media/optimized/images/atj-webcontent-001.desktop.avif",
+      "desktop_webp": "/media/optimized/images/atj-webcontent-001.desktop.webp",
+      "desktop_jpg": "/media/optimized/images/atj-webcontent-001.desktop.jpg"
     },
     {
-      "original": "/story/story14.png",
-      "mobile_webp": "/story/optimized/story14.mobile.webp",
-      "mobile_jpg": "/story/optimized/story14.mobile.jpg",
-      "desktop_webp": "/story/optimized/story14.desktop.webp",
-      "desktop_jpg": "/story/optimized/story14.desktop.jpg",
-      "name": "story14"
+      "original": "/new-assets/ATJ WebContent_002.png",
+      "name": "atj-webcontent-002",
+      "aliases": [
+        "ATJ WebContent_002"
+      ],
+      "hasAlpha": true,
+      "width": 2160,
+      "height": 2700,
+      "mobile_avif": "/media/optimized/images/atj-webcontent-002.mobile.avif",
+      "mobile_webp": "/media/optimized/images/atj-webcontent-002.mobile.webp",
+      "mobile_jpg": "/media/optimized/images/atj-webcontent-002.mobile.jpg",
+      "desktop_avif": "/media/optimized/images/atj-webcontent-002.desktop.avif",
+      "desktop_webp": "/media/optimized/images/atj-webcontent-002.desktop.webp",
+      "desktop_jpg": "/media/optimized/images/atj-webcontent-002.desktop.jpg"
     },
     {
-      "original": "/story/story15.png",
-      "mobile_webp": "/story/optimized/story15.mobile.webp",
-      "mobile_jpg": "/story/optimized/story15.mobile.jpg",
-      "desktop_webp": "/story/optimized/story15.desktop.webp",
-      "desktop_jpg": "/story/optimized/story15.desktop.jpg",
-      "name": "story15"
+      "original": "/new-assets/ATJ WebContent_003.png",
+      "name": "atj-webcontent-003",
+      "aliases": [
+        "ATJ WebContent_003"
+      ],
+      "hasAlpha": true,
+      "width": 2160,
+      "height": 2700,
+      "mobile_avif": "/media/optimized/images/atj-webcontent-003.mobile.avif",
+      "mobile_webp": "/media/optimized/images/atj-webcontent-003.mobile.webp",
+      "mobile_jpg": "/media/optimized/images/atj-webcontent-003.mobile.jpg",
+      "desktop_avif": "/media/optimized/images/atj-webcontent-003.desktop.avif",
+      "desktop_webp": "/media/optimized/images/atj-webcontent-003.desktop.webp",
+      "desktop_jpg": "/media/optimized/images/atj-webcontent-003.desktop.jpg"
     },
     {
-      "original": "/story/story2.png",
-      "mobile_webp": "/story/optimized/story2.mobile.webp",
-      "mobile_jpg": "/story/optimized/story2.mobile.jpg",
-      "desktop_webp": "/story/optimized/story2.desktop.webp",
-      "desktop_jpg": "/story/optimized/story2.desktop.jpg",
-      "name": "story2"
+      "original": "/new-assets/ATJ WebContent_004.png",
+      "name": "atj-webcontent-004",
+      "aliases": [
+        "ATJ WebContent_004"
+      ],
+      "hasAlpha": true,
+      "width": 2160,
+      "height": 2700,
+      "mobile_avif": "/media/optimized/images/atj-webcontent-004.mobile.avif",
+      "mobile_webp": "/media/optimized/images/atj-webcontent-004.mobile.webp",
+      "mobile_jpg": "/media/optimized/images/atj-webcontent-004.mobile.jpg",
+      "desktop_avif": "/media/optimized/images/atj-webcontent-004.desktop.avif",
+      "desktop_webp": "/media/optimized/images/atj-webcontent-004.desktop.webp",
+      "desktop_jpg": "/media/optimized/images/atj-webcontent-004.desktop.jpg"
     },
     {
-      "original": "/story/story3.png",
-      "mobile_webp": "/story/optimized/story3.mobile.webp",
-      "mobile_jpg": "/story/optimized/story3.mobile.jpg",
-      "desktop_webp": "/story/optimized/story3.desktop.webp",
-      "desktop_jpg": "/story/optimized/story3.desktop.jpg",
-      "name": "story3"
+      "original": "/new-assets/ATJ WebContent_005.png",
+      "name": "atj-webcontent-005",
+      "aliases": [
+        "ATJ WebContent_005"
+      ],
+      "hasAlpha": true,
+      "width": 3600,
+      "height": 2700,
+      "mobile_avif": "/media/optimized/images/atj-webcontent-005.mobile.avif",
+      "mobile_webp": "/media/optimized/images/atj-webcontent-005.mobile.webp",
+      "mobile_jpg": "/media/optimized/images/atj-webcontent-005.mobile.jpg",
+      "desktop_avif": "/media/optimized/images/atj-webcontent-005.desktop.avif",
+      "desktop_webp": "/media/optimized/images/atj-webcontent-005.desktop.webp",
+      "desktop_jpg": "/media/optimized/images/atj-webcontent-005.desktop.jpg"
     },
     {
-      "original": "/story/story4.png",
-      "mobile_webp": "/story/optimized/story4.mobile.webp",
-      "mobile_jpg": "/story/optimized/story4.mobile.jpg",
-      "desktop_webp": "/story/optimized/story4.desktop.webp",
-      "desktop_jpg": "/story/optimized/story4.desktop.jpg",
-      "name": "story4"
+      "original": "/new-assets/ATJ WebContent_006.png",
+      "name": "atj-webcontent-006",
+      "aliases": [
+        "ATJ WebContent_006"
+      ],
+      "hasAlpha": true,
+      "width": 3600,
+      "height": 2700,
+      "mobile_avif": "/media/optimized/images/atj-webcontent-006.mobile.avif",
+      "mobile_webp": "/media/optimized/images/atj-webcontent-006.mobile.webp",
+      "mobile_jpg": "/media/optimized/images/atj-webcontent-006.mobile.jpg",
+      "desktop_avif": "/media/optimized/images/atj-webcontent-006.desktop.avif",
+      "desktop_webp": "/media/optimized/images/atj-webcontent-006.desktop.webp",
+      "desktop_jpg": "/media/optimized/images/atj-webcontent-006.desktop.jpg"
     },
     {
-      "original": "/story/story5.png",
-      "mobile_webp": "/story/optimized/story5.mobile.webp",
-      "mobile_jpg": "/story/optimized/story5.mobile.jpg",
-      "desktop_webp": "/story/optimized/story5.desktop.webp",
-      "desktop_jpg": "/story/optimized/story5.desktop.jpg",
-      "name": "story5"
+      "original": "/new-assets/ATJ WebContent_007.png",
+      "name": "atj-webcontent-007",
+      "aliases": [
+        "ATJ WebContent_007"
+      ],
+      "hasAlpha": true,
+      "width": 3600,
+      "height": 2700,
+      "mobile_avif": "/media/optimized/images/atj-webcontent-007.mobile.avif",
+      "mobile_webp": "/media/optimized/images/atj-webcontent-007.mobile.webp",
+      "mobile_jpg": "/media/optimized/images/atj-webcontent-007.mobile.jpg",
+      "desktop_avif": "/media/optimized/images/atj-webcontent-007.desktop.avif",
+      "desktop_webp": "/media/optimized/images/atj-webcontent-007.desktop.webp",
+      "desktop_jpg": "/media/optimized/images/atj-webcontent-007.desktop.jpg"
     },
     {
-      "original": "/story/story6.png",
-      "mobile_webp": "/story/optimized/story6.mobile.webp",
-      "mobile_jpg": "/story/optimized/story6.mobile.jpg",
-      "desktop_webp": "/story/optimized/story6.desktop.webp",
-      "desktop_jpg": "/story/optimized/story6.desktop.jpg",
-      "name": "story6"
+      "original": "/new-assets/ATJ WebContent_008.png",
+      "name": "atj-webcontent-008",
+      "aliases": [
+        "ATJ WebContent_008"
+      ],
+      "hasAlpha": true,
+      "width": 3600,
+      "height": 2700,
+      "mobile_avif": "/media/optimized/images/atj-webcontent-008.mobile.avif",
+      "mobile_webp": "/media/optimized/images/atj-webcontent-008.mobile.webp",
+      "mobile_jpg": "/media/optimized/images/atj-webcontent-008.mobile.jpg",
+      "desktop_avif": "/media/optimized/images/atj-webcontent-008.desktop.avif",
+      "desktop_webp": "/media/optimized/images/atj-webcontent-008.desktop.webp",
+      "desktop_jpg": "/media/optimized/images/atj-webcontent-008.desktop.jpg"
     },
     {
-      "original": "/story/story7.png",
-      "mobile_webp": "/story/optimized/story7.mobile.webp",
-      "mobile_jpg": "/story/optimized/story7.mobile.jpg",
-      "desktop_webp": "/story/optimized/story7.desktop.webp",
-      "desktop_jpg": "/story/optimized/story7.desktop.jpg",
-      "name": "story7"
+      "original": "/new-assets/ATJ WebContent_009.png",
+      "name": "atj-webcontent-009",
+      "aliases": [
+        "ATJ WebContent_009"
+      ],
+      "hasAlpha": true,
+      "width": 3600,
+      "height": 2700,
+      "mobile_avif": "/media/optimized/images/atj-webcontent-009.mobile.avif",
+      "mobile_webp": "/media/optimized/images/atj-webcontent-009.mobile.webp",
+      "mobile_jpg": "/media/optimized/images/atj-webcontent-009.mobile.jpg",
+      "desktop_avif": "/media/optimized/images/atj-webcontent-009.desktop.avif",
+      "desktop_webp": "/media/optimized/images/atj-webcontent-009.desktop.webp",
+      "desktop_jpg": "/media/optimized/images/atj-webcontent-009.desktop.jpg"
     },
     {
-      "original": "/story/story8.png",
-      "mobile_webp": "/story/optimized/story8.mobile.webp",
-      "mobile_jpg": "/story/optimized/story8.mobile.jpg",
-      "desktop_webp": "/story/optimized/story8.desktop.webp",
-      "desktop_jpg": "/story/optimized/story8.desktop.jpg",
-      "name": "story8"
+      "original": "/new-assets/ATJ WebContent_010.png",
+      "name": "atj-webcontent-010",
+      "aliases": [
+        "ATJ WebContent_010"
+      ],
+      "hasAlpha": true,
+      "width": 3600,
+      "height": 2700,
+      "mobile_avif": "/media/optimized/images/atj-webcontent-010.mobile.avif",
+      "mobile_webp": "/media/optimized/images/atj-webcontent-010.mobile.webp",
+      "mobile_jpg": "/media/optimized/images/atj-webcontent-010.mobile.jpg",
+      "desktop_avif": "/media/optimized/images/atj-webcontent-010.desktop.avif",
+      "desktop_webp": "/media/optimized/images/atj-webcontent-010.desktop.webp",
+      "desktop_jpg": "/media/optimized/images/atj-webcontent-010.desktop.jpg"
     },
     {
-      "original": "/story/story9.png",
-      "mobile_webp": "/story/optimized/story9.mobile.webp",
-      "mobile_jpg": "/story/optimized/story9.mobile.jpg",
-      "desktop_webp": "/story/optimized/story9.desktop.webp",
-      "desktop_jpg": "/story/optimized/story9.desktop.jpg",
-      "name": "story9"
+      "original": "/new-assets/ATJ WebContent_011.png",
+      "name": "atj-webcontent-011",
+      "aliases": [
+        "ATJ WebContent_011"
+      ],
+      "hasAlpha": true,
+      "width": 3600,
+      "height": 2700,
+      "mobile_avif": "/media/optimized/images/atj-webcontent-011.mobile.avif",
+      "mobile_webp": "/media/optimized/images/atj-webcontent-011.mobile.webp",
+      "mobile_jpg": "/media/optimized/images/atj-webcontent-011.mobile.jpg",
+      "desktop_avif": "/media/optimized/images/atj-webcontent-011.desktop.avif",
+      "desktop_webp": "/media/optimized/images/atj-webcontent-011.desktop.webp",
+      "desktop_jpg": "/media/optimized/images/atj-webcontent-011.desktop.jpg"
+    },
+    {
+      "original": "/new-assets/ATJ WebContent_012.png",
+      "name": "atj-webcontent-012",
+      "aliases": [
+        "ATJ WebContent_012"
+      ],
+      "hasAlpha": true,
+      "width": 3600,
+      "height": 2700,
+      "mobile_avif": "/media/optimized/images/atj-webcontent-012.mobile.avif",
+      "mobile_webp": "/media/optimized/images/atj-webcontent-012.mobile.webp",
+      "mobile_jpg": "/media/optimized/images/atj-webcontent-012.mobile.jpg",
+      "desktop_avif": "/media/optimized/images/atj-webcontent-012.desktop.avif",
+      "desktop_webp": "/media/optimized/images/atj-webcontent-012.desktop.webp",
+      "desktop_jpg": "/media/optimized/images/atj-webcontent-012.desktop.jpg"
+    },
+    {
+      "original": "/new-assets/ATJ WebContent_013.png",
+      "name": "atj-webcontent-013",
+      "aliases": [
+        "ATJ WebContent_013"
+      ],
+      "hasAlpha": true,
+      "width": 3600,
+      "height": 2700,
+      "mobile_avif": "/media/optimized/images/atj-webcontent-013.mobile.avif",
+      "mobile_webp": "/media/optimized/images/atj-webcontent-013.mobile.webp",
+      "mobile_jpg": "/media/optimized/images/atj-webcontent-013.mobile.jpg",
+      "desktop_avif": "/media/optimized/images/atj-webcontent-013.desktop.avif",
+      "desktop_webp": "/media/optimized/images/atj-webcontent-013.desktop.webp",
+      "desktop_jpg": "/media/optimized/images/atj-webcontent-013.desktop.jpg"
+    },
+    {
+      "original": "/new-assets/ATJ WebContent_014.png",
+      "name": "atj-webcontent-014",
+      "aliases": [
+        "ATJ WebContent_014"
+      ],
+      "hasAlpha": true,
+      "width": 3600,
+      "height": 2700,
+      "mobile_avif": "/media/optimized/images/atj-webcontent-014.mobile.avif",
+      "mobile_webp": "/media/optimized/images/atj-webcontent-014.mobile.webp",
+      "mobile_jpg": "/media/optimized/images/atj-webcontent-014.mobile.jpg",
+      "desktop_avif": "/media/optimized/images/atj-webcontent-014.desktop.avif",
+      "desktop_webp": "/media/optimized/images/atj-webcontent-014.desktop.webp",
+      "desktop_jpg": "/media/optimized/images/atj-webcontent-014.desktop.jpg"
+    },
+    {
+      "original": "/new-assets/ATJ WebContent_015.png",
+      "name": "atj-webcontent-015",
+      "aliases": [
+        "ATJ WebContent_015"
+      ],
+      "hasAlpha": true,
+      "width": 3600,
+      "height": 2700,
+      "mobile_avif": "/media/optimized/images/atj-webcontent-015.mobile.avif",
+      "mobile_webp": "/media/optimized/images/atj-webcontent-015.mobile.webp",
+      "mobile_jpg": "/media/optimized/images/atj-webcontent-015.mobile.jpg",
+      "desktop_avif": "/media/optimized/images/atj-webcontent-015.desktop.avif",
+      "desktop_webp": "/media/optimized/images/atj-webcontent-015.desktop.webp",
+      "desktop_jpg": "/media/optimized/images/atj-webcontent-015.desktop.jpg"
+    },
+    {
+      "original": "/new-assets/ATJ WebContent_016.png",
+      "name": "atj-webcontent-016",
+      "aliases": [
+        "ATJ WebContent_016"
+      ],
+      "hasAlpha": true,
+      "width": 3600,
+      "height": 2700,
+      "mobile_avif": "/media/optimized/images/atj-webcontent-016.mobile.avif",
+      "mobile_webp": "/media/optimized/images/atj-webcontent-016.mobile.webp",
+      "mobile_jpg": "/media/optimized/images/atj-webcontent-016.mobile.jpg",
+      "desktop_avif": "/media/optimized/images/atj-webcontent-016.desktop.avif",
+      "desktop_webp": "/media/optimized/images/atj-webcontent-016.desktop.webp",
+      "desktop_jpg": "/media/optimized/images/atj-webcontent-016.desktop.jpg"
+    },
+    {
+      "original": "/new-assets/ATJ WebContent_017.png",
+      "name": "atj-webcontent-017",
+      "aliases": [
+        "ATJ WebContent_017"
+      ],
+      "hasAlpha": true,
+      "width": 3600,
+      "height": 2700,
+      "mobile_avif": "/media/optimized/images/atj-webcontent-017.mobile.avif",
+      "mobile_webp": "/media/optimized/images/atj-webcontent-017.mobile.webp",
+      "mobile_jpg": "/media/optimized/images/atj-webcontent-017.mobile.jpg",
+      "desktop_avif": "/media/optimized/images/atj-webcontent-017.desktop.avif",
+      "desktop_webp": "/media/optimized/images/atj-webcontent-017.desktop.webp",
+      "desktop_jpg": "/media/optimized/images/atj-webcontent-017.desktop.jpg"
+    },
+    {
+      "original": "/new-assets/ATJ WebContent_018.png",
+      "name": "atj-webcontent-018",
+      "aliases": [
+        "ATJ WebContent_018"
+      ],
+      "hasAlpha": true,
+      "width": 3600,
+      "height": 2700,
+      "mobile_avif": "/media/optimized/images/atj-webcontent-018.mobile.avif",
+      "mobile_webp": "/media/optimized/images/atj-webcontent-018.mobile.webp",
+      "mobile_jpg": "/media/optimized/images/atj-webcontent-018.mobile.jpg",
+      "desktop_avif": "/media/optimized/images/atj-webcontent-018.desktop.avif",
+      "desktop_webp": "/media/optimized/images/atj-webcontent-018.desktop.webp",
+      "desktop_jpg": "/media/optimized/images/atj-webcontent-018.desktop.jpg"
+    },
+    {
+      "original": "/new-assets/ATJ WebContent_019.png",
+      "name": "atj-webcontent-019",
+      "aliases": [
+        "ATJ WebContent_019"
+      ],
+      "hasAlpha": true,
+      "width": 2160,
+      "height": 2700,
+      "mobile_avif": "/media/optimized/images/atj-webcontent-019.mobile.avif",
+      "mobile_webp": "/media/optimized/images/atj-webcontent-019.mobile.webp",
+      "mobile_jpg": "/media/optimized/images/atj-webcontent-019.mobile.jpg",
+      "desktop_avif": "/media/optimized/images/atj-webcontent-019.desktop.avif",
+      "desktop_webp": "/media/optimized/images/atj-webcontent-019.desktop.webp",
+      "desktop_jpg": "/media/optimized/images/atj-webcontent-019.desktop.jpg"
+    },
+    {
+      "original": "/new-assets/ATJ WebContent_020.png",
+      "name": "atj-webcontent-020",
+      "aliases": [
+        "ATJ WebContent_020"
+      ],
+      "hasAlpha": true,
+      "width": 2160,
+      "height": 2700,
+      "mobile_avif": "/media/optimized/images/atj-webcontent-020.mobile.avif",
+      "mobile_webp": "/media/optimized/images/atj-webcontent-020.mobile.webp",
+      "mobile_jpg": "/media/optimized/images/atj-webcontent-020.mobile.jpg",
+      "desktop_avif": "/media/optimized/images/atj-webcontent-020.desktop.avif",
+      "desktop_webp": "/media/optimized/images/atj-webcontent-020.desktop.webp",
+      "desktop_jpg": "/media/optimized/images/atj-webcontent-020.desktop.jpg"
+    },
+    {
+      "original": "/new-assets/ATJ WebContent_021.png",
+      "name": "atj-webcontent-021",
+      "aliases": [
+        "ATJ WebContent_021"
+      ],
+      "hasAlpha": true,
+      "width": 2160,
+      "height": 2700,
+      "mobile_avif": "/media/optimized/images/atj-webcontent-021.mobile.avif",
+      "mobile_webp": "/media/optimized/images/atj-webcontent-021.mobile.webp",
+      "mobile_jpg": "/media/optimized/images/atj-webcontent-021.mobile.jpg",
+      "desktop_avif": "/media/optimized/images/atj-webcontent-021.desktop.avif",
+      "desktop_webp": "/media/optimized/images/atj-webcontent-021.desktop.webp",
+      "desktop_jpg": "/media/optimized/images/atj-webcontent-021.desktop.jpg"
+    },
+    {
+      "original": "/new-assets/ATJ WebContent_022.png",
+      "name": "atj-webcontent-022",
+      "aliases": [
+        "ATJ WebContent_022"
+      ],
+      "hasAlpha": true,
+      "width": 2160,
+      "height": 2700,
+      "mobile_avif": "/media/optimized/images/atj-webcontent-022.mobile.avif",
+      "mobile_webp": "/media/optimized/images/atj-webcontent-022.mobile.webp",
+      "mobile_jpg": "/media/optimized/images/atj-webcontent-022.mobile.jpg",
+      "desktop_avif": "/media/optimized/images/atj-webcontent-022.desktop.avif",
+      "desktop_webp": "/media/optimized/images/atj-webcontent-022.desktop.webp",
+      "desktop_jpg": "/media/optimized/images/atj-webcontent-022.desktop.jpg"
+    },
+    {
+      "original": "/new-assets/ATJ WebContent_023.png",
+      "name": "atj-webcontent-023",
+      "aliases": [
+        "ATJ WebContent_023"
+      ],
+      "hasAlpha": true,
+      "width": 2160,
+      "height": 2700,
+      "mobile_avif": "/media/optimized/images/atj-webcontent-023.mobile.avif",
+      "mobile_webp": "/media/optimized/images/atj-webcontent-023.mobile.webp",
+      "mobile_jpg": "/media/optimized/images/atj-webcontent-023.mobile.jpg",
+      "desktop_avif": "/media/optimized/images/atj-webcontent-023.desktop.avif",
+      "desktop_webp": "/media/optimized/images/atj-webcontent-023.desktop.webp",
+      "desktop_jpg": "/media/optimized/images/atj-webcontent-023.desktop.jpg"
+    },
+    {
+      "original": "/new-assets/ATJ WebContent_024.png",
+      "name": "atj-webcontent-024",
+      "aliases": [
+        "ATJ WebContent_024"
+      ],
+      "hasAlpha": true,
+      "width": 2160,
+      "height": 2700,
+      "mobile_avif": "/media/optimized/images/atj-webcontent-024.mobile.avif",
+      "mobile_webp": "/media/optimized/images/atj-webcontent-024.mobile.webp",
+      "mobile_jpg": "/media/optimized/images/atj-webcontent-024.mobile.jpg",
+      "desktop_avif": "/media/optimized/images/atj-webcontent-024.desktop.avif",
+      "desktop_webp": "/media/optimized/images/atj-webcontent-024.desktop.webp",
+      "desktop_jpg": "/media/optimized/images/atj-webcontent-024.desktop.jpg"
+    },
+    {
+      "original": "/new-assets/ATJ WebContent_025.png",
+      "name": "atj-webcontent-025",
+      "aliases": [
+        "ATJ WebContent_025"
+      ],
+      "hasAlpha": true,
+      "width": 2160,
+      "height": 2700,
+      "mobile_avif": "/media/optimized/images/atj-webcontent-025.mobile.avif",
+      "mobile_webp": "/media/optimized/images/atj-webcontent-025.mobile.webp",
+      "mobile_jpg": "/media/optimized/images/atj-webcontent-025.mobile.jpg",
+      "desktop_avif": "/media/optimized/images/atj-webcontent-025.desktop.avif",
+      "desktop_webp": "/media/optimized/images/atj-webcontent-025.desktop.webp",
+      "desktop_jpg": "/media/optimized/images/atj-webcontent-025.desktop.jpg"
+    },
+    {
+      "original": "/new-assets/ATJ WebContent_026.png",
+      "name": "atj-webcontent-026",
+      "aliases": [
+        "ATJ WebContent_026"
+      ],
+      "hasAlpha": true,
+      "width": 2160,
+      "height": 2700,
+      "mobile_avif": "/media/optimized/images/atj-webcontent-026.mobile.avif",
+      "mobile_webp": "/media/optimized/images/atj-webcontent-026.mobile.webp",
+      "mobile_jpg": "/media/optimized/images/atj-webcontent-026.mobile.jpg",
+      "desktop_avif": "/media/optimized/images/atj-webcontent-026.desktop.avif",
+      "desktop_webp": "/media/optimized/images/atj-webcontent-026.desktop.webp",
+      "desktop_jpg": "/media/optimized/images/atj-webcontent-026.desktop.jpg"
+    },
+    {
+      "original": "/new-assets/ATJ WebContent_027.png",
+      "name": "atj-webcontent-027",
+      "aliases": [
+        "ATJ WebContent_027"
+      ],
+      "hasAlpha": true,
+      "width": 2160,
+      "height": 2700,
+      "mobile_avif": "/media/optimized/images/atj-webcontent-027.mobile.avif",
+      "mobile_webp": "/media/optimized/images/atj-webcontent-027.mobile.webp",
+      "mobile_jpg": "/media/optimized/images/atj-webcontent-027.mobile.jpg",
+      "desktop_avif": "/media/optimized/images/atj-webcontent-027.desktop.avif",
+      "desktop_webp": "/media/optimized/images/atj-webcontent-027.desktop.webp",
+      "desktop_jpg": "/media/optimized/images/atj-webcontent-027.desktop.jpg"
+    },
+    {
+      "original": "/new-assets/ATJ WebContent_028.png",
+      "name": "atj-webcontent-028",
+      "aliases": [
+        "ATJ WebContent_028"
+      ],
+      "hasAlpha": true,
+      "width": 2160,
+      "height": 2700,
+      "mobile_avif": "/media/optimized/images/atj-webcontent-028.mobile.avif",
+      "mobile_webp": "/media/optimized/images/atj-webcontent-028.mobile.webp",
+      "mobile_jpg": "/media/optimized/images/atj-webcontent-028.mobile.jpg",
+      "desktop_avif": "/media/optimized/images/atj-webcontent-028.desktop.avif",
+      "desktop_webp": "/media/optimized/images/atj-webcontent-028.desktop.webp",
+      "desktop_jpg": "/media/optimized/images/atj-webcontent-028.desktop.jpg"
+    },
+    {
+      "original": "/new-assets/ATJ WebContent_029.png",
+      "name": "atj-webcontent-029",
+      "aliases": [
+        "ATJ WebContent_029"
+      ],
+      "hasAlpha": true,
+      "width": 2160,
+      "height": 2700,
+      "mobile_avif": "/media/optimized/images/atj-webcontent-029.mobile.avif",
+      "mobile_webp": "/media/optimized/images/atj-webcontent-029.mobile.webp",
+      "mobile_jpg": "/media/optimized/images/atj-webcontent-029.mobile.jpg",
+      "desktop_avif": "/media/optimized/images/atj-webcontent-029.desktop.avif",
+      "desktop_webp": "/media/optimized/images/atj-webcontent-029.desktop.webp",
+      "desktop_jpg": "/media/optimized/images/atj-webcontent-029.desktop.jpg"
+    },
+    {
+      "original": "/new-assets/ATJ WebContent_030.png",
+      "name": "atj-webcontent-030",
+      "aliases": [
+        "ATJ WebContent_030"
+      ],
+      "hasAlpha": true,
+      "width": 3600,
+      "height": 2700,
+      "mobile_avif": "/media/optimized/images/atj-webcontent-030.mobile.avif",
+      "mobile_webp": "/media/optimized/images/atj-webcontent-030.mobile.webp",
+      "mobile_jpg": "/media/optimized/images/atj-webcontent-030.mobile.jpg",
+      "desktop_avif": "/media/optimized/images/atj-webcontent-030.desktop.avif",
+      "desktop_webp": "/media/optimized/images/atj-webcontent-030.desktop.webp",
+      "desktop_jpg": "/media/optimized/images/atj-webcontent-030.desktop.jpg"
+    },
+    {
+      "original": "/new-assets/Galaxy Bar_Stickers.png",
+      "name": "galaxy-bar-stickers",
+      "aliases": [
+        "Galaxy Bar_Stickers"
+      ],
+      "hasAlpha": true,
+      "width": 2160,
+      "height": 2700,
+      "mobile_avif": "/media/optimized/images/galaxy-bar-stickers.mobile.avif",
+      "mobile_webp": "/media/optimized/images/galaxy-bar-stickers.mobile.webp",
+      "mobile_jpg": "/media/optimized/images/galaxy-bar-stickers.mobile.jpg",
+      "desktop_avif": "/media/optimized/images/galaxy-bar-stickers.desktop.avif",
+      "desktop_webp": "/media/optimized/images/galaxy-bar-stickers.desktop.webp",
+      "desktop_jpg": "/media/optimized/images/galaxy-bar-stickers.desktop.jpg"
+    },
+    {
+      "original": "/new-assets/GalaxyBar Explo Serviellets02.png",
+      "name": "galaxybar-explo-serviellets02",
+      "aliases": [
+        "GalaxyBar Explo Serviellets02"
+      ],
+      "hasAlpha": true,
+      "width": 2160,
+      "height": 2700,
+      "mobile_avif": "/media/optimized/images/galaxybar-explo-serviellets02.mobile.avif",
+      "mobile_webp": "/media/optimized/images/galaxybar-explo-serviellets02.mobile.webp",
+      "mobile_jpg": "/media/optimized/images/galaxybar-explo-serviellets02.mobile.jpg",
+      "desktop_avif": "/media/optimized/images/galaxybar-explo-serviellets02.desktop.avif",
+      "desktop_webp": "/media/optimized/images/galaxybar-explo-serviellets02.desktop.webp",
+      "desktop_jpg": "/media/optimized/images/galaxybar-explo-serviellets02.desktop.jpg"
+    },
+    {
+      "original": "/new-assets/IMG_3514.heic",
+      "name": "img-3514",
+      "aliases": [
+        "IMG_3514"
+      ],
+      "hasAlpha": false,
+      "width": 3024,
+      "height": 4032,
+      "mobile_avif": "/media/optimized/images/img-3514.mobile.avif",
+      "mobile_webp": "/media/optimized/images/img-3514.mobile.webp",
+      "mobile_jpg": "/media/optimized/images/img-3514.mobile.jpg",
+      "desktop_avif": "/media/optimized/images/img-3514.desktop.avif",
+      "desktop_webp": "/media/optimized/images/img-3514.desktop.webp",
+      "desktop_jpg": "/media/optimized/images/img-3514.desktop.jpg"
+    },
+    {
+      "original": "/new-assets/IMG_3623.png",
+      "name": "img-3623",
+      "aliases": [
+        "IMG_3623"
+      ],
+      "hasAlpha": true,
+      "width": 1170,
+      "height": 1558,
+      "mobile_avif": "/media/optimized/images/img-3623.mobile.avif",
+      "mobile_webp": "/media/optimized/images/img-3623.mobile.webp",
+      "mobile_jpg": "/media/optimized/images/img-3623.mobile.jpg",
+      "desktop_avif": "/media/optimized/images/img-3623.desktop.avif",
+      "desktop_webp": "/media/optimized/images/img-3623.desktop.webp",
+      "desktop_jpg": "/media/optimized/images/img-3623.desktop.jpg"
+    },
+    {
+      "original": "/new-assets/IMG_3777 3.png",
+      "name": "img-3777-3",
+      "aliases": [
+        "IMG_3777 3"
+      ],
+      "hasAlpha": true,
+      "width": 1204,
+      "height": 1558,
+      "mobile_avif": "/media/optimized/images/img-3777-3.mobile.avif",
+      "mobile_webp": "/media/optimized/images/img-3777-3.mobile.webp",
+      "mobile_jpg": "/media/optimized/images/img-3777-3.mobile.jpg",
+      "desktop_avif": "/media/optimized/images/img-3777-3.desktop.avif",
+      "desktop_webp": "/media/optimized/images/img-3777-3.desktop.webp",
+      "desktop_jpg": "/media/optimized/images/img-3777-3.desktop.jpg"
+    },
+    {
+      "original": "/new-assets/IMG_5434.HEIC",
+      "name": "img-5434",
+      "aliases": [
+        "IMG_5434"
+      ],
+      "hasAlpha": false,
+      "width": 5712,
+      "height": 4284,
+      "mobile_avif": "/media/optimized/images/img-5434.mobile.avif",
+      "mobile_webp": "/media/optimized/images/img-5434.mobile.webp",
+      "mobile_jpg": "/media/optimized/images/img-5434.mobile.jpg",
+      "desktop_avif": "/media/optimized/images/img-5434.desktop.avif",
+      "desktop_webp": "/media/optimized/images/img-5434.desktop.webp",
+      "desktop_jpg": "/media/optimized/images/img-5434.desktop.jpg"
+    },
+    {
+      "original": "/new-assets/IMG_5438.HEIC",
+      "name": "img-5438",
+      "aliases": [
+        "IMG_5438"
+      ],
+      "hasAlpha": false,
+      "width": 4032,
+      "height": 3024,
+      "mobile_avif": "/media/optimized/images/img-5438.mobile.avif",
+      "mobile_webp": "/media/optimized/images/img-5438.mobile.webp",
+      "mobile_jpg": "/media/optimized/images/img-5438.mobile.jpg",
+      "desktop_avif": "/media/optimized/images/img-5438.desktop.avif",
+      "desktop_webp": "/media/optimized/images/img-5438.desktop.webp",
+      "desktop_jpg": "/media/optimized/images/img-5438.desktop.jpg"
+    },
+    {
+      "original": "/new-assets/IMG_5447.HEIC",
+      "name": "img-5447",
+      "aliases": [
+        "IMG_5447"
+      ],
+      "hasAlpha": false,
+      "width": 4032,
+      "height": 3024,
+      "mobile_avif": "/media/optimized/images/img-5447.mobile.avif",
+      "mobile_webp": "/media/optimized/images/img-5447.mobile.webp",
+      "mobile_jpg": "/media/optimized/images/img-5447.mobile.jpg",
+      "desktop_avif": "/media/optimized/images/img-5447.desktop.avif",
+      "desktop_webp": "/media/optimized/images/img-5447.desktop.webp",
+      "desktop_jpg": "/media/optimized/images/img-5447.desktop.jpg"
+    },
+    {
+      "original": "/new-assets/Texture Ballon 9 Bitmap.png",
+      "name": "texture-ballon-9-bitmap",
+      "aliases": [
+        "Texture Ballon 9 Bitmap"
+      ],
+      "hasAlpha": true,
+      "width": 3024,
+      "height": 4032,
+      "mobile_avif": "/media/optimized/images/texture-ballon-9-bitmap.mobile.avif",
+      "mobile_webp": "/media/optimized/images/texture-ballon-9-bitmap.mobile.webp",
+      "mobile_jpg": "/media/optimized/images/texture-ballon-9-bitmap.mobile.jpg",
+      "desktop_avif": "/media/optimized/images/texture-ballon-9-bitmap.desktop.avif",
+      "desktop_webp": "/media/optimized/images/texture-ballon-9-bitmap.desktop.webp",
+      "desktop_jpg": "/media/optimized/images/texture-ballon-9-bitmap.desktop.jpg"
     }
   ],
-  "generatedAt": "2026-03-13T21:07:39.434Z"
+  "generatedAt": "2026-09-20T20:26:33.902Z"
 }

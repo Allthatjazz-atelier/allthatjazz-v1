@@ -1,4 +1,4 @@
-import HeaderFooter16 from "@/components/menu/index16";
+import HeaderFooter17 from "@/components/menu/index17";
 import Space3D_2 from "@/components/Space3D/Space3D_2";
 
 export default function Space() {
@@ -6,12 +6,12 @@ export default function Space() {
 }
 
 // Shell persistente: el wrapper debe ser ESTRUCTURALMENTE IDÉNTICO en las 3
-// rutas (mismo div + mismo HeaderFooter16) para que React preserve la instancia
+// rutas (mismo div + mismo HeaderFooter17) para que React preserve la instancia
 // del shell al navegar y solo intercambie la escena (los children).
 Space.getLayout = function getLayout(page) {
   return (
     <div className="h-full w-full overflow-hidden">
-      <HeaderFooter16 heroMode="space">{page}</HeaderFooter16>
+      <HeaderFooter17 heroMode="space">{page}</HeaderFooter17>
     </div>
   );
 };

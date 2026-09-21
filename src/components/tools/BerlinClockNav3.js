@@ -163,8 +163,14 @@ export default function BerlinClockNav3() {
   }, [updateMorph]);
 
   // ── Hover sobre cualquier link → mismo morph ────────────────────────────────
-  const handleLinkEnter = useCallback((i) => {
-    // Si ya está animando (p.ej. el link activo respirando) no reiniciamos.
+  // Solo un título morfa a la vez: al hovear un link no-activo se apaga el
+  // activo; al salir, el activo recupera su efecto en bucle.
+  const handleLinkEnter = useCallback((i, isActive) => {
+    if (isActive) return; // el activo ya está morfando
+    // Apaga el efecto del link activo mientras se hovea otro.
+    const activeIndex = NAV_ITEMS.findIndex((it) => it.href === pathnameRef.current);
+    if (activeIndex !== -1 && activeIndex !== i) morphLink(activeIndex, false);
+    // Si ya está animando este link no reiniciamos.
     if (breathTweenRef.current[i] || mainTweenRef.current[i]?.isActive()) return;
     morphLink(i, true);
   }, [morphLink]);
@@ -173,6 +179,9 @@ export default function BerlinClockNav3() {
     // El link de la vista activa nunca se apaga.
     if (isActive) return;
     morphLink(i, false);
+    // Devuelve el efecto al link activo.
+    const activeIndex = NAV_ITEMS.findIndex((it) => it.href === pathnameRef.current);
+    if (activeIndex !== -1 && activeIndex !== i) morphLink(activeIndex, true);
   }, [morphLink]);
 
   // ── Estado inicial (cerrado) ────────────────────────────────────────────────
@@ -360,7 +369,7 @@ export default function BerlinClockNav3() {
                     type="button"
                     role="menuitem"
                     onClick={() => handleNavigate(item.href)}
-                    onPointerEnter={() => handleLinkEnter(i)}
+                    onPointerEnter={() => handleLinkEnter(i, active)}
                     onPointerLeave={() => handleLinkLeave(i, active)}
                     className={`bcn-paper-link${active ? " is-active" : ""}`}
                   >
@@ -379,7 +388,7 @@ export default function BerlinClockNav3() {
           position: relative;
           overflow: hidden;
           max-width: 90vw;
-          padding: 12px 26px;
+          padding: 6px 12px;
           /* Pill: border-radius completo */
           border-radius: 999px;
           /* Velo blanco translúcido + difusión del fondo (papel de calco) */
@@ -429,7 +438,7 @@ export default function BerlinClockNav3() {
           padding: 2px 2px;
           cursor: pointer;
           color: #000;
-          font: 800 18px/1 -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+          font: 800 18px/1 'MyFont', sans-serif;
           letter-spacing: -0.03em;
           white-space: nowrap;
           opacity: 0.82;

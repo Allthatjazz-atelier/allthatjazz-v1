@@ -1,104 +1,162 @@
 /**
  * useOptimizedMedia.js
- * 
- * Consume media-manifest.json y devuelve los paths correctos
- * según el dispositivo, conexión y soporte de formatos del browser.
- * 
- * Uso en el componente:
+ *
+ * Consume /media-manifest.json y resuelve el derivado correcto según
+ * dispositivo, conexión y soporte de formatos del browser.
+ *
  *   const { getVideo, getImage, isLoaded } = useOptimizedMedia();
- *   const videoSources = getVideo("Allthatjazz cinematic©Feb26");
- *   // → { src: "/motion/optimized/Allthatjazz...mobile.webm", poster: "...", type: "video/webm" }
+ *   const img = getImage("atj-webcontent-001");
+ *   const vid = getVideo("johnny-carretes-pr-reel");
  */
 
-import { useEffect, useState, useCallback } from "react";
+import { useEffect, useState, useCallback, useMemo } from "react";
 
-// ─── Detección de capacidades del browser ──────────────────────────────────
+const AVIF_PROBE =
+  "data:image/avif;base64,AAAAIGZ0eXBhdmlmAAAAAGF2aWZtaWYxbWlhZk1BMUIAAADybWV0YQAAAAAAAAAoaGRscgAAAAAAAAAAcGljdAAAAAAAAAAAAAAAAGxpYmF2aWYAAAAADnBpdG0AAAAAAAEAAAAeaWxvYwAAAABEAAABAAEAAAABAAABGgAAAB0AAAAoaWluZgAAAAAAAQAAABppbmZlAgAAAAABAABhdjAxQ29sb3IAAAAAamlwcnAAAABLaXBjbwAAABRpc3BlAAAAAAAAAAIAAAADAAAAEHBpeGkAAAAAAwgICAAAAAxhdjFDgQ0MAAAAABNjb2xybmNseAACAAIAAYAAAAAXaXBtYQAAAAAAAAABAAEEAQKDBAAAACVtZGF0EgAKBzgADlAgI0yGh0A=";
 
-const detectCapabilities = () => {
-  if (typeof window === "undefined")
-    return { isMobile: false, supportsWebM: false, slowConnection: false };
+const WEBP_PROBE =
+  "data:image/webp;base64,UklGRiIAAABXRUJQVlA4IBYAAAAwAQCdASoBAAEADsD+JaQAA3AAAAAA";
+
+const probeFormat = (src) =>
+  new Promise((resolve) => {
+    const img = new Image();
+    img.onload = () => resolve(true);
+    img.onerror = () => resolve(false);
+    img.src = src;
+  });
+
+const detectSync = () => {
+  if (typeof window === "undefined") {
+    return {
+      isMobile: false,
+      supportsWebM: false,
+      supportsAvif: false,
+      supportsWebp: true,
+      slowConnection: false,
+    };
+  }
 
   const isMobile =
     window.innerWidth <= 768 ||
     /Android|iPhone|iPad|iPod/i.test(navigator.userAgent);
 
-  // Detección real de soporte WebM/VP9
   const video = document.createElement("video");
   const supportsWebM =
     video.canPlayType('video/webm; codecs="vp9"') === "probably" ||
     video.canPlayType('video/webm; codecs="vp8"') !== "";
 
-  // Network Information API (Chrome/Android)
-  const connection = navigator.connection || navigator.mozConnection || navigator.webkitConnection;
+  const connection =
+    navigator.connection || navigator.mozConnection || navigator.webkitConnection;
   const slowConnection =
     connection?.effectiveType === "2g" ||
     connection?.effectiveType === "slow-2g" ||
     connection?.saveData === true;
 
-  return { isMobile, supportsWebM, slowConnection };
+  return {
+    isMobile,
+    supportsWebM,
+    supportsAvif: false,
+    supportsWebp: true,
+    slowConnection,
+  };
 };
 
-// ─── Hook ──────────────────────────────────────────────────────────────────
+const detectAsyncFormats = async () => {
+  if (typeof window === "undefined") {
+    return { supportsAvif: false, supportsWebp: true };
+  }
+  const [supportsAvif, supportsWebp] = await Promise.all([
+    probeFormat(AVIF_PROBE),
+    probeFormat(WEBP_PROBE),
+  ]);
+  return { supportsAvif, supportsWebp };
+};
+
+const cleanName = (originalName) =>
+  originalName
+    .replace(/^.*[\\/]/, "")
+    .replace(/\.[^/.]+$/, "");
+
+const isHeicPath = (p) => /\.hei[cf]$/i.test(p || "");
+
+const findEntry = (list, originalName) => {
+  if (!list?.length) return null;
+  const baseName = cleanName(originalName);
+  return (
+    list.find((item) => item.name === baseName) ||
+    list.find((item) => item.aliases?.includes(baseName)) ||
+    list.find((item) => item.aliases?.includes(originalName)) ||
+    null
+  );
+};
+
+export const pickPlayableSrc = (sources) => {
+  if (!sources?.length) return null;
+  if (typeof document === "undefined") return sources[0]?.src || null;
+  const video = document.createElement("video");
+  return (sources.find((s) => video.canPlayType(s.type) !== "") || sources[0])?.src || null;
+};
 
 export const useOptimizedMedia = () => {
   const [manifest, setManifest] = useState(null);
-  const [capabilities, setCapabilities] = useState(detectCapabilities);
+  const [capabilities, setCapabilities] = useState(detectSync);
   const [isLoaded, setIsLoaded] = useState(false);
 
   useEffect(() => {
-    fetch("/media-manifest.json")
-      .then((r) => r.json())
-      .then((data) => {
-        setManifest(data);
-        setIsLoaded(true);
-      })
-      .catch(() => {
-        // Si no hay manifest (aún no se corrió el script), fallback a paths originales
-        setIsLoaded(true);
-      });
+    let cancelled = false;
 
-    const handleResize = () => setCapabilities(detectCapabilities());
+    const boot = async () => {
+      const formats = await detectAsyncFormats();
+      if (cancelled) return;
+      setCapabilities({ ...detectSync(), ...formats });
+
+      try {
+        const data = await fetch("/media-manifest.json").then((r) => r.json());
+        if (!cancelled) {
+          setManifest(data);
+          setIsLoaded(true);
+        }
+      } catch {
+        if (!cancelled) setIsLoaded(true);
+      }
+    };
+
+    boot();
+
+    const handleResize = () => {
+      setCapabilities((prev) => ({ ...prev, ...detectSync(), supportsAvif: prev.supportsAvif, supportsWebp: prev.supportsWebp }));
+    };
     window.addEventListener("resize", handleResize);
-    return () => window.removeEventListener("resize", handleResize);
+    return () => {
+      cancelled = true;
+      window.removeEventListener("resize", handleResize);
+    };
   }, []);
 
-  /**
-   * Devuelve las sources para un video, ordenadas por preferencia:
-   * WebM primero (mejor compresión), MP4 como fallback.
-   * 
-   * @param {string} originalName - nombre del archivo sin extensión ni path
-   * @returns {{ sources: Array<{src, type}>, poster: string, fallback: string }}
-   */
+  const variantFor = useCallback(() => {
+    const variant = capabilities.isMobile ? "mobile" : "desktop";
+    return capabilities.slowConnection ? "mobile" : variant;
+  }, [capabilities]);
+
   const getVideo = useCallback(
     (originalName) => {
-      // Nombre limpio para buscar en el manifest
-      const baseName = originalName
-        .replace(/^.*[\\/]/, "") // quitar path
-        .replace(/\.[^/.]+$/, ""); // quitar extensión
-
-      const entry = manifest?.videos?.find((v) => v.name === baseName);
+      const entry = findEntry(manifest?.videos, originalName);
 
       if (!entry) {
-        const fallbackName = originalName.endsWith(".mp4")
+        const fallbackName = originalName.match(/\.(mp4|mov|webm)$/i)
           ? originalName
           : `${originalName}.mp4`;
-      
         return {
-          sources: [{ src: `/motion/${fallbackName}`, type: "video/mp4" }],
+          sources: [{ src: `/new-assets/${fallbackName}`, type: "video/mp4" }],
           poster: null,
+          src: `/new-assets/${fallbackName}`,
           hasOptimized: false,
         };
       }
 
-      const variant = capabilities.isMobile ? "mobile" : "desktop";
-
-      // En conexiones lentas, forzar mobile aunque sea desktop
-      const effectiveVariant =
-        capabilities.slowConnection ? "mobile" : variant;
-
+      const effectiveVariant = variantFor();
       const sources = [];
 
-      // WebM primero (30-50% más ligero que H.264)
       if (capabilities.supportsWebM && entry[`${effectiveVariant}_webm`]) {
         sources.push({
           src: entry[`${effectiveVariant}_webm`],
@@ -106,7 +164,6 @@ export const useOptimizedMedia = () => {
         });
       }
 
-      // MP4 H.264 como fallback universal (Safari, iOS, etc.)
       if (entry[`${effectiveVariant}_mp4`]) {
         sources.push({
           src: entry[`${effectiveVariant}_mp4`],
@@ -114,46 +171,66 @@ export const useOptimizedMedia = () => {
         });
       }
 
-      // Si no hay nada optimizado, usar el original
-      if (sources.length === 0) {
+      if (sources.length === 0 && entry.original) {
         sources.push({ src: entry.original, type: "video/mp4" });
       }
 
       return {
         sources,
         poster: entry.poster || null,
-        hasOptimized: sources.length > 0,
+        src: pickPlayableSrc(sources),
+        hasOptimized: Boolean(entry.mobile_mp4 || entry.desktop_mp4),
       };
     },
-    [manifest, capabilities]
+    [manifest, capabilities, variantFor]
   );
 
-  /**
-   * Devuelve el path de imagen optimizado.
-   * 
-   * @param {string} originalName - nombre del archivo (ej: "story1.png")
-   * @returns {{ src: string, fallback: string }}
-   */
   const getImage = useCallback(
     (originalName) => {
-      const baseName = originalName.replace(/\.[^/.]+$/, "");
-      const entry = manifest?.images?.find((img) => img.name === baseName);
+      const entry = findEntry(manifest?.images, originalName);
 
       if (!entry) {
-        return { src: `/story/${originalName}`, fallback: null };
+        const withExt = /\.[a-z0-9]+$/i.test(originalName)
+          ? originalName
+          : `${originalName}.png`;
+        // Chrome/Firefox no decodifican HEIC: sin derivado, no hay src usable.
+        if (isHeicPath(withExt)) return { src: null, fallback: null };
+        return { src: `/new-assets/${withExt}`, fallback: null };
       }
 
-      const variant = capabilities.isMobile ? "mobile" : "desktop";
-      const effectiveVariant = capabilities.slowConnection ? "mobile" : variant;
+      const effectiveVariant = variantFor();
+      const avif = entry[`${effectiveVariant}_avif`];
+      const webp = entry[`${effectiveVariant}_webp`];
+      const jpg = entry[`${effectiveVariant}_jpg`];
+      const original = isHeicPath(entry.original) ? null : entry.original;
 
-      // WebP primero, JPEG fallback
-      const src = entry[`${effectiveVariant}_webp`] || entry[`${effectiveVariant}_jpg`] || entry.original;
-      const fallback = entry[`${effectiveVariant}_jpg`] || entry.original;
+      // HEIC/HEIF: Chrome sube el AVIF (mismo contenedor) por texImage3D y falla
+      // con FLIP_Y. JPEG es el único derivado fiable para WebGL.
+      if (isHeicPath(entry.original)) {
+        return { src: jpg || webp || null, fallback: jpg || null };
+      }
 
-      return { src, fallback };
+      let src = jpg || webp || avif || original;
+      if (capabilities.supportsWebp && webp) src = webp;
+      if (capabilities.supportsAvif && avif) src = avif;
+
+      return {
+        src,
+        fallback: jpg || original,
+      };
     },
-    [manifest, capabilities]
+    [manifest, capabilities, variantFor]
   );
 
-  return { getVideo, getImage, isLoaded, capabilities };
+  const videoIds = useMemo(
+    () => (manifest?.videos ?? []).map((v) => v.name),
+    [manifest]
+  );
+
+  const imageIds = useMemo(
+    () => (manifest?.images ?? []).map((v) => v.name),
+    [manifest]
+  );
+
+  return { getVideo, getImage, isLoaded, capabilities, videoIds, imageIds };
 };

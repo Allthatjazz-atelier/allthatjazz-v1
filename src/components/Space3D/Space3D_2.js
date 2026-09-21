@@ -3,16 +3,10 @@
 import { useEffect, useRef } from "react";
 import * as THREE from "three";
 import { useOptimizedMedia } from "@/hooks/useOptimizedMedia";
+import { SPACE_IMAGES, SPACE_VIDEOS } from "@/data/mediaCatalog";
 
-// ─── Media (misma fuente que la vista slider FinalSlider4) ──────────────────────
-const IMAGE_NAMES = Array.from({ length: 15 }, (_, i) => `story${i + 1}`);
-const VIDEO_NAMES = [
-  "Allthatjazz cinematic©Feb26",
-  "ATJ About Cuaderno",
-  "ATJ_AboutMotion 02",
-  "Playground_Carhartt-WIP_24012026 (1)_1",
-  "Portfolio-Gallery-4-5",
-];
+const IMAGE_NAMES = SPACE_IMAGES;
+const VIDEO_NAMES = SPACE_VIDEOS;
 
 // ─── Shaders ───────────────────────────────────────────────────────────────────
 // Vertex: billboard por-malla (siempre mira a cámara). El centro del quad es el
@@ -42,36 +36,40 @@ const FRAG = /* glsl */ `
   uniform sampler2D uTex;
   uniform float uVisNear;
   uniform float uVisFarStart;
+  uniform float uFlipV;     // 1 = invertir V (VideoTexture con flipY=false)
 
   void main() {
     if (vDepth < uVisNear || vDepth > uVisFarStart) discard;
 
-    vec4 texel = texture2D(uTex, vUv);
+    vec2 uv = vec2(vUv.x, mix(vUv.y, 1.0 - vUv.y, uFlipV));
+    vec4 texel = texture2D(uTex, uv);
     gl_FragColor = vec4(texel.rgb, 1.0);
   }
 `;
 
 // ─── Componente ────────────────────────────────────────────────────────────────
 export default function Space3D_2({
-  count   = 150,
-  box     = { x: 40, y: 22, z: 40 },
+  count,
+  box     = { x: 16, y: 10, z: 42 },
   damping = 0.085,
 
   visNearEnd  = 1.0,
-  visNear     = 4.0,
-  visFarStart = 28.0,
+  visNear     = 3.0,
+  visFarStart = 40.0,
   visFarEnd   = 50.0,
 } = {}) {
   const canvasRef = useRef(null);
 
-  const { getImage, getVideo, isLoaded } = useOptimizedMedia();
+  const { getImage, getVideo, isLoaded, imageIds } = useOptimizedMedia();
   // Capturamos los resolvers en refs para construir la media UNA vez (cuando carga
   // el manifest) y NO reconstruir toda la escena en cada resize (el hook recalcula
   // capabilities en cada resize, lo que cambiaría la identidad de getImage/getVideo).
   const getImageRef = useRef(getImage);
   const getVideoRef = useRef(getVideo);
+  const imageIdsRef = useRef(imageIds);
   getImageRef.current = getImage;
   getVideoRef.current = getVideo;
+  imageIdsRef.current = imageIds;
 
   useEffect(() => {
     const canvas = canvasRef.current;
@@ -80,7 +78,19 @@ export default function Space3D_2({
     const isMobile = window.innerWidth <= 768;
 
     // Resolución de media (optimizada por dispositivo) — capturada al construir.
-    const imageSrcs = IMAGE_NAMES.map((n) => getImageRef.current(n).src);
+    // Fuente: todas las imágenes del manifiesto (new-assets), no un subconjunto.
+    // WebGL: preferimos JPEG. AVIF es HEIF y en Chrome acaba en texImage3D+FLIP_Y.
+    const isHeic = (p) => /\.hei[cf]$/i.test(p || "");
+    const isWebglSafe = (p) => p && !isHeic(p) && !/\.avif$/i.test(p);
+    const imageNames = imageIdsRef.current.length ? imageIdsRef.current : IMAGE_NAMES;
+    const imageSrcs = imageNames
+      .map((n) => {
+        const img = getImageRef.current(n);
+        const jpg = isWebglSafe(img.fallback) ? img.fallback : null;
+        const src = isWebglSafe(img.src) ? img.src : null;
+        return { src: jpg || src, fallback: jpg && src && jpg !== src ? src : null };
+      })
+      .filter((img) => img.src);
     const videoData = VIDEO_NAMES.map((n) => {
       const v = getVideoRef.current(n);
       return { sources: v.sources, poster: v.poster };
@@ -107,7 +117,7 @@ export default function Space3D_2({
       55,
       window.innerWidth / window.innerHeight,
       0.1,
-      Math.max(box.x, box.z) * 3,
+      Math.max(box.x, box.z) * 4,
     );
 
     // ── Recursos compartidos ─────────────────────────────────────────────────────
@@ -119,6 +129,11 @@ export default function Space3D_2({
     const placeholderTex = new THREE.DataTexture(
       new Uint8Array([255, 255, 255, 255]), 1, 1, THREE.RGBAFormat,
     );
+    placeholderTex.flipY = false;
+    placeholderTex.premultiplyAlpha = false;
+    placeholderTex.generateMipmaps = false;
+    placeholderTex.minFilter = THREE.NearestFilter;
+    placeholderTex.magFilter = THREE.NearestFilter;
     placeholderTex.needsUpdate = true;
 
     // Caché de texturas de imagen por src → se cargan UNA vez y se comparten entre
@@ -127,15 +142,20 @@ export default function Space3D_2({
     const texWaiting = new Map(); // src -> [cb]
 
     const configureImageTexture = (tex) => {
-      tex.colorSpace      = THREE.SRGBColorSpace;
-      tex.anisotropy      = maxAniso;
-      tex.generateMipmaps = true; // calidad al verse pequeñas/lejos (WebGL2: NPOT OK)
-      tex.minFilter       = THREE.LinearMipmapLinearFilter;
-      tex.magFilter       = THREE.LinearFilter;
+      tex.colorSpace        = THREE.SRGBColorSpace;
+      tex.anisotropy        = maxAniso;
+      tex.generateMipmaps   = true;
+      tex.minFilter         = THREE.LinearMipmapLinearFilter;
+      tex.magFilter         = THREE.LinearFilter;
+      tex.flipY             = true;
+      tex.premultiplyAlpha  = false;
     };
 
-    const loadImage = (src, cb) => {
-      if (!src) return;
+    const loadImage = (src, cb, fallback) => {
+      if (!src) {
+        if (fallback) loadImage(fallback, cb);
+        return;
+      }
       const cached = texCache.get(src);
       if (cached) { cb(cached); return; }
       const waiting = texWaiting.get(src);
@@ -153,7 +173,10 @@ export default function Space3D_2({
           texWaiting.delete(src);
         },
         undefined,
-        () => texWaiting.delete(src),
+        () => {
+          texWaiting.delete(src);
+          if (fallback && fallback !== src) loadImage(fallback, cb);
+        },
       );
     };
 
@@ -166,27 +189,38 @@ export default function Space3D_2({
     };
 
     // ── Construcción de mallas ───────────────────────────────────────────────────
-    // Repartimos: la mayoría imágenes + unos pocos slots de vídeo (cada vídeo ~2
-    // veces). Solo 1-2 vídeos se reproducen a la vez (ver gestión más abajo).
-    const videoSlotCount = Math.min(count, videoData.length * 2);
-    const videoSlots = new Set();
-    while (videoSlots.size < videoSlotCount) {
-      videoSlots.add(Math.floor(Math.random() * count));
+    // Cada imagen dos veces (original + 1 repetición) y cada vídeo una.
+    const IMAGE_COPIES = 2;
+    const slots = [
+      ...imageSrcs.flatMap((img) =>
+        Array.from({ length: IMAGE_COPIES }, () => ({
+          type: "image",
+          src: img.src,
+          fallback: img.fallback,
+        })),
+      ),
+      ...videoData.map((vd) => ({ type: "video", sources: vd.sources, poster: vd.poster })),
+    ];
+    for (let i = slots.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1));
+      [slots[i], slots[j]] = [slots[j], slots[i]];
     }
-    const slotArr = [...videoSlots];
+    const total = typeof count === "number" ? Math.min(count, slots.length) : slots.length;
 
     const items = [];
     const videoItems = [];
     const videoEls = [];
 
-    for (let i = 0; i < count; i++) {
-      const scaleBase = 0.9 + Math.random() * 1.4; // 0.9..2.3
+    for (let i = 0; i < total; i++) {
+      const scaleBase = 1.15 + Math.random() * 1.35; // 1.15..2.5
+      const slot = slots[i];
 
       const uniforms = {
         uTex:         { value: placeholderTex },
         uSize:        { value: new THREE.Vector2(scaleBase, scaleBase) },
         uVisNear:     { value: visNear },
         uVisFarStart: { value: visFarStart },
+        uFlipV:       { value: 0 },
       };
       const mat = new THREE.ShaderMaterial({
         vertexShader: VERT,
@@ -203,34 +237,29 @@ export default function Space3D_2({
       mesh.frustumCulled = false;
       scene.add(mesh);
 
-      const item = { mesh, mat, scaleBase, type: "image", active: false };
+      const item = { mesh, mat, scaleBase, type: slot.type, active: false };
       items.push(item);
 
-      const vIdx = slotArr.indexOf(i);
-      if (vIdx !== -1) {
-        const vd = videoData[vIdx % videoData.length];
-        item.type    = "video";
-        item.sources = vd.sources;
-        item.poster  = vd.poster;
+      if (slot.type === "video") {
+        item.sources = slot.sources;
+        item.poster  = slot.poster;
         item.posterTex = null;
         item.video     = null;
         item.videoTex  = null;
         videoItems.push(item);
-        // Póster estático por defecto (mientras no es uno de los activos).
-        if (vd.poster) {
-          loadImage(vd.poster, ({ tex, aspect }) => {
+        if (slot.poster) {
+          loadImage(slot.poster, ({ tex, aspect }) => {
             item.posterTex = tex;
             if (!item.active) item.mat.uniforms.uTex.value = tex;
             applyAspect(item, aspect);
           });
         }
       } else {
-        const src = imageSrcs[i % imageSrcs.length];
-        item.src = src;
-        loadImage(src, ({ tex, aspect }) => {
+        item.src = slot.src;
+        loadImage(slot.src, ({ tex, aspect }) => {
           item.mat.uniforms.uTex.value = tex;
           applyAspect(item, aspect);
-        });
+        }, slot.fallback);
       }
     }
 
@@ -246,7 +275,7 @@ export default function Space3D_2({
         vid.preload = "auto";
         vid.crossOrigin = "anonymous";
         const src = item.sources?.[0]?.src;
-        if (src) vid.src = src;
+        if (src) vid.src = encodeURI(src);
         vid.style.display = "none";
         document.body.appendChild(vid);
 
@@ -255,6 +284,10 @@ export default function Space3D_2({
         vtex.minFilter = THREE.LinearFilter;
         vtex.magFilter = THREE.LinearFilter;
         vtex.generateMipmaps = false;
+        // Chrome WebGL2: FLIP_Y + PREMULTIPLY_ALPHA no están permitidos en
+        // texImage3D (ruta interna de algunos vídeos/HEIF). Flip en el shader.
+        vtex.flipY = false;
+        vtex.premultiplyAlpha = false;
 
         vid.addEventListener("loadedmetadata", () => {
           if (vid.videoWidth && vid.videoHeight) {
@@ -268,6 +301,7 @@ export default function Space3D_2({
       }
       item.active = true;
       item.mat.uniforms.uTex.value = item.videoTex;
+      item.mat.uniforms.uFlipV.value = 1;
       item.video.play().catch(() => {});
     };
 
@@ -276,6 +310,7 @@ export default function Space3D_2({
       item.active = false;
       if (item.video) item.video.pause();
       item.mat.uniforms.uTex.value = item.posterTex || placeholderTex;
+      item.mat.uniforms.uFlipV.value = 0;
     };
 
     const updateActiveVideos = () => {
@@ -294,17 +329,17 @@ export default function Space3D_2({
     };
 
     // ── Cámara orbital con inercia ─────────────────────────────────────────────
+    // Zoom hacia dentro hasta un tope delante del origen (nunca lo atraviesa).
+    // visNear descarta las fotos que se te echan encima, así el fondo gana protagonismo.
     const PITCH_LIMIT = Math.PI / 2 - 0.05;
-    const startDist = (visNear + visFarStart) * 0.5;
-    // vDepth ≈ distancia cámara↔malla; el centro del box está a ~state.dist.
-    // Si maxDist > visFarStart, al alejarse al máximo todas las imágenes quedan
-    // fuera de la banda visible (corte duro en el shader).
-    const maxDist = visFarStart;
+    const startDist = box.z * 0.52;
+    const maxDist = Math.max(box.z * 0.75, visFarStart * 0.85);
+    const minDist = visNear + 0.6;
 
     const state = {
       yaw: 0, pitch: 0, dist: startDist,
       targetYaw: 0, targetPitch: 0, targetDist: startDist,
-      minDist: 0.8, maxDist,
+      minDist, maxDist,
     };
 
     const applyCamera = () => {
@@ -346,12 +381,14 @@ export default function Space3D_2({
       canvas.style.cursor = "grab";
     };
 
-    // ── Wheel: zoom exponencial ────────────────────────────────────────────────
+    // ── Wheel: avance lineal por el eje de vista, acotado al tope ──────────────
     const onWheel = (e) => {
       e.preventDefault();
       const dy = e.deltaMode === 1 ? e.deltaY * 16 : e.deltaY;
-      const factor = Math.exp(dy * 0.001);
-      state.targetDist = Math.max(state.minDist, Math.min(state.maxDist, state.targetDist * factor));
+      state.targetDist = Math.max(
+        state.minDist,
+        Math.min(state.maxDist, state.targetDist + dy * 0.018),
+      );
     };
 
     // ── Pinch zoom móvil ───────────────────────────────────────────────────────
@@ -372,8 +409,8 @@ export default function Space3D_2({
         const dx = e.touches[0].clientX - e.touches[1].clientX;
         const dy = e.touches[0].clientY - e.touches[1].clientY;
         const d  = Math.hypot(dx, dy);
-        const factor = pinchStartDist / d;
-        state.targetDist = Math.max(state.minDist, Math.min(state.maxDist, pinchStartCamDist * factor));
+        const next = pinchStartCamDist - (d / pinchStartDist - 1) * Math.max(10, Math.abs(pinchStartCamDist));
+        state.targetDist = Math.max(state.minDist, Math.min(state.maxDist, next));
       }
     };
     const onTouchEnd = () => { pinchStartDist = 0; };

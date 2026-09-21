@@ -4,6 +4,12 @@ import { useEffect, useRef, useState, useMemo } from "react";
 import * as THREE from "three";
 import gsap from "gsap";
 import { useOptimizedMedia } from "@/hooks/useOptimizedMedia";
+import {
+  SLIDER_IMAGE_GROUPS,
+  SLIDER_IMAGE_LABELS,
+  SLIDER_VIDEOS,
+  SLIDER_VIDEO_LABELS,
+} from "@/data/mediaCatalog";
 
 // ─── Slide: border-radius SDF + optional video range expansion ─────────────────
 const slideVert = `
@@ -30,24 +36,10 @@ const slideFrag = `
 `;
 
 // ─── Data ──────────────────────────────────────────────────────────────────────
-const IMAGE_NAMES = [
-  ["story1",  "story2",  "story3"],
-  ["story4",  "story5",  "story6"],
-  ["story7",  "story8",  "story9"],
-  ["story10", "story11", "story12"],
-  ["story13", "story14", "story15"],
-];
-const VIDEO_NAMES = [
-  "Allthatjazz cinematic©Feb26",
-  "ATJ About Cuaderno",
-  "ATJ_AboutMotion 02",
-  "Playground_Carhartt-WIP_24012026 (1)_1",
-  "Portfolio-Gallery-4-5",
-];
-
-// ── Etiquetas ─────────────────────────────────────────────────────────────────
-const AQUA_LABELS  = ["Quiet Green",   "Crimson Reign", "Gilded Brow",  "Golden Flight", "Silver Mist"];
-const VIDEO_LABELS = ["All That Jazz", "ATJ Cuaderno",  "ATJ Motion",   "Carhartt WIP",  "Portfolio"];
+const IMAGE_NAMES  = SLIDER_IMAGE_GROUPS;
+const VIDEO_NAMES  = SLIDER_VIDEOS;
+const AQUA_LABELS  = SLIDER_IMAGE_LABELS;
+const VIDEO_LABELS = SLIDER_VIDEO_LABELS;
 
 // ─── CSS caption styles (inyectadas una sola vez) ──────────────────────────────
 const CAPTION_CSS = `

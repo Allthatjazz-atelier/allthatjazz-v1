@@ -1,29 +1,24 @@
 #!/usr/bin/env node
 /**
  * optimize-media.mjs
- * 
- * Pipeline de optimización de video e imagen para WebGL carousels.
- * 
- * Uso:
+ *
+ * Pipeline de agencia para texturas WebGL: masters en /public/new-assets,
+ * derivados por dispositivo en /public/media/optimized.
+ *
  *   node optimize-media.mjs
- *   node optimize-media.mjs --only-videos
  *   node optimize-media.mjs --only-images
- * 
- * Genera en /public/motion/optimized/:
- *   video.mobile.mp4    → H.264 720x1280, CRF 32, sin audio
- *   video.mobile.webm   → VP9 720x1280, CRF 40, sin audio
- *   video.desktop.mp4   → H.264 1080p,   CRF 26, sin audio
- *   video.desktop.webm  → VP9 1080p,     CRF 33, sin audio
- *   video.poster.webp   → primer frame del video
- * 
- * Genera en /public/story/optimized/:
- *   image.mobile.webp   → 800px wide,   quality 75
- *   image.desktop.webp  → 1600px wide,  quality 85
- *   image.mobile.jpg    → fallback JPEG 800px
- *   image.desktop.jpg   → fallback JPEG 1600px
- * 
- * Al final genera /public/media-manifest.json con los paths correctos
- * para consumir desde el componente React.
+ *   node optimize-media.mjs --only-videos
+ *   node optimize-media.mjs --force
+ *
+ * Imágenes (mobile 1080 / desktop 1920, long-edge, sin upscale):
+ *   .avif  .webp  .jpg
+ *
+ * Vídeos (mobile 1080 / desktop 1920, long-edge, sin upscale, sin audio):
+ *   .mp4  H.264  +faststart
+ *   .webm VP9
+ *   .poster.jpg
+ *
+ * Escribe /public/media-manifest.json para useOptimizedMedia.
  */
 
 import { execSync, spawn } from "child_process";
@@ -33,40 +28,47 @@ import { fileURLToPath } from "url";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
-// ─── CONFIG ────────────────────────────────────────────────────────────────
-
 const CONFIG = {
-  videosDir: path.join(__dirname, "public", "motion"),
-  imagesDir: path.join(__dirname, "public", "story"),
-  outputVideos: path.join(__dirname, "public", "motion", "optimized"),
-  outputImages: path.join(__dirname, "public", "story", "optimized"),
+  sourceDir: path.join(__dirname, "public", "new-assets"),
+  outputImages: path.join(__dirname, "public", "media", "optimized", "images"),
+  outputVideos: path.join(__dirname, "public", "media", "optimized", "videos"),
   manifestPath: path.join(__dirname, "public", "media-manifest.json"),
+  publicBase: "/media/optimized",
 
   video: {
     mobile: {
-      width: 720,
-      height: 1280,
-      mp4: { crf: 32, preset: "slow", profile: "baseline", level: "3.1" },
-      webm: { crf: 40, qmin: 33, qmax: 45, speed: 2 },
+      maxEdge: 1080,
+      mp4: { crf: 23, preset: "fast", profile: "high", level: "4.1" },
+      webm: { crf: 33, cpuUsed: 4 },
     },
     desktop: {
-      width: 1920,
-      height: 1080,
-      mp4: { crf: 26, preset: "slow", profile: "high", level: "4.2" },
-      webm: { crf: 33, qmin: 25, qmax: 38, speed: 1 },
+      maxEdge: 1920,
+      mp4: { crf: 20, preset: "fast", profile: "high", level: "4.1" },
+      webm: { crf: 29, cpuUsed: 4 },
     },
-    poster: { quality: 90 },
-    extensions: [".mp4", ".mov", ".webm", ".avi", ".mkv"],
+    extensions: [".mp4", ".mov", ".webm", ".avi", ".mkv", ".m4v"],
   },
 
   image: {
-    mobile: { width: 800, webpQuality: 75, jpgQuality: 80 },
-    desktop: { width: 1600, webpQuality: 85, jpgQuality: 88 },
-    extensions: [".jpg", ".jpeg", ".png", ".webp", ".tiff"],
+    mobile: {
+      maxEdge: 1080,
+      avifQuality: 52,
+      webpQuality: 80,
+      jpgQuality: 82,
+      chroma: "4:2:0",
+    },
+    desktop: {
+      maxEdge: 1920,
+      avifQuality: 55,
+      webpQuality: 86,
+      jpgQuality: 88,
+      chroma: "4:4:4",
+    },
+    extensions: [".jpg", ".jpeg", ".png", ".webp", ".tif", ".tiff", ".heic", ".heif"],
   },
-};
 
-// ─── UTILS ─────────────────────────────────────────────────────────────────
+  imageConcurrency: 3,
+};
 
 const log = {
   info: (msg) => console.log(`\x1b[36m[INFO]\x1b[0m ${msg}`),
@@ -76,13 +78,24 @@ const log = {
   section: (msg) => console.log(`\n\x1b[1m\x1b[35m═══ ${msg} ═══\x1b[0m\n`),
 };
 
+const FORCE = process.argv.includes("--force");
+
+const slugify = (name) =>
+  name
+    .normalize("NFKD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .replace(/&/g, "and")
+    .replace(/[^a-zA-Z0-9]+/g, "-")
+    .replace(/^-+|-+$/g, "")
+    .toLowerCase();
+
 const checkFfmpeg = () => {
   try {
     execSync("ffmpeg -version", { stdio: "ignore" });
     execSync("ffprobe -version", { stdio: "ignore" });
     return true;
   } catch {
-    log.error("FFmpeg no encontrado. Instálalo con: brew install ffmpeg (macOS) | apt install ffmpeg (Linux)");
+    log.error("FFmpeg no encontrado. Instálalo con: brew install ffmpeg");
     process.exit(1);
   }
 };
@@ -125,163 +138,144 @@ const runFfmpeg = (args) =>
     proc.stderr.on("data", (d) => (errOutput += d.toString()));
     proc.on("close", (code) => {
       if (code === 0) resolve();
-      else reject(new Error(errOutput.slice(-500)));
+      else reject(new Error(errOutput.slice(-800)));
     });
   });
 
-const getVideoInfo = (inputPath) => {
-  const raw = execSync(
-    `ffprobe -v quiet -print_format json -show_streams "${inputPath}"`,
-    { encoding: "utf-8" }
-  );
-  const info = JSON.parse(raw);
-  const video = info.streams.find((s) => s.codec_type === "video");
-  return {
-    width: video?.width,
-    height: video?.height,
-    duration: parseFloat(video?.duration || 0),
-  };
+const listSourceFiles = (extensions) =>
+  fs
+    .readdirSync(CONFIG.sourceDir)
+    .filter((f) => extensions.includes(path.extname(f).toLowerCase()))
+    .filter((f) => !f.startsWith("."))
+    .sort((a, b) => a.localeCompare(b, undefined, { numeric: true, sensitivity: "base" }));
+
+const mapLimit = async (items, limit, fn) => {
+  const ret = new Array(items.length);
+  let i = 0;
+  const workers = Array.from({ length: Math.min(limit, items.length) || 1 }, async () => {
+    while (i < items.length) {
+      const idx = i++;
+      ret[idx] = await fn(items[idx], idx);
+    }
+  });
+  await Promise.all(workers);
+  return ret;
 };
 
-/**
- * Calcula el filtro de escala manteniendo aspecto y ajustando
- * a múltiplos de 2 (requerimiento de H.264/VP9).
- */
-const scaleFilter = (targetW, targetH, srcW, srcH) => {
-    // Simplemente escala al ancho target manteniendo la proporción original.
-    // applyMediaAspect en Three.js se encarga del resto, igual que con los originales.
-    const targetSize = targetW;
-    return `scale=${targetSize}:-2`; // -2 = altura calculada automáticamente, múltiplo de 2
-  };
+const shouldWrite = (outputPath) => FORCE || !fs.existsSync(outputPath);
 
-// ─── VIDEO OPTIMIZATION ────────────────────────────────────────────────────
+const publicPath = (kind, filename) =>
+  `${CONFIG.publicBase}/${kind}/${filename}`;
+
+// ─── VIDEO ──────────────────────────────────────────────────────────────────
+
+const scaleFilter = (maxEdge) =>
+  `scale='min(${maxEdge},iw)':'min(${maxEdge},ih)':force_original_aspect_ratio=decrease:flags=lanczos,scale=trunc(iw/2)*2:trunc(ih/2)*2`;
 
 const optimizeVideoVariant = async (inputPath, outputPath, variant, format) => {
-  if (fs.existsSync(outputPath)) {
+  if (!shouldWrite(outputPath)) {
     log.skip(`Ya existe: ${path.basename(outputPath)}`);
     return false;
   }
 
-  const { width: srcW, height: srcH } = getVideoInfo(inputPath);
-  const { width, height } = CONFIG.video[variant];
-  const filter = scaleFilter(width, height, srcW, srcH);
+  const { maxEdge } = CONFIG.video[variant];
+  const filter = scaleFilter(maxEdge);
   const cfg = CONFIG.video[variant][format];
-  let args;
 
   if (format === "mp4") {
-    args = [
+    await runFfmpeg([
       "-y",
       "-i", inputPath,
       "-vf", filter,
       "-c:v", "libx264",
-      "-crf", String(cfg.crf),
       "-preset", cfg.preset,
+      "-crf", String(cfg.crf),
       "-profile:v", cfg.profile,
       "-level", cfg.level,
-      "-movflags", "+faststart",  // permite streaming progresivo
-      "-an",                       // sin audio (videos están muted)
-      "-pix_fmt", "yuv420p",       // compatibilidad máxima
-      outputPath,
-    ];
-  } else if (format === "webm") {
-    // VP9 two-pass para mejor calidad/peso
-    const passlogPath = outputPath.replace(".webm", "_pass");
-    args = [
-      "-y",
-      "-i", inputPath,
-      "-vf", filter,
-      "-c:v", "libvpx-vp9",
-      "-crf", String(cfg.crf),
-      "-b:v", "0",               // modo CRF puro (sin target bitrate)
-      "-qmin", String(cfg.qmin),
-      "-qmax", String(cfg.qmax),
-      "-speed", String(cfg.speed),
-      "-tile-columns", "2",
-      "-frame-parallel", "1",
-      "-auto-alt-ref", "1",
-      "-lag-in-frames", "25",
+      "-pix_fmt", "yuv420p",
+      "-color_primaries", "bt709",
+      "-color_trc", "bt709",
+      "-colorspace", "bt709",
+      "-movflags", "+faststart",
       "-an",
-      "-pass", "1",
-      "-passlogfile", passlogPath,
-      "-f", "null",
-      "/dev/null",
-    ];
-    await runFfmpeg(args);
-    args = [
-      "-y",
-      "-i", inputPath,
-      "-vf", filter,
-      "-c:v", "libvpx-vp9",
-      "-crf", String(cfg.crf),
-      "-b:v", "0",
-      "-qmin", String(cfg.qmin),
-      "-qmax", String(cfg.qmax),
-      "-speed", "1",
-      "-tile-columns", "2",
-      "-frame-parallel", "1",
-      "-auto-alt-ref", "1",
-      "-lag-in-frames", "25",
-      "-an",
-      "-pass", "2",
-      "-passlogfile", passlogPath,
       outputPath,
-    ];
-    await runFfmpeg(args);
-    // limpiar archivos de passlog
-    [`${passlogPath}-0.log`, `${passlogPath}-0.log.mbtree`].forEach((f) => {
-      if (fs.existsSync(f)) fs.unlinkSync(f);
-    });
+    ]);
     return true;
   }
 
-  await runFfmpeg(args);
+  await runFfmpeg([
+    "-y",
+    "-i", inputPath,
+    "-vf", filter,
+    "-c:v", "libvpx-vp9",
+    "-crf", String(cfg.crf),
+    "-b:v", "0",
+    "-row-mt", "1",
+    "-deadline", "good",
+    "-cpu-used", String(cfg.cpuUsed),
+    "-tile-columns", "2",
+    "-frame-parallel", "1",
+    "-auto-alt-ref", "1",
+    "-lag-in-frames", "16",
+    "-pix_fmt", "yuv420p",
+    "-an",
+    outputPath,
+  ]);
   return true;
 };
 
 const extractPoster = async (inputPath, outputPath) => {
-  if (fs.existsSync(outputPath)) {
+  if (!shouldWrite(outputPath)) {
     log.skip(`Poster ya existe: ${path.basename(outputPath)}`);
     return;
   }
-  // JPEG es universal en ffmpeg; WebP puede fallar si no está compilado libwebp
   await runFfmpeg([
     "-y",
-    "-ss", "0.001",
+    "-ss", "0.8",
     "-i", inputPath,
     "-frames:v", "1",
-    "-q:v", "2",
+    "-q:v", "3",
     "-f", "image2",
     outputPath,
   ]);
 };
 
-const processVideo = async (inputPath, baseName) => {
+const processVideo = async (inputPath, slug) => {
   const out = CONFIG.outputVideos;
-  const base = path.join(out, baseName);
-  const result = { original: `/motion/${path.basename(inputPath)}` };
+  const result = {
+    original: `/new-assets/${path.basename(inputPath)}`,
+    name: slug,
+    aliases: [path.parse(inputPath).name],
+  };
 
   try {
-    log.info(`Procesando video: ${path.basename(inputPath)}`);
+    log.info(`Procesando video: ${path.basename(inputPath)} → ${slug}`);
 
     for (const variant of ["mobile", "desktop"]) {
       for (const format of ["mp4", "webm"]) {
-        const outputPath = `${base}.${variant}.${format}`;
-        const created = await optimizeVideoVariant(inputPath, outputPath, variant, format);
-        if (created || fs.existsSync(outputPath)) {
-          log.ok(`${variant}.${format}: ${formatReduction(inputPath, outputPath)}`);
-          result[`${variant}_${format}`] = `/motion/optimized/${baseName}.${variant}.${format}`;
+        const filename = `${slug}.${variant}.${format}`;
+        const outputPath = path.join(out, filename);
+        try {
+          const created = await optimizeVideoVariant(inputPath, outputPath, variant, format);
+          if (created || fs.existsSync(outputPath)) {
+            if (created) log.ok(`${variant}.${format}: ${formatReduction(inputPath, outputPath)}`);
+            result[`${variant}_${format}`] = publicPath("videos", filename);
+          }
+        } catch (err) {
+          log.error(`${slug} ${variant}.${format}: ${err.message}`);
         }
       }
     }
 
-    // Poster desde la versión mobile mp4 (JPEG = compatible con cualquier ffmpeg)
-    const posterPath = `${base}.poster.jpg`;
-    const sourceForPoster = `${base}.mobile.mp4`;
-    if (fs.existsSync(sourceForPoster)) {
-      await extractPoster(sourceForPoster, posterPath);
+    const posterName = `${slug}.poster.jpg`;
+    const posterPath = path.join(out, posterName);
+    const posterSrc =
+      (result.mobile_mp4 && path.join(out, `${slug}.mobile.mp4`)) || inputPath;
+    if (fs.existsSync(posterSrc)) {
+      await extractPoster(posterSrc, posterPath);
       if (fs.existsSync(posterPath)) {
         log.ok(`poster: ${getFileSize(posterPath)}`);
-        result.poster = `/motion/optimized/${baseName}.poster.jpg`;
+        result.poster = publicPath("videos", posterName);
       }
     }
   } catch (err) {
@@ -291,108 +285,183 @@ const processVideo = async (inputPath, baseName) => {
   return result;
 };
 
-// ─── IMAGE OPTIMIZATION ────────────────────────────────────────────────────
+// ─── IMAGE ──────────────────────────────────────────────────────────────────
 
-const processImage = async (sharp, inputPath, baseName) => {
+const decodeHeicFallback = (inputPath) => {
+  const tmp = path.join(
+    CONFIG.outputImages,
+    `._heic_${slugify(path.parse(inputPath).name)}.jpg`
+  );
+  execSync(`sips -s format jpeg ${JSON.stringify(inputPath)} --out ${JSON.stringify(tmp)}`, {
+    stdio: "ignore",
+  });
+  return tmp;
+};
+
+const processImage = async (sharp, inputPath, slug) => {
   const out = CONFIG.outputImages;
-  const result = { original: `/story/${path.basename(inputPath)}` };
+  const result = {
+    original: `/new-assets/${path.basename(inputPath)}`,
+    name: slug,
+    aliases: [path.parse(inputPath).name],
+  };
+  let decodedPath = inputPath;
+  let tmpHeic = null;
 
   try {
-    log.info(`Procesando imagen: ${path.basename(inputPath)}`);
-    const { mobile, desktop } = CONFIG.image;
+    log.info(`Procesando imagen: ${path.basename(inputPath)} → ${slug}`);
+    const ext = path.extname(inputPath).toLowerCase();
+    if ([".heic", ".heif"].includes(ext)) {
+      log.info(`HEIC via sips: ${path.basename(inputPath)}`);
+      tmpHeic = decodeHeicFallback(inputPath);
+      decodedPath = tmpHeic;
+    }
+    const meta = await sharp(decodedPath, { failOn: "none" }).rotate().metadata();
+    result.hasAlpha = Boolean(meta.hasAlpha);
+    result.width = meta.width;
+    result.height = meta.height;
 
-    for (const [variant, cfg] of [["mobile", mobile], ["desktop", desktop]]) {
-      // WebP
-      const webpPath = path.join(out, `${baseName}.${variant}.webp`);
-      if (!fs.existsSync(webpPath)) {
-        await sharp(inputPath)
-          .resize(cfg.width, null, { withoutEnlargement: true, fit: "inside" })
-          .webp({ quality: cfg.webpQuality, effort: 6 })
+    for (const [variant, cfg] of [
+      ["mobile", CONFIG.image.mobile],
+      ["desktop", CONFIG.image.desktop],
+    ]) {
+      const base = sharp(decodedPath, { failOn: "none", sequentialRead: true })
+        .rotate()
+        .resize(cfg.maxEdge, cfg.maxEdge, {
+          fit: "inside",
+          withoutEnlargement: true,
+        })
+        .toColorspace("srgb");
+
+      const avifName = `${slug}.${variant}.avif`;
+      const avifPath = path.join(out, avifName);
+      if (shouldWrite(avifPath)) {
+        await base
+          .clone()
+          .avif({
+            quality: cfg.avifQuality,
+            effort: 4,
+            chromaSubsampling: cfg.chroma,
+          })
+          .toFile(avifPath);
+        log.ok(`${variant}.avif: ${formatReduction(inputPath, avifPath)}`);
+      } else {
+        log.skip(`Ya existe: ${avifName}`);
+      }
+      result[`${variant}_avif`] = publicPath("images", avifName);
+
+      const webpName = `${slug}.${variant}.webp`;
+      const webpPath = path.join(out, webpName);
+      if (shouldWrite(webpPath)) {
+        await base
+          .clone()
+          .webp({
+            quality: cfg.webpQuality,
+            effort: 5,
+            smartSubsample: cfg.chroma === "4:2:0",
+          })
           .toFile(webpPath);
         log.ok(`${variant}.webp: ${formatReduction(inputPath, webpPath)}`);
       } else {
-        log.skip(`Ya existe: ${path.basename(webpPath)}`);
+        log.skip(`Ya existe: ${webpName}`);
       }
-      result[`${variant}_webp`] = `/story/optimized/${baseName}.${variant}.webp`;
+      result[`${variant}_webp`] = publicPath("images", webpName);
 
-      // JPEG fallback
-      const jpgPath = path.join(out, `${baseName}.${variant}.jpg`);
-      if (!fs.existsSync(jpgPath)) {
-        await sharp(inputPath)
-          .resize(cfg.width, null, { withoutEnlargement: true, fit: "inside" })
-          .jpeg({ quality: cfg.jpgQuality, progressive: true, mozjpeg: true })
+      const jpgName = `${slug}.${variant}.jpg`;
+      const jpgPath = path.join(out, jpgName);
+      if (shouldWrite(jpgPath)) {
+        const jpgPipeline = result.hasAlpha
+          ? base.clone().flatten({ background: "#ffffff" })
+          : base.clone();
+        await jpgPipeline
+          .jpeg({
+            quality: cfg.jpgQuality,
+            progressive: true,
+            mozjpeg: true,
+            chromaSubsampling: cfg.chroma,
+          })
           .toFile(jpgPath);
         log.ok(`${variant}.jpg: ${formatReduction(inputPath, jpgPath)}`);
       } else {
-        log.skip(`Ya existe: ${path.basename(jpgPath)}`);
+        log.skip(`Ya existe: ${jpgName}`);
       }
-      result[`${variant}_jpg`] = `/story/optimized/${baseName}.${variant}.jpg`;
+      result[`${variant}_jpg`] = publicPath("images", jpgName);
     }
   } catch (err) {
     log.error(`Error procesando ${path.basename(inputPath)}: ${err.message}`);
+  } finally {
+    if (tmpHeic && fs.existsSync(tmpHeic)) fs.unlinkSync(tmpHeic);
   }
 
   return result;
 };
 
-// ─── MAIN ──────────────────────────────────────────────────────────────────
+// ─── MAIN ───────────────────────────────────────────────────────────────────
 
 const main = async () => {
   const args = process.argv.slice(2);
   const onlyVideos = args.includes("--only-videos");
   const onlyImages = args.includes("--only-images");
 
-  log.section("optimize-media.mjs");
+  log.section("optimize-media · new-assets");
+  if (FORCE) log.info("Modo --force: se regeneran todos los derivados");
   checkFfmpeg();
   const sharp = await checkSharp();
 
-  // Crear directorios de output
   [CONFIG.outputVideos, CONFIG.outputImages].forEach((dir) => {
-    if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
+    fs.mkdirSync(dir, { recursive: true });
   });
 
-  const manifest = { videos: [], images: [], generatedAt: new Date().toISOString() };
+  const existing = fs.existsSync(CONFIG.manifestPath)
+    ? JSON.parse(fs.readFileSync(CONFIG.manifestPath, "utf-8"))
+    : { videos: [], images: [] };
 
-  // ── VIDEOS ──
+  const manifest = {
+    source: "new-assets",
+    videos: onlyImages ? existing.videos || [] : [],
+    images: onlyVideos ? existing.images || [] : [],
+    generatedAt: new Date().toISOString(),
+  };
+
   if (!onlyImages) {
-    log.section("VIDEOS");
-    const videoFiles = fs
-      .readdirSync(CONFIG.videosDir)
-      .filter((f) => CONFIG.video.extensions.includes(path.extname(f).toLowerCase()))
-      .filter((f) => !f.startsWith("."));
-
+    log.section("VÍDEOS");
+    const videoFiles = listSourceFiles(CONFIG.video.extensions);
     log.info(`Encontrados ${videoFiles.length} videos`);
-
+    const pendingStubs = videoFiles.map((file) => ({
+      original: `/new-assets/${file}`,
+      name: slugify(path.parse(file).name),
+      aliases: [path.parse(file).name],
+    }));
     for (const file of videoFiles) {
-      const inputPath = path.join(CONFIG.videosDir, file);
-      const baseName = path.parse(file).name;
-      const result = await processVideo(inputPath, baseName);
-      manifest.videos.push({ ...result, name: baseName });
+      const inputPath = path.join(CONFIG.sourceDir, file);
+      const slug = slugify(path.parse(file).name);
+      const result = await processVideo(inputPath, slug);
+      manifest.videos.push(result);
+      const remaining = pendingStubs.filter(
+        (s) => !manifest.videos.some((v) => v.name === s.name)
+      );
+      fs.writeFileSync(
+        CONFIG.manifestPath,
+        JSON.stringify({ ...manifest, videos: [...manifest.videos, ...remaining] }, null, 2)
+      );
     }
   }
 
-  // ── IMAGES ──
   if (!onlyVideos) {
     log.section("IMÁGENES");
-    const imageFiles = fs
-      .readdirSync(CONFIG.imagesDir)
-      .filter((f) => CONFIG.image.extensions.includes(path.extname(f).toLowerCase()))
-      .filter((f) => !f.startsWith("."));
-
+    const imageFiles = listSourceFiles(CONFIG.image.extensions);
     log.info(`Encontradas ${imageFiles.length} imágenes`);
-
-    for (const file of imageFiles) {
-      const inputPath = path.join(CONFIG.imagesDir, file);
-      const baseName = path.parse(file).name;
-      const result = await processImage(sharp, inputPath, baseName);
-      manifest.images.push({ ...result, name: baseName });
-    }
+    const results = await mapLimit(imageFiles, CONFIG.imageConcurrency, async (file) => {
+      const inputPath = path.join(CONFIG.sourceDir, file);
+      const slug = slugify(path.parse(file).name);
+      return processImage(sharp, inputPath, slug);
+    });
+    manifest.images.push(...results);
   }
 
-  // ── MANIFEST ──
   fs.writeFileSync(CONFIG.manifestPath, JSON.stringify(manifest, null, 2));
   log.section("COMPLETADO");
-  log.ok(`Manifest generado → public/media-manifest.json`);
+  log.ok(`Manifest → public/media-manifest.json`);
   log.ok(`Videos: ${manifest.videos.length} | Imágenes: ${manifest.images.length}`);
 };
 
