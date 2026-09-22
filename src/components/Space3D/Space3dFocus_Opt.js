@@ -9,13 +9,26 @@ import { SPACE_IMAGES, ALL_VIDEOS } from "@/data/mediaCatalog";
 const IMAGE_NAMES = SPACE_IMAGES;
 const VIDEO_NAMES = ALL_VIDEOS;
 
+// Campo: derivado mobile (~1080). Focus: desktop (~1920) en pantallas grandes.
+// WebP (no AVIF/HEIC): WebGL-safe y conserva alpha + croma mejor que el JPEG aplanado.
+const IMAGE_COPIES = 2;
+const isHeic = (p) => /\.hei[cf]$/i.test(p || "");
+const isWebglSafe = (p) => p && !isHeic(p) && !/\.avif$/i.test(p);
+const toFieldUrl = (url) => (url || "").replace(".desktop.", ".mobile.");
+
+const toWebp = (p) => (p || "").replace(/\.avif$/i, ".webp");
+
+const pickWebglUrl = (img) => {
+  const fromAvif = toWebp(img.src);
+  const list = [fromAvif, img.src, img.fallback].filter(isWebglSafe);
+  return list.find((s) => /\.webp$/i.test(s)) || list[0] || null;
+};
+
 // ─── Shaders ───────────────────────────────────────────────────────────────────
-// Vertex: billboard por-malla (siempre mira a cámara). El centro del quad es el
-// origen del mesh transformado a vista; el quad se extiende en el plano de vista.
 const VERT = /* glsl */ `
-  uniform vec2 uSize;       // tamaño del quad en mundo (ancho, alto) — ya con aspect real
+  uniform vec2 uSize;
   varying vec2  vUv;
-  varying float vDepth;     // distancia del centro a la cámara
+  varying float vDepth;
 
   void main() {
     vec4 mvCenter = modelViewMatrix * vec4(0.0, 0.0, 0.0, 1.0);
@@ -27,9 +40,6 @@ const VERT = /* glsl */ `
   }
 `;
 
-// Fragment: muestrea la textura (imagen o vídeo) y la muestra solo dentro de la
-// banda de profundidad. Fuera del rango → discard instantáneo (sin fundido).
-// Como el aspect del quad == aspect de la textura, el UV es directo: sin distorsión.
 const FRAG = /* glsl */ `
   varying vec2  vUv;
   varying float vDepth;
@@ -37,8 +47,9 @@ const FRAG = /* glsl */ `
   uniform sampler2D uTex;
   uniform float uVisNear;
   uniform float uVisFarStart;
-  uniform float uFlipV;     // 1 = invertir V (VideoTexture con flipY=false)
-  uniform float uOpacity;   // 1 = visible; 0 = fundido a blanco
+  uniform float uFlipV;
+  uniform float uOpacity;
+  uniform float uExpandRange;
 
   void main() {
     if (uOpacity < 0.004) discard;
@@ -46,12 +57,17 @@ const FRAG = /* glsl */ `
 
     vec2 uv = vec2(vUv.x, mix(vUv.y, 1.0 - vUv.y, uFlipV));
     vec4 texel = texture2D(uTex, uv);
-    gl_FragColor = vec4(mix(vec3(1.0), texel.rgb, uOpacity), 1.0);
+    vec3 rgb = mix(
+      texel.rgb,
+      clamp((texel.rgb - 0.062745) / 0.858824, 0.0, 1.0),
+      uExpandRange
+    );
+    float a = texel.a * uOpacity;
+    gl_FragColor = vec4(mix(vec3(1.0), rgb, a), 1.0);
   }
 `;
 
-// ─── Componente ────────────────────────────────────────────────────────────────
-export default function Space3D_2_Focus({
+export default function Space3dFocusOpt({
   count,
   box     = { x: 30, y: 18, z: 42 },
   damping = 0.085,
@@ -64,9 +80,6 @@ export default function Space3D_2_Focus({
   const canvasRef = useRef(null);
 
   const { getImage, getVideo, isLoaded, imageIds, videoIds } = useOptimizedMedia();
-  // Capturamos los resolvers en refs para construir la media UNA vez (cuando carga
-  // el manifest) y NO reconstruir toda la escena en cada resize (el hook recalcula
-  // capabilities en cada resize, lo que cambiaría la identidad de getImage/getVideo).
   const getImageRef = useRef(getImage);
   const getVideoRef = useRef(getVideo);
   const imageIdsRef = useRef(imageIds);
@@ -81,42 +94,42 @@ export default function Space3D_2_Focus({
     if (!canvas || !isLoaded) return;
 
     const isMobile = window.innerWidth <= 768;
+    const dprCap = isMobile ? 1 : 2;
 
-    // Resolución de media (optimizada por dispositivo) — capturada al construir.
-    // Fuente: todas las imágenes del manifiesto (new-assets), no un subconjunto.
-    // WebGL: preferimos JPEG. AVIF es HEIF y en Chrome acaba en texImage3D+FLIP_Y.
-    const isHeic = (p) => /\.hei[cf]$/i.test(p || "");
-    const isWebglSafe = (p) => p && !isHeic(p) && !/\.avif$/i.test(p);
     const imageNames = imageIdsRef.current.length ? imageIdsRef.current : IMAGE_NAMES;
     const imageSrcs = imageNames
       .map((n) => {
         const img = getImageRef.current(n);
+        const hi = pickWebglUrl(img);
+        if (!hi) return null;
         const jpg = isWebglSafe(img.fallback) ? img.fallback : null;
-        const src = isWebglSafe(img.src) ? img.src : null;
-        return { src: jpg || src, fallback: jpg && src && jpg !== src ? src : null };
+        return {
+          field: toFieldUrl(hi),
+          hi,
+          fieldFb: jpg ? toFieldUrl(jpg) : null,
+          hiFb: jpg && jpg !== hi ? jpg : null,
+        };
       })
-      .filter((img) => img.src);
+      .filter(Boolean);
     const videoNames = videoIdsRef.current.length ? videoIdsRef.current : VIDEO_NAMES;
     const videoData = videoNames.map((n) => {
       const v = getVideoRef.current(n);
       return { sources: v.sources, poster: v.poster };
     });
 
-    // ── Renderer ───────────────────────────────────────────────────────────────
     const renderer = new THREE.WebGLRenderer({
       canvas,
-      antialias: true,
+      antialias: !isMobile,
       alpha: false,
-      // Necesario para la captura 2D del modal About (HeaderFooter16).
-      preserveDrawingBuffer: true,
-      powerPreference: "high-performance",
+      // RouteTransition ya no hace readback; About de index17 tampoco.
+      preserveDrawingBuffer: false,
+      powerPreference: isMobile ? "default" : "high-performance",
+      failIfMajorPerformanceCaveat: false,
     });
-    renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+    renderer.setPixelRatio(Math.min(window.devicePixelRatio, dprCap));
     renderer.setSize(window.innerWidth, window.innerHeight, false);
     renderer.outputColorSpace = THREE.SRGBColorSpace;
     renderer.setClearColor(0xffffff, 1);
-
-    const maxAniso = renderer.capabilities.getMaxAnisotropy();
 
     const scene  = new THREE.Scene();
     const camera = new THREE.PerspectiveCamera(
@@ -126,12 +139,9 @@ export default function Space3D_2_Focus({
       Math.max(box.x, box.z) * 4,
     );
 
-    // ── Recursos compartidos ─────────────────────────────────────────────────────
-    const plane = new THREE.PlaneGeometry(1, 1); // una sola geometría para todos
+    const plane = new THREE.PlaneGeometry(1, 1);
     const loader = new THREE.TextureLoader();
 
-    // Textura placeholder blanca (1×1): invisible sobre el fondo blanco hasta que
-    // la imagen real cargue → cero "flash" negro.
     const placeholderTex = new THREE.DataTexture(
       new Uint8Array([255, 255, 255, 255]), 1, 1, THREE.RGBAFormat,
     );
@@ -142,14 +152,13 @@ export default function Space3D_2_Focus({
     placeholderTex.magFilter = THREE.NearestFilter;
     placeholderTex.needsUpdate = true;
 
-    // Caché de texturas de imagen por src → se cargan UNA vez y se comparten entre
-    // todas las mallas que usan la misma media (mínima memoria de GPU).
-    const texCache = new Map();   // src -> { tex, aspect }
-    const texWaiting = new Map(); // src -> [cb]
+    const texCache = new Map();
+    const texWaiting = new Map();
 
     const configureImageTexture = (tex) => {
       tex.colorSpace        = THREE.SRGBColorSpace;
-      tex.anisotropy        = maxAniso;
+      // Billboards de cara a cámara: aniso no aporta y gasta bandwidth.
+      tex.anisotropy        = 1;
       tex.generateMipmaps   = true;
       tex.minFilter         = THREE.LinearMipmapLinearFilter;
       tex.magFilter         = THREE.LinearFilter;
@@ -186,24 +195,17 @@ export default function Space3D_2_Focus({
       );
     };
 
-    // Ajusta el tamaño del quad al aspect real, preservando área (sqrt) para que
-    // landscapes y portraits ocupen un área visual parecida.
     const applyAspect = (item, aspect) => {
       const ar = Math.min(2.6, Math.max(0.4, aspect));
       const s  = Math.sqrt(ar);
       item.mat.uniforms.uSize.value.set(item.scaleBase * s, item.scaleBase / s);
     };
 
-    // ── Construcción de mallas ───────────────────────────────────────────────────
-    // Cada imagen dos veces + todos los vídeos una. Las copias se colocan lejos
-    // entre sí (best-candidate); no es random puro, que agrupa gemelos.
-    const IMAGE_COPIES = 2;
     const slots = [
       ...imageSrcs.flatMap((img) =>
         Array.from({ length: IMAGE_COPIES }, () => ({
           type: "image",
-          src: img.src,
-          fallback: img.fallback,
+          ...img,
         })),
       ),
       ...videoData.map((vd) => ({ type: "video", sources: vd.sources, poster: vd.poster })),
@@ -214,7 +216,7 @@ export default function Space3D_2_Focus({
     const slotKey = (slot) =>
       slot.type === "video"
         ? `v:${slot.sources?.[0]?.src || slot.poster || ""}`
-        : `i:${slot.src}`;
+        : `i:${slot.hi || slot.field}`;
 
     const uniques = [];
     const dupes = [];
@@ -279,21 +281,42 @@ export default function Space3D_2_Focus({
     const videoItems = [];
     const videoEls = [];
 
+    const bindFieldTex = (item, { tex, aspect }) => {
+      item.fieldTex = tex;
+      if (!item.hiBound && !item.active) item.mat.uniforms.uTex.value = tex;
+      applyAspect(item, aspect);
+    };
+
+    const ensureHiRes = (item) => {
+      if (item.type !== "image" || !item.hiSrc || item.hiSrc === item.fieldSrc) return;
+      if (item.hiBound) return;
+      loadImage(item.hiSrc, ({ tex, aspect }) => {
+        item.hiTex = tex;
+        item.hiBound = true;
+        applyAspect(item, aspect);
+        if (focus.item === item && !item.active) {
+          item.mat.uniforms.uTex.value = tex;
+        }
+      }, item.hiFb);
+    };
+
     for (const { slot, pos } of placed) {
-      const scaleBase = 1.15 + Math.random() * 1.35; // 1.15..2.5
+      const scaleBase = 1.15 + Math.random() * 1.35;
 
       const uniforms = {
-        uTex:         { value: placeholderTex },
-        uSize:        { value: new THREE.Vector2(scaleBase, scaleBase) },
-        uVisNear:     { value: visNear },
-        uVisFarStart: { value: visFarStart },
-        uFlipV:       { value: 0 },
-        uOpacity:     { value: 1 },
+        uTex:          { value: placeholderTex },
+        uSize:         { value: new THREE.Vector2(scaleBase, scaleBase) },
+        uVisNear:      { value: visNear },
+        uVisFarStart:  { value: visFarStart },
+        uFlipV:        { value: 0 },
+        uOpacity:      { value: 1 },
+        uExpandRange:  { value: 0 },
       };
       const mat = new THREE.ShaderMaterial({
         vertexShader: VERT,
         fragmentShader: FRAG,
         uniforms,
+        toneMapped: true,
       });
 
       const mesh = new THREE.Mesh(plane, mat);
@@ -308,6 +331,9 @@ export default function Space3D_2_Focus({
         type: slot.type,
         active: false,
         homePos: pos.clone(),
+        fieldTex: null,
+        hiTex: null,
+        hiBound: false,
       };
       items.push(item);
 
@@ -326,18 +352,14 @@ export default function Space3D_2_Focus({
           });
         }
       } else {
-        item.src = slot.src;
-        loadImage(slot.src, ({ tex, aspect }) => {
-          item.mat.uniforms.uTex.value = tex;
-          applyAspect(item, aspect);
-        }, slot.fallback);
+        item.fieldSrc = slot.field;
+        item.hiSrc = slot.hi;
+        item.hiFb = slot.hiFb;
+        loadImage(slot.field, (entry) => bindFieldTex(item, entry), slot.fieldFb || slot.hi);
       }
     }
 
-    // ── Gestión de vídeo (decodes capados) ───────────────────────────────────────
-    // Todos los vídeos están en escena (póster). Decodes en vivo: 2 móvil / 4 desktop.
-    // Reproducir todos a la vez satura el decoder (Safari móvil se ahoga con 3+).
-    const MAX_ACTIVE_VIDEOS = isMobile ? 2 : 4;
+    const MAX_ACTIVE_VIDEOS = isMobile ? 2 : 3;
 
     const activateVideo = (item) => {
       if (!item.video) {
@@ -357,8 +379,6 @@ export default function Space3D_2_Focus({
         vtex.minFilter = THREE.LinearFilter;
         vtex.magFilter = THREE.LinearFilter;
         vtex.generateMipmaps = false;
-        // Chrome WebGL2: FLIP_Y + PREMULTIPLY_ALPHA no están permitidos en
-        // texImage3D (ruta interna de algunos vídeos/HEIF). Flip en el shader.
         vtex.flipY = false;
         vtex.premultiplyAlpha = false;
 
@@ -379,6 +399,7 @@ export default function Space3D_2_Focus({
       item.active = true;
       item.mat.uniforms.uTex.value = item.videoTex;
       item.mat.uniforms.uFlipV.value = 1;
+      item.mat.uniforms.uExpandRange.value = 1;
       item.video.play().catch(() => {});
     };
 
@@ -388,6 +409,7 @@ export default function Space3D_2_Focus({
       if (item.video) item.video.pause();
       item.mat.uniforms.uTex.value = item.posterTex || placeholderTex;
       item.mat.uniforms.uFlipV.value = 0;
+      item.mat.uniforms.uExpandRange.value = 0;
     };
 
     const updateActiveVideos = () => {
@@ -401,8 +423,11 @@ export default function Space3D_2_Focus({
       }
       const cam = camera.position;
       const ranked = videoItems
-        .map((it) => ({ it, d: cam.distanceTo(it.mesh.position) }))
-        .filter((o) => o.d >= visNear * 0.7 && o.d <= visFarStart * 1.15)
+        .map((it) => ({ it, d: cam.distanceToSquared(it.mesh.position) }))
+        .filter((o) => {
+          const d = Math.sqrt(o.d);
+          return d >= visNear * 0.7 && d <= visFarStart * 1.15;
+        })
         .sort((a, b) => a.d - b.d);
 
       const activeSet = new Set(ranked.slice(0, MAX_ACTIVE_VIDEOS).map((o) => o.it));
@@ -412,9 +437,6 @@ export default function Space3D_2_Focus({
       }
     };
 
-    // ── Cámara orbital con inercia ─────────────────────────────────────────────
-    // Zoom hacia dentro hasta un tope delante del origen (nunca lo atraviesa).
-    // visNear descarta las fotos que se te echan encima, así el fondo gana protagonismo.
     const PITCH_LIMIT = Math.PI / 2 - 0.05;
     const startDist = box.z * 0.52;
     const maxDist = Math.max(box.z * 0.75, visFarStart * 0.85);
@@ -435,7 +457,6 @@ export default function Space3D_2_Focus({
     };
     applyCamera();
 
-    // ── Focus: click abre detalle centrado; el resto se funde a blanco ─────────
     const focus = { item: null, locked: false, saved: null };
     const CLICK_PX = 8;
 
@@ -448,24 +469,34 @@ export default function Space3D_2_Focus({
       return Math.max(distH, distW, 1.6);
     };
 
+    let canvasRect = canvas.getBoundingClientRect();
+    const refreshRect = () => { canvasRect = canvas.getBoundingClientRect(); };
+
+    const nearSq = (visNear * 0.85) ** 2;
+    const farSq  = (visFarStart * 1.15) ** 2;
+    const hitFarSq = (visFarStart * 1.05) ** 2;
+    const hitNearSq = (visNear * 0.85) ** 2;
+
     const hitTest = (clientX, clientY) => {
-      const rect = canvas.getBoundingClientRect();
-      const mx = clientX - rect.left;
-      const my = clientY - rect.top;
-      const w = rect.width;
-      const h = rect.height;
+      const mx = clientX - canvasRect.left;
+      const my = clientY - canvasRect.top;
+      const w = canvasRect.width;
+      const h = canvasRect.height;
       const vFov = (camera.fov * Math.PI) / 180;
       let best = null;
       let bestD = Infinity;
       const ndc = new THREE.Vector3();
+      const camPos = camera.position;
       for (const item of items) {
+        if (!item.mesh.visible) continue;
         if (item.mat.uniforms.uOpacity.value < 0.05) continue;
         ndc.copy(item.mesh.position).project(camera);
         if (ndc.z < -1 || ndc.z > 1) continue;
         const sx = (ndc.x * 0.5 + 0.5) * w;
         const sy = (-ndc.y * 0.5 + 0.5) * h;
-        const dist = camera.position.distanceTo(item.mesh.position);
-        if (dist < visNear * 0.85 || dist > visFarStart * 1.05) continue;
+        const distSq = camPos.distanceToSquared(item.mesh.position);
+        if (distSq < hitNearSq || distSq > hitFarSq) continue;
+        const dist = Math.sqrt(distSq);
         const worldPerPx = (2 * dist * Math.tan(vFov / 2)) / h;
         const sz = item.mat.uniforms.uSize.value;
         const hw = (sz.x / worldPerPx) * 0.5;
@@ -476,6 +507,24 @@ export default function Space3D_2_Focus({
         }
       }
       return best;
+    };
+
+    const cullItems = () => {
+      const camPos = camera.position;
+      if (focus.item) {
+        for (const it of items) {
+          it.mesh.visible = it.mat.uniforms.uOpacity.value >= 0.004;
+        }
+        return;
+      }
+      for (const it of items) {
+        if (it.mat.uniforms.uOpacity.value < 0.004) {
+          it.mesh.visible = false;
+          continue;
+        }
+        const d = camPos.distanceToSquared(it.mesh.position);
+        it.mesh.visible = d >= nearSq && d <= farSq;
+      }
     };
 
     const enterFocus = (item) => {
@@ -494,6 +543,8 @@ export default function Space3D_2_Focus({
       gsap.killTweensOf(state);
       for (const it of items) gsap.killTweensOf(it.mat.uniforms.uOpacity);
       gsap.killTweensOf(item.mesh.position);
+
+      ensureHiRes(item);
 
       const fit = fitDistFor(item);
       item.mat.uniforms.uVisNear.value = 0.01;
@@ -567,11 +618,11 @@ export default function Space3D_2_Focus({
       }
     };
 
-    // ── Drag para rotar / click para focus ─────────────────────────────────────
     const drag = { active: false, x: 0, y: 0, sx: 0, sy: 0, moved: false };
 
     const onPointerDown = (e) => {
       if (e.button !== undefined && e.button !== 0) return;
+      refreshRect();
       drag.active = true;
       drag.moved = false;
       drag.x = drag.sx = e.clientX;
@@ -613,7 +664,6 @@ export default function Space3D_2_Focus({
       if (!focus.item) canvas.style.cursor = "grab";
     };
 
-    // ── Wheel: avance lineal por el eje de vista, acotado al tope ──────────────
     const onWheel = (e) => {
       e.preventDefault();
       if (focus.item) return;
@@ -624,7 +674,6 @@ export default function Space3D_2_Focus({
       );
     };
 
-    // ── Pinch zoom móvil ───────────────────────────────────────────────────────
     let pinchStartDist = 0;
     let pinchStartCamDist = 0;
     const onTouchStart = (e) => {
@@ -658,14 +707,15 @@ export default function Space3D_2_Focus({
     canvas.addEventListener("touchmove",     onTouchMove,  { passive: false });
     canvas.addEventListener("touchend",      onTouchEnd);
 
-    // ── Resize ─────────────────────────────────────────────────────────────────
     const onResize = () => {
       const w = window.innerWidth;
       const h = window.innerHeight;
-      renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+      const cap = w <= 768 ? 1 : 2;
+      renderer.setPixelRatio(Math.min(window.devicePixelRatio, cap));
       renderer.setSize(w, h, false);
       camera.aspect = w / h;
       camera.updateProjectionMatrix();
+      refreshRect();
       if (focus.item) {
         const fit = fitDistFor(focus.item);
         state.dist = state.targetDist = fit;
@@ -678,17 +728,13 @@ export default function Space3D_2_Focus({
     };
     window.addEventListener("keydown", onKeyDown);
 
-    // ── Visibility pause ───────────────────────────────────────────────────────
     let visible = !document.hidden;
     const onVisibility = () => {
       visible = !document.hidden;
-      // Al ocultar la pestaña pausamos los vídeos activos; al volver, el bucle los
-      // reactiva según cercanía.
       if (document.hidden) videoItems.forEach((it) => it.video?.pause());
     };
     document.addEventListener("visibilitychange", onVisibility);
 
-    // ── RAF ────────────────────────────────────────────────────────────────────
     let raf = 0;
     let frame = 0;
     let readyDispatched = false;
@@ -702,10 +748,9 @@ export default function Space3D_2_Focus({
         state.dist  += (state.targetDist  - state.dist)  * damping;
       }
       applyCamera();
+      cullItems();
 
-      // Reevaluar qué vídeos están activos cada ~12 frames (evita churn).
       if (frame % 12 === 0) updateActiveVideos();
-      // Forzar subida de frame solo de los vídeos activos (1-2 como máximo).
       for (const it of videoItems) {
         if (it.active && it.videoTex) it.videoTex.needsUpdate = true;
       }
@@ -713,7 +758,6 @@ export default function Space3D_2_Focus({
 
       renderer.render(scene, camera);
 
-      // 2b: avisar a RouteTransition de que la escena ya pintó su primer frame.
       if (!readyDispatched) {
         readyDispatched = true;
         window.dispatchEvent(new CustomEvent("atj-scene-ready"));
@@ -723,7 +767,6 @@ export default function Space3D_2_Focus({
 
     canvas.style.cursor = "grab";
 
-    // ── Cleanup ────────────────────────────────────────────────────────────────
     return () => {
       cancelAnimationFrame(raf);
       gsap.killTweensOf(state);

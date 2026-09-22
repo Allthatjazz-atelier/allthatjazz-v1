@@ -1,25 +1,16 @@
 "use client";
 
-import { useEffect, useLayoutEffect, useCallback, useId, useRef, useState, memo } from "react";
+import { useEffect, useLayoutEffect, useCallback, useRef, useState, memo } from "react";
 import { useRouter } from "next/router";
 import { useGSAP } from "@gsap/react";
 import gsap from "gsap";
 
-// A Slider · B Galaxy · C Ring
+// A Slider · B Galaxy
 const NAV_ITEMS = [
   { key: "A", label: "Slider", href: "/" },
   { key: "B", label: "Galaxy", href: "/space" },
-  { key: "C", label: "Ring",   href: "/ring" },
 ];
 
-const LETTER_PATHS = [
-  "M50,214 L128,40 L206,214 M90,158 L166,158",
-  "M86,50 L86,210 M86,50 L148,50 C184,50 194,74 194,98 C194,122 180,128 148,128 L86,128 M86,128 L156,128 C196,128 208,154 208,178 C208,204 188,210 156,210 L86,210",
-  "M190,78 C164,48 96,50 72,104 C54,142 56,176 76,206 C100,232 166,230 192,200",
-];
-
-const NB_CIRCLES = 36;
-const CIRCLE_R = 14;
 const PILL_DUR = 0.62;
 const PILL_EASE = "power2.inOut";
 const NAV_PUSH_DELAY = PILL_DUR * 1000;
@@ -29,7 +20,7 @@ function activeIndexFromPath(pathname) {
   return i === -1 ? 0 : i;
 }
 
-export default function ClockAndNavGooey() {
+export default function NavAndClock() {
   const router = useRouter();
   const routerRef = useRef(router);
   routerRef.current = router;
@@ -42,11 +33,10 @@ export default function ClockAndNavGooey() {
     NAV_ITEMS.forEach((item) => {
       if (item.href?.startsWith("/")) router.prefetch(item.href);
     });
-    // Calienta el JS de Galaxy/Ring en idle. Los shaders GPU siguen
+    // Calienta el JS de Galaxy en idle. Los shaders GPU siguen
     // compilándose al montar; esto evita el parse de chunk en el click.
     const warm = () => {
       import("@/components/Space3D/Space3D_2");
-      import("@/components/ring/RingSLider4");
     };
     if (typeof requestIdleCallback === "function") {
       const id = requestIdleCallback(warm, { timeout: 1800 });
@@ -73,7 +63,7 @@ export default function ClockAndNavGooey() {
     if (pushTimer.current) clearTimeout(pushTimer.current);
     if (lagTimer.current) clearTimeout(lagTimer.current);
     // Sin lagSmoothing, un frame largo (compile de shaders) hace que GSAP
-    // salte el playhead → tripón en pill y gooey. 0 = no saltar.
+    // salte el playhead → tripón en pill. 0 = no saltar.
     gsap.ticker.lagSmoothing(0);
     pushTimer.current = setTimeout(() => {
       if (href !== r.pathname) r.push(href);
@@ -92,17 +82,14 @@ export default function ClockAndNavGooey() {
         </div>
         <NavPills activeIndex={activeIndex} onNavigate={handleNavigate} />
       </div>
-      <GooeyMark letterIndex={activeIndex} />
 
       <style>{`
         .bcn {
           --bcn-pill: 1.5em;
           --bcn-cut: 2px;
-          --bcn-gooey: 2.55em;
           display: flex;
           flex-direction: column;
           align-items: center;
-          gap: 1.8em;
           contain: layout style;
           isolation: isolate;
         }
@@ -119,14 +106,6 @@ export default function ClockAndNavGooey() {
 
         .bcn-nav {
           display: contents;
-        }
-
-        .bcn-gooey {
-          width: var(--bcn-gooey);
-          height: var(--bcn-gooey);
-          overflow: visible;
-          pointer-events: none;
-          opacity: 0.46;
         }
 
         .bcn-pill {
@@ -197,13 +176,6 @@ export default function ClockAndNavGooey() {
           pointer-events: none;
         }
 
-        .bcn-gooey svg {
-          display: block;
-          width: 100%;
-          height: 100%;
-          overflow: visible;
-        }
-
         @media (prefers-reduced-motion: reduce) {
           .bcn-pill { transition: none; }
         }
@@ -212,7 +184,7 @@ export default function ClockAndNavGooey() {
   );
 }
 
-// Reloj fuera de React: un setInterval no debe re-renderizar pills ni gooey.
+// Reloj fuera de React: un setInterval no debe re-renderizar pills.
 const BerlinClock = memo(function BerlinClock() {
   const ref = useRef(null);
   useEffect(() => {
@@ -236,7 +208,7 @@ const BerlinClock = memo(function BerlinClock() {
 const NavPills = memo(function NavPills({ activeIndex, onNavigate }) {
   const nameRefs = useRef([]);
   const growRefs = useRef([]);
-  const nameW = useRef([0, 0, 0]);
+  const nameW = useRef([0, 0]);
   const first = useRef(true);
 
   const measure = useCallback(() => {
@@ -300,172 +272,5 @@ const NavPills = memo(function NavPills({ activeIndex, onNavigate }) {
         );
       })}
     </nav>
-  );
-});
-
-// ── Sampler ──────────────────────────────────────────────────────────────────
-function dist(a, b) {
-  return Math.hypot(b.x - a.x, b.y - a.y);
-}
-function linePt(a, b, t) {
-  return { x: a.x + (b.x - a.x) * t, y: a.y + (b.y - a.y) * t };
-}
-function cubicPt(a, c1, c2, b, t) {
-  const u = 1 - t;
-  return {
-    x: u * u * u * a.x + 3 * u * u * t * c1.x + 3 * u * t * t * c2.x + t * t * t * b.x,
-    y: u * u * u * a.y + 3 * u * u * t * c1.y + 3 * u * t * t * c2.y + t * t * t * b.y,
-  };
-}
-function approxLen(sample, steps = 12) {
-  let len = 0;
-  let prev = sample(0);
-  for (let i = 1; i <= steps; i++) {
-    const p = sample(i / steps);
-    len += dist(prev, p);
-    prev = p;
-  }
-  return Math.max(len, 0.001);
-}
-function samplePath(d, count) {
-  const tokens = d.match(/[MLQC]|-?\d*\.?\d+/g) || [];
-  let i = 0;
-  let cmd = "M";
-  let x = 0;
-  let y = 0;
-  const segs = [];
-  const num = () => parseFloat(tokens[i++]);
-
-  while (i < tokens.length) {
-    if (/[MLQC]/.test(tokens[i])) cmd = tokens[i++];
-    if (cmd === "M") {
-      x = num();
-      y = num();
-    } else if (cmd === "L") {
-      const nx = num();
-      const ny = num();
-      const a = { x, y };
-      const b = { x: nx, y: ny };
-      segs.push({ len: dist(a, b), at: (t) => linePt(a, b, t) });
-      x = nx;
-      y = ny;
-    } else if (cmd === "C") {
-      const c1 = { x: num(), y: num() };
-      const c2 = { x: num(), y: num() };
-      const b = { x: num(), y: num() };
-      const a = { x, y };
-      const at = (t) => cubicPt(a, c1, c2, b, t);
-      segs.push({ len: approxLen(at, 16), at });
-      x = b.x;
-      y = b.y;
-    }
-  }
-
-  const total = segs.reduce((s, seg) => s + seg.len, 0) || 1;
-  return Array.from({ length: count }, (_, n) => {
-    let walk = (n / count) * total;
-    let hit = segs[segs.length - 1];
-    for (const seg of segs) {
-      if (walk <= seg.len) { hit = seg; break; }
-      walk -= seg.len;
-    }
-    return hit.at(hit.len ? walk / hit.len : 0);
-  });
-}
-
-const LETTER_POINTS = LETTER_PATHS.map((d) => samplePath(d, NB_CIRCLES));
-
-// Morph corto: cabe en el mismo tramo que la pill (~0.62s) para no
-// solaparse con el compile WebGL de Galaxy/Ring. Ola breve, no la de /tests.
-const MORPH_DUR = 0.5;
-const MORPH_STAGGER = 0.0034;
-
-const GooeyMark = memo(function GooeyMark({ letterIndex }) {
-  const rawId = useId().replace(/[:]/g, "");
-  const fid = `bcng-${rawId}`;
-  const circlesRef = useRef([]);
-  const [homeIndex] = useState(letterIndex);
-  const proxyRef = useRef({ p: 0 });
-  const firstRunRef = useRef(true);
-
-  useGSAP(() => {
-    const circles = circlesRef.current;
-    const to = LETTER_POINTS[letterIndex];
-    if (!to) return;
-
-    if (firstRunRef.current) {
-      firstRunRef.current = false;
-      return;
-    }
-
-    const reduce = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
-    const from = circles.map((c) => ({
-      x: c ? parseFloat(c.getAttribute("cx")) : 128,
-      y: c ? parseFloat(c.getAttribute("cy")) : 128,
-    }));
-
-    if (reduce) {
-      circles.forEach((c, i) => {
-        if (!c || !to[i]) return;
-        c.setAttribute("cx", to[i].x);
-        c.setAttribute("cy", to[i].y);
-      });
-      return;
-    }
-
-    const proxy = proxyRef.current;
-    const total = MORPH_DUR + (NB_CIRCLES - 1) * MORPH_STAGGER;
-    gsap.killTweensOf(proxy);
-    proxy.p = 0;
-    gsap.to(proxy, {
-      p: 1,
-      duration: total,
-      ease: "none",
-      overwrite: true,
-      onUpdate: () => {
-        const time = proxy.p * total;
-        for (let i = 0; i < NB_CIRCLES; i++) {
-          const c = circles[i];
-          if (!c || !to[i]) continue;
-          let t = (time - i * MORPH_STAGGER) / MORPH_DUR;
-          if (t <= 0) continue;
-          if (t > 1) t = 1;
-          const e = 1 - (1 - t) * (1 - t);
-          const f = from[i];
-          c.setAttribute("cx", (f.x + (to[i].x - f.x) * e).toFixed(2));
-          c.setAttribute("cy", (f.y + (to[i].y - f.y) * e).toFixed(2));
-        }
-      },
-    });
-  }, { dependencies: [letterIndex], revertOnUpdate: false });
-
-  return (
-    <div className="bcn-gooey" aria-hidden="true">
-      <svg viewBox="24 18 216 228" preserveAspectRatio="xMidYMid meet">
-        <defs>
-          <filter id={fid} x="-50%" y="-50%" width="200%" height="200%">
-            <feGaussianBlur in="SourceGraphic" stdDeviation="12" result="goo" />
-            <feColorMatrix
-              in="goo"
-              type="matrix"
-              values="1 0 0 0 0  0 1 0 0 0  0 0 1 0 0  0 0 0 24 -10"
-            />
-          </filter>
-        </defs>
-
-        <g filter={`url(#${fid})`}>
-          {Array.from({ length: NB_CIRCLES }, (_, i) => (
-            <circle
-              key={i}
-              ref={(el) => { circlesRef.current[i] = el; }}
-              cx={LETTER_POINTS[homeIndex][i].x}
-              cy={LETTER_POINTS[homeIndex][i].y}
-              r={CIRCLE_R}
-              fill="#111111"
-            />
-          ))}
-        </g>
-      </svg>
-    </div>
   );
 });

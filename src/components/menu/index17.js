@@ -2,7 +2,7 @@
 import { useState, useEffect, useRef, useCallback } from "react";
 import gsap from "gsap";
 import AboutSection7 from "../about/index7";
-import ClockAndNavGooey from "../tools/ClockAndNavGooey";
+import NavAndClock from "../navigation/NavAndClock";
 
 export default function HeaderFooter17({ children, heroMode }) {
   const [modalState, setModalState] = useState("closed");
@@ -300,7 +300,7 @@ export default function HeaderFooter17({ children, heroMode }) {
   return (
     <>
       <div className="fixed top-0 left-0 w-full flex justify-center pt-[16px] z-[9999] pointer-events-none">
-        <ClockAndNavGooey />
+        <NavAndClock />
       </div>
 
       <div className="fixed bottom-0 left-0 w-full flex flex-col justify-center items-center pb-2 leading-[2.75rem] z-[9999] HeaderFooter select-none pointer-events-auto">
