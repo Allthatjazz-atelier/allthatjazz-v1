@@ -20,19 +20,19 @@ const CONSTELLATIONS = [
   {
     id: "galaxy-bar",
     label: "Galaxy Bar",
-    shape: "knot",
+    shape: "ball",
     images: ["galaxy-bar-stickers", "galaxybar-explo-serviellets02", "atj-webcontent-001", "atj-webcontent-004", "atj-webcontent-005"],
   },
   {
     id: "johnny",
     label: "Johnny Carretes",
-    shape: "filament",
+    shape: "spindle",
     images: ["atj-webcontent-006", "atj-webcontent-007", "atj-webcontent-008", "atj-webcontent-009", "atj-webcontent-010"],
   },
   {
     id: "bisbis",
     label: "Bis Bis",
-    shape: "grid",
+    shape: "lattice",
     images: ["atj-webcontent-011", "atj-webcontent-012", "atj-webcontent-013", "atj-webcontent-014", "atj-webcontent-015"],
   },
   {
@@ -44,13 +44,13 @@ const CONSTELLATIONS = [
   {
     id: "dfny",
     label: "DFNY",
-    shape: "spiral",
+    shape: "disc",
     images: ["atj-webcontent-021", "atj-webcontent-022", "atj-webcontent-023", "atj-webcontent-024", "atj-webcontent-025"],
   },
   {
     id: "playground",
     label: "Playground",
-    shape: "wave",
+    shape: "swarm",
     images: ["atj-webcontent-026", "atj-webcontent-027", "atj-webcontent-028", "atj-webcontent-029", "atj-webcontent-030"],
   },
   {
@@ -70,10 +70,11 @@ const TARGET_PIECES = 120;
 // Núcleo compacto y volumétrico: las constelaciones se reparten sobre una
 // esfera de Fibonacci (no en un plano), así hay recorrido real en los tres ejes
 // y la masa se lee densa desde cualquier ángulo.
-const CORE_R = 10.5;          // radio del núcleo donde viven las constelaciones
+const CORE_R = 9.2;           // radio del núcleo donde viven las constelaciones
 const GALAXY_FLAT = 0.78;     // achatado en Y (1 = esfera perfecta)
-const BLOB_R = 4.4;           // radio de cada constelación
-const PIECE_SIZE = [1.05, 2.15];
+const BLOB_R = 4.6;           // radio de cada constelación (a más cerca de CORE_R,
+                              // más se interpenetran y más densa se ve la masa)
+const PIECE_SIZE = [1.2, 2.5];   // tamaño de pieza relativo a la galaxia = densidad aparente
 
 // Cuánto carácter tiene cada constelación: 0 = todas son el mismo enjambre,
 // 1 = cada una con su silueta. Es el mando para decidir si las formas aportan.
@@ -84,8 +85,8 @@ const SHAPE_VARIETY = 0.6;
 // sin ensanchar la silueta. La cámara se coloca por búsqueda numérica a la
 // distancia mínima donde todo entra en cuadro respetando NEAR_MARGIN, así que
 // el encuadre es correcto en cualquier pantalla y el gradiente sale solo.
-const DEPTH_STRETCH = 1.55;
-const FRAME_FILL    = 0.9;    // fracción del cuadro que puede ocupar la galaxia
+const DEPTH_STRETCH = 1.9;
+const FRAME_FILL    = 0.92;    // fracción del cuadro que puede ocupar la galaxia
 const NEAR_MARGIN   = 7;      // nada se acerca más que esto a la cámara
 
 const PITCH_0  = 0.42;
@@ -106,8 +107,8 @@ const ATLAS_COLS = 11;        // 121 celdas: cubre el catálogo objetivo de ~120
 const ATLAS_CELL = 186;
 const ATLAS_SIZE = ATLAS_COLS * ATLAS_CELL;
 const ATLAS_CAP  = ATLAS_COLS * ATLAS_COLS;
-const HIRES_DIST = 22;        // a partir de aquí una pieza pide su textura completa
-const VIDEO_DIST = 18;
+const HIRES_PX = ATLAS_CELL * 0.8;   // por encima de esto la celda del atlas se nota
+const VIDEO_PX = 90;                 // tamaño mínimo para que valga la pena reproducir
 const MIN_HIT_PX = 22;        // suelo de área de clic: una mota de 12px es inalcanzable
 
 // ─── URLs ──────────────────────────────────────────────────────────────────────
@@ -332,7 +333,7 @@ function buildGroups(imageNames, videoNames) {
   const groups = CONSTELLATIONS.map((c) => ({
     id: c.id,
     label: c.label,
-    shape: SHAPES[c.shape] ? c.shape : "knot",
+    shape: SHAPES[c.shape] ? c.shape : "swarm",
     members: c.images.filter((n) => imgPool.has(n)).map((name) => ({ name, type: "image" })),
   }));
   if (!groups.length) return [];
@@ -440,10 +441,42 @@ export default function NewSpace3dFocus_2({ damping = 0.085 } = {}) {
       55, window.innerWidth / window.innerHeight, 0.1, 300,
     );
 
-    const fitGalaxyDist = () => {
+    // Distancia mínima a la que la galaxia entera entra en cuadro respetando el
+    // margen cercano. Búsqueda binaria sobre las posiciones reales: se adapta a
+    // cualquier pantalla y a cualquier cambio de constantes, sin número mágico.
+    const UP_AXIS = new THREE.Vector3(0, 1, 0);
+    const fitPos = new THREE.Vector3();
+    const fitFwd = new THREE.Vector3();
+    const fitRight = new THREE.Vector3();
+    const fitUp = new THREE.Vector3();
+    const fitRel = new THREE.Vector3();
+
+    const framesAll = (dist, yaw, pitch) => {
+      const cp = Math.cos(pitch);
+      fitPos.set(dist * cp * Math.sin(yaw), dist * Math.sin(pitch), dist * cp * Math.cos(yaw));
+      fitFwd.copy(fitPos).multiplyScalar(-1).normalize();
+      fitRight.crossVectors(fitFwd, UP_AXIS).normalize();
+      fitUp.crossVectors(fitRight, fitFwd);
       const tanV = Math.tan((camera.fov * Math.PI) / 360);
       const tanH = tanV * camera.aspect;
-      return THREE.MathUtils.clamp(R / (tanH * FIT_K), 24, 70);
+      for (const p of pieces) {
+        fitRel.copy(p.pos).sub(fitPos);
+        const d = fitRel.dot(fitFwd);
+        if (d < NEAR_MARGIN) return false;
+        if (Math.abs(fitRel.dot(fitRight)) > d * tanH * FRAME_FILL) return false;
+        if (Math.abs(fitRel.dot(fitUp)) > d * tanV * FRAME_FILL) return false;
+      }
+      return true;
+    };
+
+    const fitGalaxyDist = (yaw = YAW_0, pitch = PITCH_0) => {
+      let lo = NEAR_MARGIN;
+      let hi = 160;
+      for (let i = 0; i < 26; i++) {
+        const mid = (lo + hi) / 2;
+        if (framesAll(mid, yaw, pitch)) hi = mid; else lo = mid;
+      }
+      return hi;
     };
 
     // ── Atlas ────────────────────────────────────────────────────────────────
@@ -528,39 +561,58 @@ export default function NewSpace3dFocus_2({ damping = 0.085 } = {}) {
     // ── Siembra ──────────────────────────────────────────────────────────────
     const centers = [];
     const pieces = [];
-    const lanes = Math.max(1, Math.ceil(groups.length / ARMS) - 0.85);
+    const bx = new THREE.Vector3();
+    const by = new THREE.Vector3();
+    const bz = new THREE.Vector3();
+    const upRef = new THREE.Vector3();
 
     groups.forEach((g, gi) => {
       const rnd = mulberry(1000 + gi * 37);
-      const arm = gi % ARMS;
-      const t = 0.24 + (Math.floor(gi / ARMS) / lanes) * 0.82;
-      const rad = R * Math.pow(t, 0.92);
-      const theta = (arm * TAU) / ARMS + t * 2.35 + 0.4;
-      const rx = Math.cos(theta) * rad;
-      const rz = Math.sin(theta) * rad;
-      const along = rx * VIEW_AXIS.x + rz * VIEW_AXIS.z;
-      const cx = rx + along * VIEW_AXIS.x * (DEPTH_STRETCH - 1);
-      const cz = rz + along * VIEW_AXIS.z * (DEPTH_STRETCH - 1);
-      const cy = gauss(rnd) * 1.1 * (1 - t * 0.5);
-      const tang = { x: -Math.sin(theta), z: Math.cos(theta) };
-      const radl = { x: Math.cos(theta), z: Math.sin(theta) };
+
+      // Centro sobre una esfera de Fibonacci, con radio variado para que unas
+      // constelaciones queden al fondo y otras delante.
+      const k = gi + 0.5;
+      const phi = Math.acos(1 - (2 * k) / groups.length);
+      const th = Math.PI * (1 + Math.sqrt(5)) * k;
+      const rad = CORE_R * (0.45 + 0.55 * rnd());
+      let cx = Math.cos(th) * Math.sin(phi) * rad;
+      const cy = Math.cos(phi) * rad * GALAXY_FLAT;
+      let cz = Math.sin(th) * Math.sin(phi) * rad;
+
+      // Estirado a lo largo del eje de vista: profundidad sin ensanchar.
+      const along = cx * VIEW_AXIS.x + cz * VIEW_AXIS.z;
+      cx += along * VIEW_AXIS.x * (DEPTH_STRETCH - 1);
+      cz += along * VIEW_AXIS.z * (DEPTH_STRETCH - 1);
       centers.push(new THREE.Vector3(cx, cy, cz));
 
-      const shape = SHAPES[g.shape];
+      // Cada cúmulo con su propia inclinación: la silueta no se repite orientada
+      // igual ocho veces.
+      bz.set(gauss(rnd), gauss(rnd) * 0.7, gauss(rnd));
+      if (bz.lengthSq() < 1e-4) bz.set(0, 0, 1);
+      bz.normalize();
+      upRef.set(Math.abs(bz.y) > 0.92 ? 1 : 0, Math.abs(bz.y) > 0.92 ? 0 : 1, 0);
+      bx.crossVectors(upRef, bz).normalize();
+      by.crossVectors(bz, bx);
+
+      const shape = SHAPES[g.shape] || SHAPES.swarm;
       const n = g.members.length;
-      const s = SHAPE_SIZE * (0.85 + 0.35 * Math.min(1, n / 16));
+      const s = BLOB_R * (0.85 + 0.35 * Math.min(1, n / 16));
 
       g.members.forEach((m, i) => {
-        const [lx, ly, lz] = shape(i, n, rnd, s);
+        const shaped = shape(i, n, rnd, s);
+        const neutral = swarm(rnd, s);
+        const lx = neutral[0] + (shaped[0] - neutral[0]) * SHAPE_VARIETY;
+        const ly = neutral[1] + (shaped[1] - neutral[1]) * SHAPE_VARIETY;
+        const lz = neutral[2] + (shaped[2] - neutral[2]) * SHAPE_VARIETY;
         const base = between(rnd, PIECE_SIZE);
         pieces.push({
           name: m.name,
           type: m.type,
           group: gi,
           pos: new THREE.Vector3(
-            cx + tang.x * lx + radl.x * lz,
-            cy + ly,
-            cz + tang.z * lx + radl.z * lz,
+            cx + bx.x * lx + by.x * ly + bz.x * lz,
+            cy + bx.y * lx + by.y * ly + bz.y * lz,
+            cz + bx.z * lx + by.z * ly + bz.z * lz,
           ),
           base,
           w: base,
@@ -572,6 +624,11 @@ export default function NewSpace3dFocus_2({ damping = 0.085 } = {}) {
         });
       });
     });
+
+    // Radio real de la galaxia una vez sembrada: lo usan la niebla, el corte
+    // lejano y el límite del pivote, en vez de una constante que se desincroniza.
+    let GALAXY_RADIUS = 1;
+    for (const p of pieces) GALAXY_RADIUS = Math.max(GALAXY_RADIUS, p.pos.length());
 
     // ── Nube: una instanced mesh con todas las piezas ────────────────────────
     const plane = new THREE.PlaneGeometry(1, 1);
@@ -826,15 +883,19 @@ export default function NewSpace3dFocus_2({ damping = 0.085 } = {}) {
     const updatePool = () => {
       if (focus.piece) return;
       const camPos = camera.position;
-      for (const p of pieces) p.d = camPos.distanceTo(p.pos);
+      const focal = (renderer.domElement.clientHeight / 2) / Math.tan((camera.fov * Math.PI) / 360);
+      for (const p of pieces) {
+        p.d = camPos.distanceTo(p.pos);
+        p.px = (focal * Math.max(p.w, p.h)) / Math.max(0.001, p.d);
+      }
 
       const wanted = new Set();
       const images = pieces
-        .filter((p) => p.type === "image" && p.d < HIRES_DIST && visibleGroup(p.group))
-        .sort((a, b) => a.d - b.d);
+        .filter((p) => p.type === "image" && p.px > HIRES_PX && visibleGroup(p.group))
+        .sort((a, b) => b.px - a.px);
       const videos = pieces
-        .filter((p) => p.type === "video" && p.d < VIDEO_DIST && visibleGroup(p.group))
-        .sort((a, b) => a.d - b.d)
+        .filter((p) => p.type === "video" && p.px > VIDEO_PX && visibleGroup(p.group))
+        .sort((a, b) => b.px - a.px)
         .slice(0, MAX_ACTIVE_VIDEOS);
 
       videos.forEach((p) => wanted.add(p));
@@ -886,7 +947,7 @@ export default function NewSpace3dFocus_2({ damping = 0.085 } = {}) {
 
     const clampPivot = () => {
       const len = state.targetPivot.length();
-      const max = R * 1.15;
+      const max = GALAXY_RADIUS * 1.05;
       if (len > max) state.targetPivot.multiplyScalar(max / len);
     };
 
@@ -1170,7 +1231,7 @@ export default function NewSpace3dFocus_2({ damping = 0.085 } = {}) {
       camera.aspect = w / h;
       camera.updateProjectionMatrix();
       refreshRect();
-      state.maxDist = Math.max(state.maxDist, fitGalaxyDist() * 1.25);
+      state.maxDist = Math.max(state.maxDist, fitGalaxyDist(state.yaw, state.pitch) * 1.25);
       if (focus.piece) placeFocus(focus.piece, fitDistFor(focus.piece));
     };
     window.addEventListener("resize", onResize);
@@ -1206,7 +1267,7 @@ export default function NewSpace3dFocus_2({ damping = 0.085 } = {}) {
       reset() {
         if (focus.piece) exitFocus();
         setFilter(null);
-        flyTo(new THREE.Vector3(), fitGalaxyDist());
+        flyTo(new THREE.Vector3(), fitGalaxyDist(state.yaw, state.pitch));
       },
     };
 
@@ -1229,8 +1290,8 @@ export default function NewSpace3dFocus_2({ damping = 0.085 } = {}) {
 
       const ref = Math.max(state.dist, 6);
       shared.uFogNear.value = ref * FOG_NEAR_K;
-      shared.uFogFar.value  = ref * FOG_FAR_K + R * FOG_FAR_R;
-      shared.uFar.value     = ref + R * FAR_R;
+      shared.uFogFar.value  = ref * FOG_FAR_K + GALAXY_RADIUS * FOG_FAR_R;
+      shared.uFar.value     = ref + GALAXY_RADIUS * FAR_R;
 
       if (atlasDirty && performance.now() - atlasStamp > 150) {
         atlasTex.needsUpdate = true;
