@@ -1,8 +1,9 @@
 import HeaderFooter17 from "@/components/menu/index17";
 import Space3dFocus_Opt from "@/components/Space3D/Space3dFocus_Opt";
+import NewSpace3dFocus from "@/components/Space3D/NewSpace3dFocus";
 
 export default function Space() {
-  return <Space3dFocus_Opt />;
+  return <NewSpace3dFocus />;
 }
 
 // Shell persistente: el wrapper debe ser ESTRUCTURALMENTE IDÉNTICO en las 3
