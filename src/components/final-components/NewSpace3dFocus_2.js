@@ -823,9 +823,33 @@ export default function NewSpace3dFocus_2({ damping = 0.085, active = true, view
       }
     };
 
+    // Hasta que hay un frame decodificado la malla sigue en el póster del atlas.
+    // Cambiar ya al VideoTexture deja la casilla negra durante el vuelo al centro.
+    const revealVideo = (piece) => {
+      const slot = piece.slot;
+      if (!slot || slot.piece !== piece || !piece.videoTex) return;
+      if (piece.video.readyState < 2) return;
+      if (slot.mat.uniforms.uTex.value === piece.videoTex) return;
+      piece.videoTex.needsUpdate = true;
+      slot.mat.uniforms.uTex.value = piece.videoTex;
+      slot.mat.uniforms.uUseAtlas.value = 0;
+      slot.mat.uniforms.uFlipV.value = 1;
+      slot.mat.uniforms.uExpandRange.value = 1;
+    };
+
+    const pickFieldSrc = (sources) => {
+      if (!sources?.length) return null;
+      const mp4 = sources.find((s) => s.type === "video/mp4");
+      // En táctil el H.264 va por hardware. El VP9 (sources[0] si hay WebM)
+      // alarga justo la espera del primer frame.
+      if (coarsePointer && mp4) return mp4.src;
+      const probe = document.createElement("video");
+      return (sources.find((s) => probe.canPlayType(s.type) !== "") || sources[0]).src;
+    };
+
     const startVideo = (slot, piece) => {
       if (!piece.video) {
-        const src = videoSrc.get(piece.name)?.sources?.[0]?.src;
+        const src = pickFieldSrc(videoSrc.get(piece.name)?.sources);
         const vid = document.createElement("video");
         vid.muted = true;
         vid.loop = true;
@@ -858,11 +882,8 @@ export default function NewSpace3dFocus_2({ damping = 0.085, active = true, view
         piece.video = vid;
         piece.videoTex = vtex;
       }
-      slot.mat.uniforms.uTex.value = piece.videoTex;
-      slot.mat.uniforms.uUseAtlas.value = 0;
-      slot.mat.uniforms.uFlipV.value = 1;
-      slot.mat.uniforms.uExpandRange.value = 1;
-      piece.video.play().catch(() => {});
+      piece.wantsVideo = true;
+      piece.video.play().catch(() => { piece.wantsVideo = false; });
     };
 
     const promote = (slot, piece, fieldFirst = false) => {
@@ -940,7 +961,10 @@ export default function NewSpace3dFocus_2({ damping = 0.085, active = true, view
       slot.mat.uniforms.uFlipV.value = 0;
       slot.mat.uniforms.uExpandRange.value = 0;
       slot.mat.uniforms.uOpacity.value = 1;
-      if (piece.type === "video") piece.video?.pause();
+      if (piece.type === "video") {
+        piece.wantsVideo = false;
+        piece.video?.pause();
+      }
       writeInstance(piece);
     };
 
@@ -1611,7 +1635,10 @@ export default function NewSpace3dFocus_2({ damping = 0.085, active = true, view
 
       if (morphing || frame % 12 === 0) updatePool();
       for (const p of pieces) {
-        if (p.slot && p.videoTex && p.video && !p.video.paused) p.videoTex.needsUpdate = true;
+        if (!p.slot || !p.videoTex || !p.video || !p.wantsVideo) continue;
+        if (p.video.readyState < 2) continue;
+        revealVideo(p);
+        if (!p.video.paused) p.videoTex.needsUpdate = true;
       }
       frame += 1;
 

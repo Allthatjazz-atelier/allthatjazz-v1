@@ -13,7 +13,7 @@ import { useSyncExternalStore } from "react";
  *
  * La escalera de columnas la publica la propia rejilla, que es quien conoce sus
  * puntos de ruptura: en escritorio es 12·8·6·3, pero en un móvil esas cifras no
- * significan nada y allí son 4·3·2·1. El navbar solo pinta lo que le digan.
+ * significan nada y allí son 4·3·2. El navbar solo pinta lo que le digan.
  */
 
 const DEFAULT_LADDER = [12, 8, 6, 3];

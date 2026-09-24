@@ -34,6 +34,11 @@ const WHEEL_K = 1.0;      // px de recorrido por px de rueda
 const SMOOTHING = 0.22;   // mismo amortiguado que la versión WebGL
 const SNAP_DELAY = 140;   // ms de calma antes de encajar
 const SNAP_DUR = 0.55;
+// Inercia del dedo en móvil. Un flick recorre varias piezas y luego se asienta;
+// sin esto cada gesto encaja en la siguiente y con ~120 hay que ir de una en una.
+const GLIDE_F = 0.978;
+const GLIDE_GAIN = 32;          // px/frame por cada px/ms del dedo
+const GLIDE_MAX_SLIDES = 14;
 const MAX_ACTIVE_VIDEOS = { desktop: 4, mobile: 2 };
 const NEAR_IMAGES = 6;    // piezas a cada lado que reciben `src` de imagen
 
@@ -55,11 +60,14 @@ export default function ATJ_Slider({ viewRef, active = true } = {}) {
   // reconstruir el slider, solo dormirlo.
   const activeRef = useRef(active);
   activeRef.current = active;
+  // Mientras el dedo sigue viajando no se abren decodificadores nuevos.
+  const glidingRef = useRef(false);
   const itemRefs = useRef([]);
   const [isMobile, setIsMobile] = useState(
     () => typeof window !== "undefined" && window.innerWidth <= 768,
   );
   const [activeIndex, setActiveIndex] = useState(0);
+  const [glideSettle, setGlideSettle] = useState(0);
   const [hoverIndex, setHoverIndex] = useState(null);
 
   const { getImage, getVideo, isLoaded, imageIds, videoIds } = useOptimizedMedia();
@@ -165,6 +173,8 @@ export default function ATJ_Slider({ viewRef, active = true } = {}) {
     let snapTimer = null;
     let snapTween = null;
     let dragging = false;
+    let glide = 0;
+    const sample = { v: 0, t: 0 };
 
     // Cada pieza se coloca en la ventana [-total/2, total/2) alrededor del
     // centro: con eso el carrusel es infinito sin clonar nodos.
@@ -234,6 +244,10 @@ export default function ATJ_Slider({ viewRef, active = true } = {}) {
       snapTween?.kill();
       clearTimeout(snapTimer);
       dragging = true;
+      glide = 0;
+      glidingRef.current = false;
+      sample.v = 0;
+      sample.t = performance.now();
       drag.id = e.pointerId;
       drag.x = e.clientX;
       drag.moved = false;
@@ -245,6 +259,11 @@ export default function ATJ_Slider({ viewRef, active = true } = {}) {
       const dx = e.clientX - drag.x;
       drag.x = e.clientX;
       if (Math.abs(dx) > 1) drag.moved = true;
+      const now = performance.now();
+      const dt = now - sample.t;
+      if (dt > 0 && dt < 80) sample.v = sample.v * 0.35 + (-dx / dt) * 0.65;
+      else sample.v = dt > 0 && dt < 120 ? -dx / dt : 0;
+      sample.t = now;
       pos.target -= dx;
       pos.current -= dx;   // el arrastre va pegado al dedo, sin amortiguar
     };
@@ -253,6 +272,19 @@ export default function ATJ_Slider({ viewRef, active = true } = {}) {
       dragging = false;
       try { root.releasePointerCapture?.(e.pointerId); } catch { /* ok */ }
       root.style.cursor = "grab";
+      if (key === "mobile" && !reduce && drag.moved) {
+        const age = performance.now() - sample.t;
+        const v = age < 100 ? sample.v : 0;
+        let g = v * GLIDE_GAIN;
+        const maxDist = metrics.unit * GLIDE_MAX_SLIDES;
+        const est = Math.abs(g) / (1 - GLIDE_F);
+        if (est > maxDist && est > 0) g *= maxDist / est;
+        glide = Math.abs(g) < 0.8 ? 0 : g;
+        glidingRef.current = glide !== 0;
+        if (!glide) queueSnap();
+        return;
+      }
+      glidingRef.current = false;
       queueSnap();
     };
 
@@ -284,7 +316,20 @@ export default function ATJ_Slider({ viewRef, active = true } = {}) {
     const tick = () => {
       raf = requestAnimationFrame(tick);
       if (document.hidden || !activeRef.current) return;
-      if (!dragging) pos.current += (pos.target - pos.current) * (reduce ? 1 : SMOOTHING);
+      if (glide) {
+        pos.current += glide;
+        pos.target = pos.current;
+        glide *= GLIDE_F;
+        if (Math.abs(glide) < 0.35) {
+          glide = 0;
+          glidingRef.current = false;
+          snapNow();
+          setActiveIndex(centered.current);
+          setGlideSettle((n) => n + 1);
+        }
+      } else if (!dragging) {
+        pos.current += (pos.target - pos.current) * (reduce ? 1 : SMOOTHING);
+      }
       layout();
     };
     raf = requestAnimationFrame(tick);
@@ -421,7 +466,7 @@ export default function ATJ_Slider({ viewRef, active = true } = {}) {
       const video = el.querySelector("video");
       if (!video) return;
       video.muted = true;   // la propiedad, no el atributo: es la que mira el autoplay
-      if (!near(i, videoRadius)) { video.pause(); return; }
+      if (!near(i, videoRadius) || glidingRef.current) { video.pause(); return; }
       if (!video.getAttribute("src")) {
         video.setAttribute("src", piece.src);
         video.addEventListener("loadedmetadata", () => {
@@ -431,7 +476,7 @@ export default function ATJ_Slider({ viewRef, active = true } = {}) {
       if (document.hidden || !active) video.pause();
       else video.play().catch(() => {});
     });
-  }, [pieces, isMobile, activeIndex, applyFit, active]);
+  }, [pieces, isMobile, activeIndex, applyFit, active, glideSettle]);
 
   useEffect(() => { syncMedia(); }, [syncMedia]);
 

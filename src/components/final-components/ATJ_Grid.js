@@ -29,7 +29,7 @@ import { setDensityLadder, useViewPrefs } from "@/components/final-components/vi
 const LADDER = {
   desktop: [12, 8, 6, 3],
   tablet: [8, 6, 4, 2],
-  mobile: [4, 3, 2, 1],
+  mobile: [4, 3, 2],
 };
 
 const GUTTER = { desktop: 18, tablet: 16, mobile: 12 };

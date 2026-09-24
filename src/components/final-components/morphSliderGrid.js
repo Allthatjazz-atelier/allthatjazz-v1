@@ -20,6 +20,25 @@ const COMPRESS = 0.22;
 const CLUSTER_MIN = 48;
 const CLUSTER_MAX = 96;
 
+// En táctil el mismo relato, más corto y en tres olas: menos capas vivas a la vez.
+const COARSE = {
+  recedeDur: 0.35,
+  bloomDur: 0.55,
+  overlap: 0.12,
+  stagger: 0.045,
+  ranks: 3,
+};
+
+const coarsePointer = () =>
+  typeof window !== "undefined" &&
+  window.matchMedia("(hover: none) and (pointer: coarse)").matches;
+
+const motionOf = () => (
+  coarsePointer()
+    ? COARSE
+    : { recedeDur: RECEDE_DUR, bloomDur: BLOOM_DUR, overlap: OVERLAP, stagger: STAGGER, ranks: STAGGER_RANKS }
+);
+
 export const MORPH_MS = Math.round(
   (RECEDE_DUR + BLOOM_DUR - OVERLAP + STAGGER * (STAGGER_RANKS - 1) + 0.12) * 1000,
 );
@@ -70,12 +89,12 @@ function recedeFromDest(to, vanish) {
   return recedeRect(to, vanish);
 }
 
-/** 0 en el centro del viewport, STAGGER_RANKS-1 en los bordes. */
-function rankOf(rect, origin, vw, vh) {
+/** 0 en el centro del viewport, ranks-1 en los bordes. */
+function rankOf(rect, origin, vw, vh, ranks) {
   const c = centerOf(rect);
   const d = Math.hypot(c.x - origin.x, c.y - origin.y);
   const t = Math.min(1, d / (Math.hypot(vw, vh) * 0.42));
-  return Math.round(t * (STAGGER_RANKS - 1));
+  return Math.round(t * (ranks - 1));
 }
 
 function applyBox(el, start, box) {
@@ -83,20 +102,6 @@ function applyBox(el, start, box) {
   // medio, así que el alto cae solo. Evita aplastar el fotograma.
   const s = start.w > 0 ? box.w / start.w : 1;
   el.style.transform = `translate3d(${box.x.toFixed(2)}px,${box.y.toFixed(2)}px,0) scale(${s.toFixed(4)})`;
-}
-
-/** Fotograma actual: tapa el hueco negro mientras el clon del vídeo arranca. */
-function snapshotPoster(video) {
-  if (!video || video.readyState < 2 || !video.videoWidth) return null;
-  try {
-    const c = document.createElement("canvas");
-    c.width = video.videoWidth;
-    c.height = video.videoHeight;
-    c.getContext("2d").drawImage(video, 0, 0);
-    return c.toDataURL("image/jpeg", 0.72);
-  } catch {
-    return null;
-  }
 }
 
 function styleFlyer(el, start) {
@@ -108,49 +113,20 @@ function styleFlyer(el, start) {
   applyBox(el, start, start);
 }
 
-function resolveMedia(from, to) {
+// Siempre una imagen ya decodificada (póster o still). Un <video> nuevo
+// abriría otro decodificador en mitad del gesto.
+function resolveStill(from, to) {
   const a = from?.visible !== false ? from : null;
   const b = to;
-  const videoSrc = (a?.kind === "video" && a.src) || (b?.kind === "video" && b.src);
-  if (videoSrc) {
-    return {
-      kind: "video",
-      src: videoSrc,
-      poster: a?.poster || b?.poster || null,
-      currentTime: a?.currentTime || b?.currentTime || 0,
-      el: (a?.kind === "video" && a.el) || (b?.kind === "video" && b.el) || null,
-    };
-  }
-  const src = a?.src || b?.src || a?.poster || b?.poster;
-  return src ? { kind: "image", src } : null;
+  const src = a?.poster || b?.poster || (a?.kind !== "video" && a?.src) || (b?.kind !== "video" && b?.src) || null;
+  return src || null;
 }
 
-function makeClone(media, start) {
-  if (media.kind === "video") {
-    const v = document.createElement("video");
-    styleFlyer(v, start);
-    v.muted = true;
-    v.defaultMuted = true;
-    v.loop = true;
-    v.playsInline = true;
-    v.setAttribute("playsinline", "");
-    v.setAttribute("muted", "");
-    v.preload = "auto";
-    v.poster = snapshotPoster(media.el) || media.poster || "";
-    v.src = media.src;
-    const t = media.currentTime || 0;
-    const kick = () => {
-      try { if (t > 0.05 && Number.isFinite(t)) v.currentTime = t; } catch { /* ok */ }
-      v.play().catch(() => {});
-    };
-    if (v.readyState >= 1) kick();
-    else v.addEventListener("loadedmetadata", kick, { once: true });
-    return v;
-  }
+function makeClone(src, start) {
   const img = document.createElement("img");
   styleFlyer(img, start);
   img.alt = "";
-  img.src = media.src;
+  img.src = src;
   return img;
 }
 
@@ -171,6 +147,7 @@ export function runMorph({ fromFlyers, toFlyers, layer, onComplete }) {
   const vw = window.innerWidth;
   const vh = window.innerHeight;
   const vanish = vanishOf(vw, vh);
+  const motion = motionOf();
 
   const keys = new Set();
   fromFlyers.forEach((f, k) => { if (f.visible !== false) keys.add(k); });
@@ -187,22 +164,15 @@ export function runMorph({ fromFlyers, toFlyers, layer, onComplete }) {
   });
 
   const cleanup = () => {
-    clones.forEach((el) => {
-      if (el.tagName === "VIDEO") {
-        el.pause();
-        el.removeAttribute("src");
-        el.load();
-      }
-      el.remove();
-    });
+    clones.forEach((el) => el.remove());
     clones.length = 0;
   };
 
   keys.forEach((key) => {
     const from = fromFlyers.get(key);
     const to = toFlyers.get(key);
-    const media = resolveMedia(from, to);
-    if (!media) return;
+    const src = resolveStill(from, to);
+    if (!src) return;
 
     const start = from && from.visible !== false ? from : recedeFromDest(to, vanish);
     const mid = from && from.visible !== false
@@ -212,12 +182,12 @@ export function runMorph({ fromFlyers, toFlyers, layer, onComplete }) {
     const lands = Boolean(to);
     const arrivesFromCluster = !from || from.visible === false;
 
-    const recedeRank = rankOf(from || mid, vanish, vw, vh);
-    const bloomRank = rankOf(end, vanish, vw, vh);
-    const recedeDelay = recedeRank * STAGGER;
-    const bloomDelay = bloomRank * STAGGER;
+    const recedeRank = rankOf(from || mid, vanish, vw, vh, motion.ranks);
+    const bloomRank = rankOf(end, vanish, vw, vh, motion.ranks);
+    const recedeDelay = recedeRank * motion.stagger;
+    const bloomDelay = bloomRank * motion.stagger;
 
-    const flyer = makeClone(media, start);
+    const flyer = makeClone(src, start);
     // El centro viaja encima: la ola se lee en profundidad.
     flyer.style.zIndex = String(20 - recedeRank);
     flyer.style.opacity = arrivesFromCluster ? "0" : "1";
@@ -229,7 +199,7 @@ export function runMorph({ fromFlyers, toFlyers, layer, onComplete }) {
     if (!arrivesFromCluster) {
       tl.to(proxy, {
         x: mid.x, y: mid.y, w: mid.w, h: mid.h,
-        duration: RECEDE_DUR,
+        duration: motion.recedeDur,
         ease: RECEDE_EASE,
         onUpdate: () => applyBox(flyer, start, proxy),
       }, recedeDelay);
@@ -238,19 +208,19 @@ export function runMorph({ fromFlyers, toFlyers, layer, onComplete }) {
       proxy.x = mid.x; proxy.y = mid.y; proxy.w = mid.w; proxy.h = mid.h;
     }
 
-    const bloomAt = recedeDelay + RECEDE_DUR - OVERLAP + bloomDelay;
+    const bloomAt = recedeDelay + motion.recedeDur - motion.overlap + bloomDelay;
     if (lands) {
       tl.to(proxy, {
         x: end.x, y: end.y, w: end.w, h: end.h,
-        duration: BLOOM_DUR,
+        duration: motion.bloomDur,
         ease: BLOOM_EASE,
         onUpdate: () => applyBox(flyer, start, proxy),
       }, Math.max(0, bloomAt));
       if (arrivesFromCluster) {
-        tl.to(flyer, { opacity: 1, duration: 0.36, ease: "power2.out" }, Math.max(0, bloomAt));
+        tl.to(flyer, { opacity: 1, duration: coarsePointer() ? 0.24 : 0.36, ease: "power2.out" }, Math.max(0, bloomAt));
       }
     } else {
-      tl.to(flyer, { opacity: 0, duration: 0.28, ease: "power2.in" }, recedeDelay + RECEDE_DUR * 0.45);
+      tl.to(flyer, { opacity: 0, duration: 0.28, ease: "power2.in" }, recedeDelay + motion.recedeDur * 0.45);
     }
   });
 
