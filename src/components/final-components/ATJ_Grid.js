@@ -140,7 +140,7 @@ export default function ATJ_Grid({ viewRef, active = true, onSelect } = {}) {
         }
         const set = getImageSet(p.name);
         if (!set?.src) return null;
-        return { ...p, src: set.src, srcSet: set.srcSet, w: set.width, h: set.height };
+        return { ...p, src: set.src, srcSet: set.srcSet, w: set.width, h: set.height, heic: set.heic };
       })
       .filter(Boolean);
   }, [isLoaded, imageIds, videoIds, getImageSet, getVideo]);
@@ -268,8 +268,12 @@ export default function ATJ_Grid({ viewRef, active = true, onSelect } = {}) {
       const scroller = rootRef.current;
       if (!p || !fig || !inner || !scroller) return;
 
-      // 1. Proporción de la pieza; su tamaño sale del hueco que se elija.
-      const ar = p.w && p.h ? p.w / p.h : FALLBACK_AR;
+      // Solo el HEIC: el manifiesto puede traer el sensor sin girar. El resto
+      // usa la proporción del archivo, que es la de la celda.
+      const still = p.heic ? fig.querySelector(".atj-grid__media img") : null;
+      const ar = still?.naturalWidth && still?.naturalHeight
+        ? still.naturalWidth / still.naturalHeight
+        : (p.w && p.h ? p.w / p.h : FALLBACK_AR);
       // 2. Las líneas reales de la rejilla. Las columnas son regulares, las
       //    filas no —cada una mide lo que su pieza más alta—, y por eso hay que
       //    leerlas en vez de calcularlas.
@@ -592,7 +596,12 @@ export default function ATJ_Grid({ viewRef, active = true, onSelect } = {}) {
                     alt={p.label}
                     loading="lazy"
                     decoding="async"
-                    draggable="false"
+                    onLoad={p.heic ? (e) => {
+                      const img = e.currentTarget;
+                      const box = img.parentElement;
+                      if (!box || !img.naturalWidth || !img.naturalHeight) return;
+                      box.style.aspectRatio = String(img.naturalWidth / img.naturalHeight);
+                    } : undefined}
                   />
                   {isVideo && (
                     // Sin `src` hasta que entra en pantalla: un <video> vacío no

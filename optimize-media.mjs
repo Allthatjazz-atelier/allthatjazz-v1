@@ -17,6 +17,8 @@
  *   .mp4  H.264  +faststart
  *   .webm VP9
  *   .poster.jpg
+ *   .thumb.mp4   H.264 480  (rejilla densa y campo de la galaxia)
+ *   .poster.thumb.jpg  384
  *
  * Escribe /public/media-manifest.json para useOptimizedMedia.
  */
@@ -40,6 +42,10 @@ const CONFIG = {
       maxEdge: 1080,
       mp4: { crf: 23, preset: "fast", profile: "high", level: "4.1" },
       webm: { crf: 33, cpuUsed: 4 },
+    },
+    thumb: {
+      maxEdge: 480,
+      mp4: { crf: 28, preset: "veryfast", profile: "high", level: "4.0" },
     },
     desktop: {
       maxEdge: 1920,
@@ -240,6 +246,22 @@ const extractPoster = async (inputPath, outputPath) => {
   ]);
 };
 
+const extractPosterThumb = async (inputPath, outputPath) => {
+  if (!shouldWrite(outputPath)) {
+    log.skip(`Poster thumb ya existe: ${path.basename(outputPath)}`);
+    return;
+  }
+  await runFfmpeg([
+    "-y",
+    "-i", inputPath,
+    "-vf", scaleFilter(384),
+    "-frames:v", "1",
+    "-q:v", "4",
+    "-f", "image2",
+    outputPath,
+  ]);
+};
+
 const processVideo = async (inputPath, slug) => {
   const out = CONFIG.outputVideos;
   const result = {
@@ -276,7 +298,29 @@ const processVideo = async (inputPath, slug) => {
       if (fs.existsSync(posterPath)) {
         log.ok(`poster: ${getFileSize(posterPath)}`);
         result.poster = publicPath("videos", posterName);
+        const thumbPosterName = `${slug}.poster.thumb.jpg`;
+        const thumbPosterPath = path.join(out, thumbPosterName);
+        await extractPosterThumb(posterPath, thumbPosterPath);
+        if (fs.existsSync(thumbPosterPath)) {
+          log.ok(`poster thumb: ${getFileSize(thumbPosterPath)}`);
+          result.poster_thumb = publicPath("videos", thumbPosterName);
+        }
       }
+    }
+
+    const thumbName = `${slug}.thumb.mp4`;
+    const thumbPath = path.join(out, thumbName);
+    const thumbInput = fs.existsSync(path.join(out, `${slug}.mobile.mp4`))
+      ? path.join(out, `${slug}.mobile.mp4`)
+      : inputPath;
+    try {
+      const created = await optimizeVideoVariant(thumbInput, thumbPath, "thumb", "mp4");
+      if (created || fs.existsSync(thumbPath)) {
+        if (created) log.ok(`thumb.mp4: ${formatReduction(thumbInput, thumbPath)}`);
+        result.thumb_mp4 = publicPath("videos", thumbName);
+      }
+    } catch (err) {
+      log.error(`${slug} thumb.mp4: ${err.message}`);
     }
   } catch (err) {
     log.error(`Error procesando ${path.basename(inputPath)}: ${err.message}`);
@@ -386,6 +430,22 @@ const processImage = async (sharp, inputPath, slug) => {
         log.skip(`Ya existe: ${jpgName}`);
       }
       result[`${variant}_jpg`] = publicPath("images", jpgName);
+    }
+
+    // sharp().metadata() devuelve el sensor sin la orientación del HEIC.
+    // El JPEG ya sale girado: si no, la rejilla reserva una caja apaisada y cover recorta.
+    const mobileJpg = path.join(out, `${slug}.mobile.jpg`);
+    if (result.width && result.height && fs.existsSync(mobileJpg)) {
+      const file = await sharp(mobileJpg).metadata();
+      if (file.width && file.height) {
+        const fileAR = file.width / file.height;
+        const metaAR = result.width / result.height;
+        if (Math.abs(fileAR - metaAR) > 0.02 && Math.abs(fileAR - 1 / metaAR) < 0.02) {
+          const w = result.width;
+          result.width = result.height;
+          result.height = w;
+        }
+      }
     }
   } catch (err) {
     log.error(`Error procesando ${path.basename(inputPath)}: ${err.message}`);

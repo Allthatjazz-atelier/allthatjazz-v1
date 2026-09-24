@@ -257,9 +257,7 @@ export const useOptimizedMedia = () => {
       const entry = findEntry(manifest?.images, originalName);
       if (!entry) {
         const single = getImage(originalName);
-        return single?.src
-          ? { src: single.src, srcSet: null, width: null, height: null }
-          : { src: null, srcSet: null, width: null, height: null };
+        return { src: single.src, srcSet: null, width: null, height: null, heic: false };
       }
 
       // HEIC: el AVIF comparte contenedor y Chrome lo trata como imagen HEIF;
@@ -283,7 +281,7 @@ export const useOptimizedMedia = () => {
       }
       if (!candidates.length) {
         const single = getImage(originalName);
-        return { src: single?.src || null, srcSet: null, width: entry.width, height: entry.height };
+        return { src: single?.src || null, srcSet: null, width: entry.width, height: entry.height, heic };
       }
 
       return {
@@ -291,6 +289,7 @@ export const useOptimizedMedia = () => {
         srcSet: candidates.map((c) => `${c.url} ${c.w}w`).join(", "),
         width: entry.width || null,
         height: entry.height || null,
+        heic,
       };
     },
     [manifest, capabilities, getImage]

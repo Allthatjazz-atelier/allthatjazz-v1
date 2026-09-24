@@ -435,7 +435,13 @@ export default function NewSpace3dFocus_2({ damping = 0.085, active = true, view
         if (m.type === "video") {
           if (videoSrc.has(m.name)) continue;
           const v = getVideoRef.current(m.name);
-          if (v?.sources?.length) videoSrc.set(m.name, { sources: v.sources, poster: v.poster || null });
+          if (v?.sources?.length) {
+            videoSrc.set(m.name, {
+              sources: v.sources,
+              poster: v.poster || null,
+              thumb: v.thumbSrc || null,
+            });
+          }
           continue;
         }
         if (imageSrc.has(m.name)) continue;
@@ -868,16 +874,47 @@ export default function NewSpace3dFocus_2({ damping = 0.085, active = true, view
       return (sources.find((s) => probe.canPlayType(s.type) !== "") || sources[0]).src;
     };
 
+    const fieldSrcOf = (name) => {
+      const meta = videoSrc.get(name);
+      if (!meta) return null;
+      return meta.thumb || pickFieldSrc(meta.sources);
+    };
+    const focusSrcOf = (name) => pickFieldSrc(videoSrc.get(name)?.sources);
+
+    const holdPoster = (piece) => {
+      const slot = piece.slot;
+      if (!slot) return;
+      const cell = cellOf.get(piece.name);
+      slot.mat.uniforms.uTex.value = cell ? atlasTex : whiteTex;
+      slot.mat.uniforms.uUseAtlas.value = cell ? 1 : 0;
+      slot.mat.uniforms.uFlipV.value = 0;
+      slot.mat.uniforms.uExpandRange.value = 0;
+    };
+
+    const playSrc = (piece, src) => {
+      if (!piece.video || !src) return;
+      let current = piece.video.src || "";
+      try { current = decodeURI(current); } catch { /* ok */ }
+      if (current.endsWith(src)) {
+        piece.wantsVideo = true;
+        if (piece.video.paused) piece.video.play().catch(() => { piece.wantsVideo = false; });
+        return;
+      }
+      // Al cambiar de archivo el texture se vacía: el póster del atlas tapa el hueco.
+      holdPoster(piece);
+      piece.wantsVideo = true;
+      piece.video.src = encodeURI(src);
+      piece.video.play().catch(() => { piece.wantsVideo = false; });
+    };
+
     const startVideo = (slot, piece) => {
       if (!piece.video) {
-        const src = pickFieldSrc(videoSrc.get(piece.name)?.sources);
         const vid = document.createElement("video");
         vid.muted = true;
         vid.loop = true;
         vid.playsInline = true;
         vid.preload = "auto";
         vid.crossOrigin = "anonymous";
-        if (src) vid.src = encodeURI(src);
         vid.style.display = "none";
         document.body.appendChild(vid);
 
@@ -903,8 +940,7 @@ export default function NewSpace3dFocus_2({ damping = 0.085, active = true, view
         piece.video = vid;
         piece.videoTex = vtex;
       }
-      piece.wantsVideo = true;
-      piece.video.play().catch(() => { piece.wantsVideo = false; });
+      playSrc(piece, fieldSrcOf(piece.name));
     };
 
     const promote = (slot, piece, fieldFirst = false) => {
@@ -1218,6 +1254,7 @@ export default function NewSpace3dFocus_2({ damping = 0.085, active = true, view
       gsap.to(cloudMaster, { value: 0, duration: 0.45, ease: "power2.out" });
 
       placeFocus(piece, fitDistFor(piece));
+      if (piece.type === "video") playSrc(piece, focusSrcOf(piece.name));
       canvas.style.cursor = "default";
       onFocusRef.current?.(true);
     };
@@ -1241,6 +1278,7 @@ export default function NewSpace3dFocus_2({ damping = 0.085, active = true, view
           focus.piece = null;
           focus.slot = null;
           focus.locked = false;
+          if (piece.type === "video") playSrc(piece, fieldSrcOf(piece.name));
         },
       });
       for (const s of pool) {

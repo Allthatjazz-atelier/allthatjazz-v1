@@ -11,7 +11,9 @@
       "mobile_webm": "/media/optimized/videos/atj-about-cuaderno.mobile.webm",
       "desktop_mp4": "/media/optimized/videos/atj-about-cuaderno.desktop.mp4",
       "desktop_webm": "/media/optimized/videos/atj-about-cuaderno.desktop.webm",
-      "poster": "/media/optimized/videos/atj-about-cuaderno.poster.jpg"
+      "poster": "/media/optimized/videos/atj-about-cuaderno.poster.jpg",
+      "poster_thumb": "/media/optimized/videos/atj-about-cuaderno.poster.thumb.jpg",
+      "thumb_mp4": "/media/optimized/videos/atj-about-cuaderno.thumb.mp4"
     },
     {
       "original": "/new-assets/ATJ_AboutMotion 01.mp4",
@@ -23,7 +25,9 @@
       "mobile_webm": "/media/optimized/videos/atj-aboutmotion-01.mobile.webm",
       "desktop_mp4": "/media/optimized/videos/atj-aboutmotion-01.desktop.mp4",
       "desktop_webm": "/media/optimized/videos/atj-aboutmotion-01.desktop.webm",
-      "poster": "/media/optimized/videos/atj-aboutmotion-01.poster.jpg"
+      "poster": "/media/optimized/videos/atj-aboutmotion-01.poster.jpg",
+      "poster_thumb": "/media/optimized/videos/atj-aboutmotion-01.poster.thumb.jpg",
+      "thumb_mp4": "/media/optimized/videos/atj-aboutmotion-01.thumb.mp4"
     },
     {
       "original": "/new-assets/ATJ_AboutMotion 02.mp4",
@@ -35,7 +39,9 @@
       "mobile_webm": "/media/optimized/videos/atj-aboutmotion-02.mobile.webm",
       "desktop_mp4": "/media/optimized/videos/atj-aboutmotion-02.desktop.mp4",
       "desktop_webm": "/media/optimized/videos/atj-aboutmotion-02.desktop.webm",
-      "poster": "/media/optimized/videos/atj-aboutmotion-02.poster.jpg"
+      "poster": "/media/optimized/videos/atj-aboutmotion-02.poster.jpg",
+      "poster_thumb": "/media/optimized/videos/atj-aboutmotion-02.poster.thumb.jpg",
+      "thumb_mp4": "/media/optimized/videos/atj-aboutmotion-02.thumb.mp4"
     },
     {
       "original": "/new-assets/BisBisMotion Portfolio JUN26.mp4",
@@ -47,7 +53,9 @@
       "mobile_webm": "/media/optimized/videos/bisbismotion-portfolio-jun26.mobile.webm",
       "desktop_mp4": "/media/optimized/videos/bisbismotion-portfolio-jun26.desktop.mp4",
       "desktop_webm": "/media/optimized/videos/bisbismotion-portfolio-jun26.desktop.webm",
-      "poster": "/media/optimized/videos/bisbismotion-portfolio-jun26.poster.jpg"
+      "poster": "/media/optimized/videos/bisbismotion-portfolio-jun26.poster.jpg",
+      "poster_thumb": "/media/optimized/videos/bisbismotion-portfolio-jun26.poster.thumb.jpg",
+      "thumb_mp4": "/media/optimized/videos/bisbismotion-portfolio-jun26.thumb.mp4"
     },
     {
       "original": "/new-assets/DFNY Explo01.mp4",
@@ -55,11 +63,15 @@
       "aliases": [
         "DFNY Explo01"
       ],
+      "width": 1080,
+      "height": 608,
       "mobile_mp4": "/media/optimized/videos/dfny-explo01.mobile.mp4",
       "mobile_webm": "/media/optimized/videos/dfny-explo01.mobile.webm",
       "desktop_mp4": "/media/optimized/videos/dfny-explo01.desktop.mp4",
       "desktop_webm": "/media/optimized/videos/dfny-explo01.desktop.webm",
-      "poster": "/media/optimized/videos/dfny-explo01.poster.jpg"
+      "poster": "/media/optimized/videos/dfny-explo01.poster.jpg",
+      "poster_thumb": "/media/optimized/videos/dfny-explo01.poster.thumb.jpg",
+      "thumb_mp4": "/media/optimized/videos/dfny-explo01.thumb.mp4"
     },
     {
       "original": "/new-assets/DFNY_InstaReel 02.mp4",
@@ -71,7 +83,9 @@
       "mobile_webm": "/media/optimized/videos/dfny-instareel-02.mobile.webm",
       "desktop_mp4": "/media/optimized/videos/dfny-instareel-02.desktop.mp4",
       "desktop_webm": "/media/optimized/videos/dfny-instareel-02.desktop.webm",
-      "poster": "/media/optimized/videos/dfny-instareel-02.poster.jpg"
+      "poster": "/media/optimized/videos/dfny-instareel-02.poster.jpg",
+      "poster_thumb": "/media/optimized/videos/dfny-instareel-02.poster.thumb.jpg",
+      "thumb_mp4": "/media/optimized/videos/dfny-instareel-02.thumb.mp4"
     },
     {
       "original": "/new-assets/DFNY_InstaReel 03.mp4",
@@ -83,7 +97,9 @@
       "mobile_webm": "/media/optimized/videos/dfny-instareel-03.mobile.webm",
       "desktop_mp4": "/media/optimized/videos/dfny-instareel-03.desktop.mp4",
       "desktop_webm": "/media/optimized/videos/dfny-instareel-03.desktop.webm",
-      "poster": "/media/optimized/videos/dfny-instareel-03.poster.jpg"
+      "poster": "/media/optimized/videos/dfny-instareel-03.poster.jpg",
+      "poster_thumb": "/media/optimized/videos/dfny-instareel-03.poster.thumb.jpg",
+      "thumb_mp4": "/media/optimized/videos/dfny-instareel-03.thumb.mp4"
     },
     {
       "original": "/new-assets/DFNY-JAZZTHETICS-InstaReel-IntroTest01 (1).mp4",
@@ -95,7 +111,9 @@
       "mobile_webm": "/media/optimized/videos/dfny-jazzthetics-instareel-introtest01-1.mobile.webm",
       "desktop_mp4": "/media/optimized/videos/dfny-jazzthetics-instareel-introtest01-1.desktop.mp4",
       "desktop_webm": "/media/optimized/videos/dfny-jazzthetics-instareel-introtest01-1.desktop.webm",
-      "poster": "/media/optimized/videos/dfny-jazzthetics-instareel-introtest01-1.poster.jpg"
+      "poster": "/media/optimized/videos/dfny-jazzthetics-instareel-introtest01-1.poster.jpg",
+      "poster_thumb": "/media/optimized/videos/dfny-jazzthetics-instareel-introtest01-1.poster.thumb.jpg",
+      "thumb_mp4": "/media/optimized/videos/dfny-jazzthetics-instareel-introtest01-1.thumb.mp4"
     },
     {
       "original": "/new-assets/DFNY-Sketches-Flicker-04.mp4",
@@ -107,7 +125,9 @@
       "mobile_webm": "/media/optimized/videos/dfny-sketches-flicker-04.mobile.webm",
       "desktop_mp4": "/media/optimized/videos/dfny-sketches-flicker-04.desktop.mp4",
       "desktop_webm": "/media/optimized/videos/dfny-sketches-flicker-04.desktop.webm",
-      "poster": "/media/optimized/videos/dfny-sketches-flicker-04.poster.jpg"
+      "poster": "/media/optimized/videos/dfny-sketches-flicker-04.poster.jpg",
+      "poster_thumb": "/media/optimized/videos/dfny-sketches-flicker-04.poster.thumb.jpg",
+      "thumb_mp4": "/media/optimized/videos/dfny-sketches-flicker-04.thumb.mp4"
     },
     {
       "original": "/new-assets/DFNY-VIZ-Raw-Final-Nobrand.mp4",
@@ -119,7 +139,9 @@
       "mobile_webm": "/media/optimized/videos/dfny-viz-raw-final-nobrand.mobile.webm",
       "desktop_mp4": "/media/optimized/videos/dfny-viz-raw-final-nobrand.desktop.mp4",
       "desktop_webm": "/media/optimized/videos/dfny-viz-raw-final-nobrand.desktop.webm",
-      "poster": "/media/optimized/videos/dfny-viz-raw-final-nobrand.poster.jpg"
+      "poster": "/media/optimized/videos/dfny-viz-raw-final-nobrand.poster.jpg",
+      "poster_thumb": "/media/optimized/videos/dfny-viz-raw-final-nobrand.poster.thumb.jpg",
+      "thumb_mp4": "/media/optimized/videos/dfny-viz-raw-final-nobrand.thumb.mp4"
     },
     {
       "original": "/new-assets/IMG_3612.mov",
@@ -131,7 +153,9 @@
       "mobile_webm": "/media/optimized/videos/img-3612.mobile.webm",
       "desktop_mp4": "/media/optimized/videos/img-3612.desktop.mp4",
       "desktop_webm": "/media/optimized/videos/img-3612.desktop.webm",
-      "poster": "/media/optimized/videos/img-3612.poster.jpg"
+      "poster": "/media/optimized/videos/img-3612.poster.jpg",
+      "poster_thumb": "/media/optimized/videos/img-3612.poster.thumb.jpg",
+      "thumb_mp4": "/media/optimized/videos/img-3612.thumb.mp4"
     },
     {
       "original": "/new-assets/IMG_3614.mov",
@@ -143,7 +167,9 @@
       "mobile_webm": "/media/optimized/videos/img-3614.mobile.webm",
       "desktop_mp4": "/media/optimized/videos/img-3614.desktop.mp4",
       "desktop_webm": "/media/optimized/videos/img-3614.desktop.webm",
-      "poster": "/media/optimized/videos/img-3614.poster.jpg"
+      "poster": "/media/optimized/videos/img-3614.poster.jpg",
+      "poster_thumb": "/media/optimized/videos/img-3614.poster.thumb.jpg",
+      "thumb_mp4": "/media/optimized/videos/img-3614.thumb.mp4"
     },
     {
       "original": "/new-assets/Johnny Carretes_PR Reel.mp4",
@@ -155,7 +181,9 @@
       "mobile_webm": "/media/optimized/videos/johnny-carretes-pr-reel.mobile.webm",
       "desktop_mp4": "/media/optimized/videos/johnny-carretes-pr-reel.desktop.mp4",
       "desktop_webm": "/media/optimized/videos/johnny-carretes-pr-reel.desktop.webm",
-      "poster": "/media/optimized/videos/johnny-carretes-pr-reel.poster.jpg"
+      "poster": "/media/optimized/videos/johnny-carretes-pr-reel.poster.jpg",
+      "poster_thumb": "/media/optimized/videos/johnny-carretes-pr-reel.poster.thumb.jpg",
+      "thumb_mp4": "/media/optimized/videos/johnny-carretes-pr-reel.thumb.mp4"
     },
     {
       "original": "/new-assets/MMD040-Socarrat-PR-Motion-2-Comp.mp4",
@@ -167,7 +195,9 @@
       "mobile_webm": "/media/optimized/videos/mmd040-socarrat-pr-motion-2-comp.mobile.webm",
       "desktop_mp4": "/media/optimized/videos/mmd040-socarrat-pr-motion-2-comp.desktop.mp4",
       "desktop_webm": "/media/optimized/videos/mmd040-socarrat-pr-motion-2-comp.desktop.webm",
-      "poster": "/media/optimized/videos/mmd040-socarrat-pr-motion-2-comp.poster.jpg"
+      "poster": "/media/optimized/videos/mmd040-socarrat-pr-motion-2-comp.poster.jpg",
+      "poster_thumb": "/media/optimized/videos/mmd040-socarrat-pr-motion-2-comp.poster.thumb.jpg",
+      "thumb_mp4": "/media/optimized/videos/mmd040-socarrat-pr-motion-2-comp.thumb.mp4"
     },
     {
       "original": "/new-assets/movo-1080p-1536x1920 (8).mp4",
@@ -177,9 +207,11 @@
       ],
       "mobile_mp4": "/media/optimized/videos/movo-1080p-1536x1920-8.mobile.mp4",
       "mobile_webm": "/media/optimized/videos/movo-1080p-1536x1920-8.mobile.webm",
+      "desktop_mp4": "/media/optimized/videos/movo-1080p-1536x1920-8.desktop.mp4",
+      "desktop_webm": "/media/optimized/videos/movo-1080p-1536x1920-8.desktop.webm",
       "poster": "/media/optimized/videos/movo-1080p-1536x1920-8.poster.jpg",
-      "desktop_mp4": "/media/optimized/videos/movo-1080p-1536x1920-8.mobile.mp4",
-      "desktop_webm": "/media/optimized/videos/movo-1080p-1536x1920-8.mobile.webm"
+      "poster_thumb": "/media/optimized/videos/movo-1080p-1536x1920-8.poster.thumb.jpg",
+      "thumb_mp4": "/media/optimized/videos/movo-1080p-1536x1920-8.thumb.mp4"
     },
     {
       "original": "/new-assets/Portfolio-Gallery-4-5.mp4",
@@ -191,7 +223,9 @@
       "mobile_webm": "/media/optimized/videos/portfolio-gallery-4-5.mobile.webm",
       "desktop_mp4": "/media/optimized/videos/portfolio-gallery-4-5.desktop.mp4",
       "desktop_webm": "/media/optimized/videos/portfolio-gallery-4-5.desktop.webm",
-      "poster": "/media/optimized/videos/portfolio-gallery-4-5.poster.jpg"
+      "poster": "/media/optimized/videos/portfolio-gallery-4-5.poster.jpg",
+      "poster_thumb": "/media/optimized/videos/portfolio-gallery-4-5.poster.thumb.jpg",
+      "thumb_mp4": "/media/optimized/videos/portfolio-gallery-4-5.thumb.mp4"
     },
     {
       "original": "/new-assets/Socarrat Showcase Test04.mp4",
@@ -202,8 +236,10 @@
       "mobile_mp4": "/media/optimized/videos/socarrat-showcase-test04.mobile.mp4",
       "mobile_webm": "/media/optimized/videos/socarrat-showcase-test04.mobile.webm",
       "desktop_mp4": "/media/optimized/videos/socarrat-showcase-test04.desktop.mp4",
+      "desktop_webm": "/media/optimized/videos/socarrat-showcase-test04.desktop.webm",
       "poster": "/media/optimized/videos/socarrat-showcase-test04.poster.jpg",
-      "desktop_webm": "/media/optimized/videos/socarrat-showcase-test04.mobile.webm"
+      "poster_thumb": "/media/optimized/videos/socarrat-showcase-test04.poster.thumb.jpg",
+      "thumb_mp4": "/media/optimized/videos/socarrat-showcase-test04.thumb.mp4"
     },
     {
       "original": "/new-assets/Socarrat Video Reel0826_NoSound.mp4",
@@ -215,7 +251,9 @@
       "mobile_webm": "/media/optimized/videos/socarrat-video-reel0826-nosound.mobile.webm",
       "desktop_mp4": "/media/optimized/videos/socarrat-video-reel0826-nosound.desktop.mp4",
       "desktop_webm": "/media/optimized/videos/socarrat-video-reel0826-nosound.desktop.webm",
-      "poster": "/media/optimized/videos/socarrat-video-reel0826-nosound.poster.jpg"
+      "poster": "/media/optimized/videos/socarrat-video-reel0826-nosound.poster.jpg",
+      "poster_thumb": "/media/optimized/videos/socarrat-video-reel0826-nosound.poster.thumb.jpg",
+      "thumb_mp4": "/media/optimized/videos/socarrat-video-reel0826-nosound.thumb.mp4"
     },
     {
       "original": "/new-assets/TEST02 2.mp4",
@@ -227,7 +265,9 @@
       "mobile_webm": "/media/optimized/videos/test02-2.mobile.webm",
       "desktop_mp4": "/media/optimized/videos/test02-2.desktop.mp4",
       "desktop_webm": "/media/optimized/videos/test02-2.desktop.webm",
-      "poster": "/media/optimized/videos/test02-2.poster.jpg"
+      "poster": "/media/optimized/videos/test02-2.poster.jpg",
+      "poster_thumb": "/media/optimized/videos/test02-2.poster.thumb.jpg",
+      "thumb_mp4": "/media/optimized/videos/test02-2.thumb.mp4"
     },
     {
       "original": "/new-assets/TEST09.mp4",
@@ -239,7 +279,9 @@
       "mobile_webm": "/media/optimized/videos/test09.mobile.webm",
       "desktop_mp4": "/media/optimized/videos/test09.desktop.mp4",
       "desktop_webm": "/media/optimized/videos/test09.desktop.webm",
-      "poster": "/media/optimized/videos/test09.poster.jpg"
+      "poster": "/media/optimized/videos/test09.poster.jpg",
+      "poster_thumb": "/media/optimized/videos/test09.poster.thumb.jpg",
+      "thumb_mp4": "/media/optimized/videos/test09.thumb.mp4"
     }
   ],
   "images": [
@@ -874,8 +916,8 @@
         "IMG_5434"
       ],
       "hasAlpha": false,
-      "width": 5712,
-      "height": 4284,
+      "width": 4284,
+      "height": 5712,
       "mobile_avif": "/media/optimized/images/img-5434.mobile.avif",
       "mobile_webp": "/media/optimized/images/img-5434.mobile.webp",
       "mobile_jpg": "/media/optimized/images/img-5434.mobile.jpg",
@@ -890,8 +932,8 @@
         "IMG_5438"
       ],
       "hasAlpha": false,
-      "width": 4032,
-      "height": 3024,
+      "width": 3024,
+      "height": 4032,
       "mobile_avif": "/media/optimized/images/img-5438.mobile.avif",
       "mobile_webp": "/media/optimized/images/img-5438.mobile.webp",
       "mobile_jpg": "/media/optimized/images/img-5438.mobile.jpg",
@@ -906,8 +948,8 @@
         "IMG_5447"
       ],
       "hasAlpha": false,
-      "width": 4032,
-      "height": 3024,
+      "width": 3024,
+      "height": 4032,
       "mobile_avif": "/media/optimized/images/img-5447.mobile.avif",
       "mobile_webp": "/media/optimized/images/img-5447.mobile.webp",
       "mobile_jpg": "/media/optimized/images/img-5447.mobile.jpg",
@@ -932,5 +974,5 @@
       "desktop_jpg": "/media/optimized/images/texture-ballon-9-bitmap.desktop.jpg"
     }
   ],
-  "generatedAt": "2026-09-20T20:26:33.902Z"
+  "generatedAt": "2026-09-24T21:24:26.408Z"
 }

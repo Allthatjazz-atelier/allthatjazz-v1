@@ -152,8 +152,8 @@ export default function HeaderFooter17({ children, heroMode }) {
   }, [applyHover]);
 
   // ── Scramble ──────────────────────────────────────────────────────────────
-  // Se repite hasta que la primera pieza puede verse (`atj:content-ready`).
-  // Un tope evita quedarse en bucle si esa señal no llega.
+  // La primera vuelta se hace siempre, para que el efecto se vea aunque la
+  // pieza ya esté lista. Después se repite hasta `atj:content-ready`, con tope.
   const words = ["allthatjazz","すべてのジャズ","όλοαυτότζαζ","वह सभी जाज है","allthatjazz"];
   useEffect(() => {
     if (!h1Ref.current) return;
@@ -213,14 +213,19 @@ export default function HeaderFooter17({ children, heroMode }) {
         });
       }
 
-      while (!stopped && !ready) {
+      // Una vuelta, una vez empezada, llega siempre hasta la última palabra.
+      // `ready` solo decide si arranca otra: a mitad de すべてのジャズ se sigue
+      // hasta allthatjazz y entonces se apaga el efecto.
+      const cycle = async () => {
         for (const w of words) {
-          if (stopped || ready) break;
+          if (stopped) return;
           await scramble(w);
-          if (stopped || ready) break;
+          if (stopped) return;
           await pause(500);
         }
-      }
+      };
+      await cycle();
+      while (!stopped && !ready) await cycle();
       if (stopped) return;
       el.textContent = "allthatjazz";
 
