@@ -22,7 +22,7 @@ import { buildPieces } from "@/data/pieces";
 
 const SLIDE_VH = { desktop: 52.03, mobile: 64.13 };      // alto de la caja, en vh
 const SLIDE_AR = { desktop: 0.8, mobile: 0.894118 };     // ancho / alto de la caja
-const GAP_RATIO = { desktop: 0.025, mobile: 0.005263 };  // hueco / ancho de caja
+const GAP_RATIO = { desktop: 0.06, mobile: 0.045 };      // hueco / ancho de caja
 // Aire contra el chrome. En móvil 64vh × 0.89 desborda el ancho de un iPhone
 // y la leyenda se corta arriba: la caja se clampa a esta banda.
 const CHROME = {
@@ -71,6 +71,11 @@ export default function ATJ_Slider({ viewRef, active = true } = {}) {
   const [glideSettle, setGlideSettle] = useState(0);
   const [hoverIndex, setHoverIndex] = useState(null);
 
+  // Proporción real de cada medio, por índice. El motor la usa para que el hueco
+  // entre bordes visibles sea siempre el mismo, sea cual sea el encaje.
+  const aspectRef = useRef([]);
+  const relayoutRef = useRef(null);
+
   const { getImage, getVideo, isLoaded, imageIds, videoIds } = useOptimizedMedia();
 
   const pieces = useMemo(() => {
@@ -97,14 +102,19 @@ export default function ATJ_Slider({ viewRef, active = true } = {}) {
   // El medio se encaja dentro de la caja como en `videoBaseScale`: la proporción
   // sale del fotograma fijo y se afina con los metadatos del vídeo.
   const applyFit = useCallback((i, mediaAspect) => {
+    if (!mediaAspect) return;
+    aspectRef.current[i] = mediaAspect;
+    relayoutRef.current?.();
     const el = itemRefs.current[i]?.querySelector(".atj-slide__fit");
-    if (!el || !mediaAspect) return;
+    if (!el) return;
     const box = SLIDE_AR[window.innerWidth <= 768 ? "mobile" : "desktop"];
     const fx = mediaAspect > box ? 1 : mediaAspect / box;
     const fy = mediaAspect > box ? box / mediaAspect : 1;
     el.style.setProperty("--fit-x", fx.toFixed(4));
     el.style.setProperty("--fit-y", fy.toFixed(4));
   }, []);
+
+  useEffect(() => { aspectRef.current = []; }, [pieces]);
 
   useEffect(() => {
     if (!pieces.length) return;
@@ -147,7 +157,23 @@ export default function ATJ_Slider({ viewRef, active = true } = {}) {
     const reduce = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
     const n = pieces.length;
 
-    const metrics = { w: 0, h: 0, unit: 0, total: 0, vw: 0, vh: 0 };
+    const metrics = { w: 0, h: 0, gap: 0, unit: 0, total: 0, vw: 0, vh: 0 };
+    // Ancho visible de cada medio y su centro a lo largo de la tira. La caja
+    // sigue fijando el alto; el hueco se mide entre bordes reales del medio.
+    const widths = new Float64Array(n);
+    const centers = new Float64Array(n);
+    const computeStrip = () => {
+      const box = SLIDE_AR[key];
+      let x = 0;
+      for (let i = 0; i < n; i++) {
+        const ar = aspectRef.current[i];
+        const w = metrics.w * (ar && ar < box ? ar / box : 1);
+        widths[i] = w;
+        centers[i] = x + w / 2;
+        x += w + metrics.gap;
+      }
+      metrics.total = x;
+    };
     const measure = () => {
       metrics.vw = window.innerWidth;
       metrics.vh = window.innerHeight;
@@ -161,8 +187,9 @@ export default function ATJ_Slider({ viewRef, active = true } = {}) {
       if (h > availH) { h = availH; w = h * ar; }
       metrics.h = h;
       metrics.w = w;
-      metrics.unit = metrics.w * (1 + GAP_RATIO[key]);
-      metrics.total = metrics.unit * n;
+      metrics.gap = metrics.w * GAP_RATIO[key];
+      metrics.unit = metrics.w + metrics.gap;
+      computeStrip();
       const midY = chrome.top + (metrics.vh - chrome.top - chrome.bottom) / 2;
       root.style.setProperty("--slide-w", `${metrics.w}px`);
       root.style.setProperty("--slide-h", `${metrics.h}px`);
@@ -170,7 +197,7 @@ export default function ATJ_Slider({ viewRef, active = true } = {}) {
     };
     measure();
 
-    const pos = { current: 0, target: 0 };
+    const pos = { current: centers[0], target: centers[0] };
     let snapTimer = null;
     let snapTween = null;
     let dragging = false;
@@ -179,17 +206,41 @@ export default function ATJ_Slider({ viewRef, active = true } = {}) {
 
     // Cada pieza se coloca en la ventana [-total/2, total/2) alrededor del
     // centro: con eso el carrusel es infinito sin clonar nodos.
-    const wrapOffset = (i) => {
-      let x = i * metrics.unit - pos.current;
-      const half = metrics.total / 2;
-      x = ((x % metrics.total) + metrics.total) % metrics.total;
-      if (x >= half) x -= metrics.total;
+    const wrap = (d) => {
+      let x = ((d % metrics.total) + metrics.total) % metrics.total;
+      if (x >= metrics.total / 2) x -= metrics.total;
       return x;
+    };
+    const wrapOffset = (i) => wrap(centers[i] - pos.current);
+    const nearest = (p) => {
+      let i = 0;
+      let d = Infinity;
+      for (let k = 0; k < n; k++) {
+        const dk = wrap(centers[k] - p);
+        if (Math.abs(dk) < Math.abs(d)) { d = dk; i = k; }
+      }
+      return { i, d };
     };
 
     const centered = { current: -1 };
 
+    // Las proporciones llegan asíncronas: al recalcular la tira, la pieza del
+    // centro se queda donde está y el resto se reacomoda alrededor.
+    let dirty = false;
+    const reflow = () => {
+      dirty = false;
+      const anchor = centered.current >= 0 ? centered.current : 0;
+      const before = wrapOffset(anchor);
+      computeStrip();
+      const shift = wrap(centers[anchor] - pos.current) - before;
+      pos.current += shift;
+      pos.target += shift;
+      if (snapTween?.isActive()) snapNow();
+    };
+    relayoutRef.current = () => { dirty = true; };
+
     const layout = () => {
+      if (dirty) reflow();
       const left = metrics.vw / 2 - metrics.w / 2;
       let best = 0;
       let bestDist = Infinity;
@@ -212,7 +263,7 @@ export default function ATJ_Slider({ viewRef, active = true } = {}) {
 
     const snapNow = () => {
       snapTween?.kill();
-      const target = Math.round(pos.target / metrics.unit) * metrics.unit;
+      const target = pos.target + nearest(pos.target).d;
       if (reduce) { pos.target = target; pos.current = target; layout(); return; }
       snapTween = gsap.to(pos, { target, duration: SNAP_DUR, ease: "power3.out" });
     };
@@ -225,7 +276,10 @@ export default function ATJ_Slider({ viewRef, active = true } = {}) {
     const nudge = (dir) => {
       snapTween?.kill();
       clearTimeout(snapTimer);
-      const target = (Math.round(pos.target / metrics.unit) + dir) * metrics.unit;
+      const { i, d } = nearest(pos.target);
+      const j = (i + dir + n) % n;
+      const step = widths[i] / 2 + metrics.gap + widths[j] / 2;
+      const target = pos.target + d + dir * step;
       if (reduce) { pos.target = target; pos.current = target; layout(); return; }
       snapTween = gsap.to(pos, { target, duration: SNAP_DUR, ease: "power3.out" });
     };
@@ -292,10 +346,10 @@ export default function ATJ_Slider({ viewRef, active = true } = {}) {
     };
 
     const onResize = () => {
-      const before = metrics.unit;
+      const before = metrics.w;
       measure();
       if (before > 0) {
-        const k = metrics.unit / before;
+        const k = metrics.w / before;
         pos.current *= k;
         pos.target *= k;
       }
@@ -400,10 +454,8 @@ export default function ATJ_Slider({ viewRef, active = true } = {}) {
             : pieces.findIndex((p) => p.name === target);
           if (i < 0 || i >= n) return;
           snapTween?.kill();
-          const half = metrics.total / 2;
-          let delta = i * metrics.unit - pos.target;
-          delta = ((delta % metrics.total) + metrics.total) % metrics.total;
-          if (delta >= half) delta -= metrics.total;
+          if (dirty) reflow();
+          const delta = wrap(centers[i] - pos.target);
           // Instantáneo: el morph de entrada necesita la tira ya colocada
           // aunque el RAF esté dormido (capa inactiva).
           if (!duration) {
@@ -430,6 +482,7 @@ export default function ATJ_Slider({ viewRef, active = true } = {}) {
       window.removeEventListener("keydown", onKeyDown);
       window.removeEventListener("resize", onResize);
       if (viewRef) viewRef.current = null;
+      relayoutRef.current = null;
     };
   }, [pieces, isMobile, viewRef]);
 
