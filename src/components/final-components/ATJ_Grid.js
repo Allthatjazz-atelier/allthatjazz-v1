@@ -35,9 +35,10 @@ const LADDER = {
 const GUTTER = { desktop: 18, tablet: 16, mobile: 12 };
 const GAP = { desktop: 10, tablet: 8, mobile: 6 };
 
-// Aire bajo las pills al entrar (16 + 21 de reloj + 4 + 21 de densidad = 62) y
-// sobre el lockup (44 + 44 + 8 de línea base, más el desbordamiento del h1).
-const TOP_INSET = { desktop: 88, tablet: 84, mobile: 76 };
+// Aire bajo las pills al entrar (16 + 21 de reloj + 4 + 21 de densidad = 62; en
+// táctil 16 + 25 + 6 + 25 = 72) y sobre el lockup (44 + 44 + 8 de línea base,
+// más el desbordamiento del h1).
+const TOP_INSET = { desktop: 88, tablet: 90, mobile: 90 };
 const BOTTOM_INSET = { desktop: 132, tablet: 124, mobile: 108 };
 
 const FLIP_DUR = 0.72;

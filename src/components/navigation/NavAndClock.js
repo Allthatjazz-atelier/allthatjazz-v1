@@ -140,27 +140,31 @@ export default function NavAndClock() {
           border-radius: 999px;
           overflow: hidden;
         }
-        .bcn-pill--theme {
-          justify-content: center;
+        /* Interruptor: la bolita toma --atj-ink, así que es negra en claro y
+           blanca en oscuro sin lógica aparte. */
+        .bcn-pill.bcn-pill--theme {
+          --bcn-knob: 1em;
+          --bcn-knob-pad: calc((var(--bcn-pill) - var(--bcn-knob)) / 2);
+          width: calc(var(--bcn-pill) * 1.9);
+          padding: 0 var(--bcn-knob-pad);
+          opacity: 1;
         }
 
-        .bcn-radio {
-          width: 0.66em;
-          height: 0.66em;
-          position: relative;
-          border: 1px solid currentColor;
-          border-radius: 50%;
-        }
-        .bcn-radio::after {
-          content: "";
-          position: absolute;
-          inset: 1.5px;
+        .bcn-knob {
+          width: var(--bcn-knob);
+          height: var(--bcn-knob);
           border-radius: 50%;
           background: currentColor;
-          opacity: 0;
-          transition: opacity 180ms ease;
+          transform: translate3d(0, 0, 0);
+          transition: transform 320ms cubic-bezier(0.65, 0, 0.35, 1);
         }
-        .bcn-pill--theme.is-active .bcn-radio::after { opacity: 1; }
+        .bcn-pill--theme.is-active .bcn-knob {
+          transform: translate3d(
+            calc(var(--bcn-pill) * 1.9 - var(--bcn-knob-pad) * 2 - var(--bcn-knob)),
+            0,
+            0
+          );
+        }
 
         .bcn-bar--dens {
           margin-top: 4px;
@@ -239,9 +243,18 @@ export default function NavAndClock() {
           pointer-events: none;
         }
 
+        /* Solo la altura: la letra no cambia porque el ancho de los nombres se
+           mide en px al montar y quedaría desfasado al rotar el dispositivo. */
+        @media (max-width: 768px), (pointer: coarse) {
+          .bcn { --bcn-pill: 1.8em; }
+          .bcn-bar--dens { margin-top: 6px; }
+          .bcn-pill--dens { padding: 0 0.85em; }
+          .bcn-pill.bcn-pill--theme { --bcn-knob: 1.2em; }
+        }
+
         @media (prefers-reduced-motion: reduce) {
           .bcn-pill,
-          .bcn-radio::after { transition: none; }
+          .bcn-knob { transition: none; }
         }
       `}</style>
     </div>
@@ -263,7 +276,7 @@ const ThemePill = memo(function ThemePill() {
         onClick={toggle}
         className={`bcn-pill bcn-pill--theme${dark ? " is-active" : ""}`}
       >
-        <span className="bcn-radio" aria-hidden="true" />
+        <span className="bcn-knob" aria-hidden="true" />
       </button>
     </div>
   );

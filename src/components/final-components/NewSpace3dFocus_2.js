@@ -1905,9 +1905,12 @@ export default function NewSpace3dFocus_2({ damping = 0.085, active = true, view
       </div>
 
       <style>{`
+        /* --cst-pill replica --bcn-pill del navbar: misma altura y colocada
+           justo debajo de él en cada punto de ruptura. */
         .cst {
+          --cst-pill: 1.5em;
           position: fixed;
-          top: calc(16px + 1.5em + 4px);
+          top: calc(16px + var(--cst-pill) + 4px);
           left: 0;
           width: 100%;
           display: flex;
@@ -1935,7 +1938,7 @@ export default function NewSpace3dFocus_2({ damping = 0.085, active = true, view
 
         .cst-pill {
           flex: 0 0 auto;
-          height: 1.5em;
+          height: var(--cst-pill);
           display: flex;
           align-items: center;
           padding: 0 0.7em;
@@ -1956,6 +1959,11 @@ export default function NewSpace3dFocus_2({ damping = 0.085, active = true, view
         .cst-pill:hover,
         .cst-pill:focus-visible { opacity: 1; outline: none; }
         .cst-pill.is-active { opacity: 1; }
+
+        @media (max-width: 768px), (pointer: coarse) {
+          .cst { --cst-pill: 1.8em; top: calc(16px + var(--cst-pill) + 6px); }
+          .cst-pill { padding: 0 0.85em; }
+        }
 
         @media (prefers-reduced-motion: reduce) {
           .cst, .cst-pill { transition: none; }
