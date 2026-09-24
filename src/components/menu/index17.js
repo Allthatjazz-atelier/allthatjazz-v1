@@ -354,7 +354,7 @@ export default function HeaderFooter17({ children, heroMode }) {
         <div className="flex">
           <h1
             ref={h1Ref}
-            className="text-[4rem] tracking-[-0.04em] text-black select-none whitespace-nowrap cursor-pointer"
+            className="text-[4rem] tracking-[-0.04em] text-[var(--atj-ink)] select-none whitespace-nowrap cursor-pointer"
             onMouseEnter={() => applyHover(true)}
             onMouseLeave={() => applyHover(false)}
             onClick={() => {
@@ -374,7 +374,7 @@ export default function HeaderFooter17({ children, heroMode }) {
           </h1>
         </div>
 
-        <p className="flex text-[1.35rem] text-black MyFont2 tracking-[-0.05em] pointer-none">
+        <p className="flex text-[1.35rem] text-[var(--atj-ink)] MyFont2 tracking-[-0.05em] pointer-none">
           Atelier de création graphique et digitale.
         </p>
       </div>
@@ -387,7 +387,7 @@ export default function HeaderFooter17({ children, heroMode }) {
             ref={blurLayerRef}
             className="fixed inset-0 z-[1000]"
             style={{
-              backgroundColor:      "rgba(255, 255, 255, 0.15)",
+              backgroundColor:      "var(--atj-veil)",
               backdropFilter:       "blur(20px)",
               WebkitBackdropFilter: "blur(20px)",
               opacity:              0,

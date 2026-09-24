@@ -693,7 +693,7 @@ export default function ATJ_Grid({ viewRef, active = true, onSelect } = {}) {
           overflow-y: auto;
           overflow-x: hidden;
           overscroll-behavior: contain;
-          background: #fff;
+          background: var(--atj-bg);
           scrollbar-width: none;
           -webkit-overflow-scrolling: touch;
         }
@@ -724,7 +724,7 @@ export default function ATJ_Grid({ viewRef, active = true, onSelect } = {}) {
           position: relative;
           width: 100%;
           overflow: hidden;
-          background: #f4f4f4;
+          background: var(--atj-surface);
         }
         .atj-grid__img,
         .atj-grid__video {
@@ -749,7 +749,7 @@ export default function ATJ_Grid({ viewRef, active = true, onSelect } = {}) {
           margin-top: 6px;
           font: 400 var(--cap, 11px)/1.2 -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
           letter-spacing: -0.02em;
-          color: #111;
+          color: var(--atj-fg);
           opacity: 0.5;
           white-space: nowrap;
           overflow: hidden;
@@ -774,7 +774,7 @@ export default function ATJ_Grid({ viewRef, active = true, onSelect } = {}) {
           align-items: center;
           justify-content: center;
           padding: var(--detail-pad, 12px);
-          background: #fff;
+          background: var(--atj-bg);
           cursor: pointer;
           /* Aparece, no viaja: 120 ms de opacidad y ya está encima. */
           animation: atj-detail-in 120ms cubic-bezier(0.4, 0, 0.2, 1);
@@ -787,7 +787,7 @@ export default function ATJ_Grid({ viewRef, active = true, onSelect } = {}) {
           position: relative;
           flex: 0 0 auto;
           overflow: hidden;
-          background: #f4f4f4;
+          background: var(--atj-surface);
         }
         .atj-grid__detailBase,
         .atj-grid__detailFull {
@@ -809,7 +809,7 @@ export default function ATJ_Grid({ viewRef, active = true, onSelect } = {}) {
           max-width: 100%;
           font: 400 11px/1.2 -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
           letter-spacing: -0.02em;
-          color: #111;
+          color: var(--atj-fg);
           text-align: center;
           white-space: nowrap;
           overflow: hidden;
@@ -824,7 +824,7 @@ export default function ATJ_Grid({ viewRef, active = true, onSelect } = {}) {
           padding: 18px 0 6px;
           font: 800 12px/1 -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
           letter-spacing: -0.045em;
-          color: #111;
+          color: var(--atj-fg);
         }
         .atj-grid__mark span:last-child { font-weight: 400; opacity: 0.4; font-variant-numeric: tabular-nums; }
 

@@ -5,6 +5,7 @@ import { useRouter } from "next/router";
 import { useGSAP } from "@gsap/react";
 import gsap from "gsap";
 import { setDensityLevel, useViewPrefs } from "@/components/final-components/viewPrefs";
+import { useTheme } from "@/hooks/useTheme";
 
 // A Slider · B Grid · C Galaxy
 const NAV_ITEMS = [
@@ -78,14 +79,17 @@ export default function NavAndClock() {
 
   return (
     <div
-      className="bcn relative text-[0.875rem] tracking-[-0.04em] text-black"
+      className="bcn relative text-[0.875rem] tracking-[-0.04em] text-[var(--atj-ink)]"
       style={{ pointerEvents: "auto" }}
     >
-      <div className="bcn-bar">
-        <div className="bcn-pill bcn-clock" aria-live="polite">
-          <BerlinClock />
+      <div className="bcn-head">
+        <div className="bcn-bar">
+          <div className="bcn-pill bcn-clock" aria-live="polite">
+            <BerlinClock />
+          </div>
+          <NavPills activeIndex={activeIndex} onNavigate={handleNavigate} />
         </div>
-        <NavPills activeIndex={activeIndex} onNavigate={handleNavigate} />
+        <ThemePill />
       </div>
 
       {/* Segunda fila, solo en la rejilla: densidad. Mismo idioma de cápsula
@@ -118,6 +122,46 @@ export default function NavAndClock() {
           display: contents;
         }
 
+        .bcn-head {
+          position: relative;
+          display: flex;
+        }
+
+        /* Cápsula aparte y fuera del flujo: la barra conserva su centro óptico
+           y la fila de densidad sigue alineada debajo. El hueco es mayor que
+           --bcn-cut para que se lea como otra pieza, no como otra minipill. */
+        .bcn-theme {
+          position: absolute;
+          top: 0;
+          left: 100%;
+          margin-left: 6px;
+          display: flex;
+          height: var(--bcn-pill);
+          border-radius: 999px;
+          overflow: hidden;
+        }
+        .bcn-pill--theme {
+          justify-content: center;
+        }
+
+        .bcn-radio {
+          width: 0.66em;
+          height: 0.66em;
+          position: relative;
+          border: 1px solid currentColor;
+          border-radius: 50%;
+        }
+        .bcn-radio::after {
+          content: "";
+          position: absolute;
+          inset: 1.5px;
+          border-radius: 50%;
+          background: currentColor;
+          opacity: 0;
+          transition: opacity 180ms ease;
+        }
+        .bcn-pill--theme.is-active .bcn-radio::after { opacity: 1; }
+
         .bcn-bar--dens {
           margin-top: 4px;
           font-variant-numeric: tabular-nums;
@@ -136,7 +180,7 @@ export default function NavAndClock() {
           padding: 0;
           border: 0;
           border-radius: 0;
-          background: rgba(17, 17, 17, 0.06);
+          background: var(--atj-hairline);
           color: inherit;
           font: inherit;
           letter-spacing: inherit;
@@ -196,12 +240,34 @@ export default function NavAndClock() {
         }
 
         @media (prefers-reduced-motion: reduce) {
-          .bcn-pill { transition: none; }
+          .bcn-pill,
+          .bcn-radio::after { transition: none; }
         }
       `}</style>
     </div>
   );
 }
+
+// Aislado en su propio componente para que el cambio de tema no re-renderice
+// las pills de vista: el estado de color no tiene nada que ver con la ruta.
+const ThemePill = memo(function ThemePill() {
+  const { theme, toggle } = useTheme();
+  const dark = theme === "dark";
+  return (
+    <div className="bcn-theme">
+      <button
+        type="button"
+        role="switch"
+        aria-checked={dark}
+        aria-label="Modo oscuro"
+        onClick={toggle}
+        className={`bcn-pill bcn-pill--theme${dark ? " is-active" : ""}`}
+      >
+        <span className="bcn-radio" aria-hidden="true" />
+      </button>
+    </div>
+  );
+});
 
 // Densidad de la rejilla. El nivel vive en un store externo porque la rejilla
 // cuelga del escenario y estas pills del layout: son dos árboles hermanos.

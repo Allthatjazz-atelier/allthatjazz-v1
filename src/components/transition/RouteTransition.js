@@ -117,7 +117,7 @@ export default function RouteTransition() {
       style={{
         position: "fixed",
         inset: 0,
-        background: "#ffffff",
+        background: "var(--atj-bg)",
         zIndex: 1300,
         pointerEvents: "none",
         display: "none",

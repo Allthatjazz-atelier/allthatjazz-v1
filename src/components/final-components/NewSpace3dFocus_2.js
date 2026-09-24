@@ -4,6 +4,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import * as THREE from "three";
 import gsap from "gsap";
 import { useOptimizedMedia } from "@/hooks/useOptimizedMedia";
+import { onThemeChange, readThemeColor } from "@/hooks/useTheme";
 import { buildPieces, GALLERIES } from "@/data/pieces";
 
 // ─── Contenido ─────────────────────────────────────────────────────────────────
@@ -260,6 +261,7 @@ const CLOUD_VERT = /* glsl */ `
 const CLOUD_FRAG = /* glsl */ `
   uniform sampler2D uAtlas;
   uniform float uCellScale;
+  uniform vec3  uBg;
 
   varying vec2  vUv;
   varying vec2  vCell;
@@ -269,7 +271,7 @@ const CLOUD_FRAG = /* glsl */ `
     if (vAlpha < 0.012) discard;
     vec2 uv = (vCell + vec2(vUv.x, 1.0 - vUv.y)) * uCellScale;
     vec4 texel = texture2D(uAtlas, uv);
-    gl_FragColor = vec4(mix(vec3(1.0), texel.rgb, texel.a * vAlpha), 1.0);
+    gl_FragColor = vec4(mix(uBg, texel.rgb, texel.a * vAlpha), 1.0);
   }
 `;
 
@@ -322,6 +324,7 @@ const PIECE_FRAG = /* glsl */ `
   uniform float uCellScale;
   uniform float uFlipV;
   uniform float uExpandRange;
+  uniform vec3  uBg;
 
   varying vec2  vUv;
   varying float vAlpha;
@@ -340,7 +343,7 @@ const PIECE_FRAG = /* glsl */ `
       uExpandRange
     );
     float a = texel.a * vAlpha;
-    gl_FragColor = vec4(mix(vec3(1.0), rgb, a), 1.0);
+    gl_FragColor = vec4(mix(uBg, rgb, a), 1.0);
   }
 `;
 
@@ -454,6 +457,10 @@ export default function NewSpace3dFocus_2({ damping = 0.085, active = true, view
     }
 
     // ── Renderer ─────────────────────────────────────────────────────────────
+    // El fondo es el mismo token que pinta el DOM: las piezas se funden contra
+    // él por profundidad, así que la galaxia y la página comparten un solo valor.
+    const bgColor = new THREE.Color(readThemeColor("--atj-bg"));
+
     const renderer = new THREE.WebGLRenderer({
       canvas,
       antialias: !isMobile,
@@ -465,7 +472,7 @@ export default function NewSpace3dFocus_2({ damping = 0.085, active = true, view
     renderer.setPixelRatio(Math.min(window.devicePixelRatio, dprCap));
     renderer.setSize(window.innerWidth, window.innerHeight, false);
     renderer.outputColorSpace = THREE.SRGBColorSpace;
-    renderer.setClearColor(0xffffff, 1);
+    renderer.setClearColor(bgColor, 1);
 
     const scene = new THREE.Scene();
     const camera = new THREE.PerspectiveCamera(
@@ -517,7 +524,9 @@ export default function NewSpace3dFocus_2({ damping = 0.085, active = true, view
     atlasCanvas.width = ATLAS_SIZE;
     atlasCanvas.height = ATLAS_SIZE;
     const atlasCtx = atlasCanvas.getContext("2d", { alpha: false });
-    atlasCtx.fillStyle = "#ffffff";
+    // Solo se ve en el padding entre celdas y en el sangrado de los mipmaps: el
+    // atlas no se repinta al cambiar de tema porque resubir 21 MB daría tirón.
+    atlasCtx.fillStyle = readThemeColor("--atj-bg");
     atlasCtx.fillRect(0, 0, ATLAS_SIZE, ATLAS_SIZE);
 
     const atlasTex = new THREE.CanvasTexture(atlasCanvas);
@@ -590,6 +599,7 @@ export default function NewSpace3dFocus_2({ damping = 0.085, active = true, view
       uCursorPoint:  { value: new THREE.Vector3(0, 0, 0) },
       uCursorPush:   { value: 0 },
       uCursorRadius: { value: CURSOR_RADIUS },
+      uBg:           { value: bgColor },
     };
     const cloudMaster = { value: 1 };
     const morph = { value: 1 };   // 1 = la galaxia en su sitio
@@ -734,6 +744,7 @@ export default function NewSpace3dFocus_2({ damping = 0.085, active = true, view
         uCursorPoint:  shared.uCursorPoint,
         uCursorPush:   shared.uCursorPush,
         uCursorRadius: shared.uCursorRadius,
+        uBg:           shared.uBg,
       },
       toneMapped: true,
     });
@@ -780,10 +791,28 @@ export default function NewSpace3dFocus_2({ damping = 0.085, active = true, view
     // Lo que está cerca, en vídeo o en focus sale de la nube y pasa a su propia
     // mesh con textura completa. Acota la memoria y deja los draw calls en
     // 1 + lo promocionado.
-    const whiteTex = new THREE.DataTexture(
-      new Uint8Array([255, 255, 255, 255]), 1, 1, THREE.RGBAFormat,
+    // Relleno mientras la textura real no ha llegado. Va del color de fondo, así
+    // que la pieza aún no cargada no parpadea: simplemente no se ve.
+    const blankTex = new THREE.DataTexture(
+      new Uint8Array(4), 1, 1, THREE.RGBAFormat,
     );
-    whiteTex.needsUpdate = true;
+    const paintBlank = () => {
+      const px = blankTex.image.data;
+      px[0] = Math.round(bgColor.r * 255);
+      px[1] = Math.round(bgColor.g * 255);
+      px[2] = Math.round(bgColor.b * 255);
+      px[3] = 255;
+      blankTex.needsUpdate = true;
+    };
+    paintBlank();
+
+    // `shared.uBg.value` es este mismo objeto: mutarlo ya llega a los dos
+    // materiales sin recompilar ni tocar el bucle de render.
+    const offTheme = onThemeChange(() => {
+      bgColor.set(readThemeColor("--atj-bg"));
+      renderer.setClearColor(bgColor, 1);
+      paintBlank();
+    });
 
     const loader = new THREE.TextureLoader();
     const pool = [];
@@ -792,7 +821,7 @@ export default function NewSpace3dFocus_2({ damping = 0.085, active = true, view
         vertexShader: PIECE_VERT,
         fragmentShader: PIECE_FRAG,
         uniforms: {
-          uTex:         { value: whiteTex },
+          uTex:         { value: blankTex },
           uUseAtlas:    { value: 0 },
           uCell:        { value: new THREE.Vector2() },
           uSize:        { value: new THREE.Vector2(1, 1) },
@@ -817,6 +846,7 @@ export default function NewSpace3dFocus_2({ damping = 0.085, active = true, view
           uCursorPoint:  shared.uCursorPoint,
           uCursorPush:   shared.uCursorPush,
           uCursorRadius: shared.uCursorRadius,
+          uBg:           shared.uBg,
         },
         toneMapped: true,
       });
@@ -885,7 +915,7 @@ export default function NewSpace3dFocus_2({ damping = 0.085, active = true, view
       const slot = piece.slot;
       if (!slot) return;
       const cell = cellOf.get(piece.name);
-      slot.mat.uniforms.uTex.value = cell ? atlasTex : whiteTex;
+      slot.mat.uniforms.uTex.value = cell ? atlasTex : blankTex;
       slot.mat.uniforms.uUseAtlas.value = cell ? 1 : 0;
       slot.mat.uniforms.uFlipV.value = 0;
       slot.mat.uniforms.uExpandRange.value = 0;
@@ -953,7 +983,7 @@ export default function NewSpace3dFocus_2({ damping = 0.085, active = true, view
       slot.mesh.visible = true;
       const cell = cellOf.get(piece.name);
       slot.mat.uniforms.uCell.value.set(cell ? cell[0] : 0, cell ? cell[1] : 0);
-      slot.mat.uniforms.uTex.value = cell ? atlasTex : whiteTex;
+      slot.mat.uniforms.uTex.value = cell ? atlasTex : blankTex;
       slot.mat.uniforms.uUseAtlas.value = cell ? 1 : 0;
       slot.mat.uniforms.uSize.value.set(piece.w, piece.h);
       slot.mat.uniforms.uGroup.value = piece.group;
@@ -1013,7 +1043,7 @@ export default function NewSpace3dFocus_2({ damping = 0.085, active = true, view
       slot.mesh.visible = false;
       slot.hiTex?.dispose();
       slot.hiTex = null;
-      slot.mat.uniforms.uTex.value = whiteTex;
+      slot.mat.uniforms.uTex.value = blankTex;
       slot.mat.uniforms.uUseAtlas.value = 0;
       slot.mat.uniforms.uFlipV.value = 0;
       slot.mat.uniforms.uExpandRange.value = 0;
@@ -1756,6 +1786,7 @@ export default function NewSpace3dFocus_2({ damping = 0.085, active = true, view
         gsap.killTweensOf(s.mesh.position);
       });
 
+      offTheme();
       window.removeEventListener("resize", onResize);
       window.visualViewport?.removeEventListener("resize", onResize);
       window.visualViewport?.removeEventListener("scroll", onResize);
@@ -1786,7 +1817,7 @@ export default function NewSpace3dFocus_2({ damping = 0.085, active = true, view
       cloudMat.dispose();
       plane.dispose();
       atlasTex.dispose();
-      whiteTex.dispose();
+      blankTex.dispose();
       renderer.dispose();
     };
   }, [isLoaded, groups, damping, viewRef]);
@@ -1834,7 +1865,7 @@ export default function NewSpace3dFocus_2({ damping = 0.085, active = true, view
         right: 0,
         top: vvBox ? vvBox.top : 0,
         height: vvBox ? vvBox.height : "100dvh",
-        background: "#fff",
+        background: "var(--atj-bg)",
         overflow: "hidden",
         touchAction: "none",
       }}
@@ -1885,7 +1916,7 @@ export default function NewSpace3dFocus_2({ damping = 0.085, active = true, view
           pointer-events: none;
           font-size: 0.875rem;
           letter-spacing: -0.04em;
-          color: #111;
+          color: var(--atj-fg);
           transition: opacity 240ms ease;
         }
         .cst[data-dimmed="true"] { opacity: 0; }
@@ -1910,7 +1941,7 @@ export default function NewSpace3dFocus_2({ damping = 0.085, active = true, view
           padding: 0 0.7em;
           border: 0;
           border-radius: 0;
-          background: rgba(17, 17, 17, 0.06);
+          background: var(--atj-hairline);
           color: inherit;
           font: inherit;
           letter-spacing: inherit;

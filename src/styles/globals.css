@@ -1,5 +1,29 @@
 @import "tailwindcss";
 
+@custom-variant dark (&:where(.dark, .dark *));
+
+/* Paleta única de la pieza. Todo lo que pinta color —DOM, canvas 2D y los
+   uniforms de los shaders— lee de aquí vía `useTheme`, nunca hardcodea. */
+:root {
+  --atj-bg:       #ffffff;
+  --atj-surface:  #f4f4f4;
+  --atj-ink:      #000000;
+  --atj-fg:       #111111;
+  --atj-hairline: rgba(17, 17, 17, 0.06);
+  --atj-veil:     rgba(255, 255, 255, 0.15);
+  color-scheme: light;
+}
+
+.dark {
+  --atj-bg:       #0b0b0b;
+  --atj-surface:  #171717;
+  --atj-ink:      #ffffff;
+  --atj-fg:       #ededed;
+  --atj-hairline: rgba(237, 237, 237, 0.08);
+  --atj-veil:     rgba(11, 11, 11, 0.20);
+  color-scheme: dark;
+}
+
 @font-face {
   font-family: 'MyFont';
   src: url('/fonts/my-font/SuisseIntl-SemiBold-WebXL.woff2') format('woff2'), 
@@ -29,6 +53,7 @@ html, body {
   padding: 0;
   box-sizing: border-box;
   font-family: 'MyFont', sans-serif;
+  background: var(--atj-bg);
 }
 
 .MyFont2 {

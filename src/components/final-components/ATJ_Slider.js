@@ -623,7 +623,7 @@ export default function ATJ_Slider({ viewRef, active = true } = {}) {
         .atj-slider {
           position: fixed;
           inset: 0;
-          background: #fff;
+          background: var(--atj-bg);
           overflow: hidden;
           touch-action: pan-y;
           outline: none;
@@ -672,7 +672,7 @@ export default function ATJ_Slider({ viewRef, active = true } = {}) {
           gap: 1em;
           font: 800 12px/1 -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
           letter-spacing: -0.045em;
-          color: #111;
+          color: var(--atj-fg);
           white-space: nowrap;
           opacity: 0;
           transition: opacity 180ms ease;
