@@ -42,8 +42,11 @@ const GLIDE_MAX_SLIDES = 14;
 const MAX_ACTIVE_VIDEOS = { desktop: 4, mobile: 2 };
 const NEAR_IMAGES = 6;    // piezas a cada lado que reciben `src` de imagen
 
-const pickSrc = (sources) => {
+const pickSrc = (sources, preferMp4 = false) => {
   if (!sources?.length) return null;
+  const mp4 = sources.find((s) => s.type === "video/mp4");
+  // En móvil el H.264 llega al primer frame antes que el VP9.
+  if (preferMp4 && mp4) return mp4.src;
   if (typeof document === "undefined") return sources[0]?.src || null;
   const v = document.createElement("video");
   return (sources.find((s) => v.canPlayType(s.type) !== "") || sources[0])?.src || null;
@@ -60,8 +63,6 @@ export default function ATJ_Slider({ viewRef, active = true } = {}) {
   // reconstruir el slider, solo dormirlo.
   const activeRef = useRef(active);
   activeRef.current = active;
-  // Mientras el dedo sigue viajando no se abren decodificadores nuevos.
-  const glidingRef = useRef(false);
   const itemRefs = useRef([]);
   const [isMobile, setIsMobile] = useState(
     () => typeof window !== "undefined" && window.innerWidth <= 768,
@@ -78,7 +79,7 @@ export default function ATJ_Slider({ viewRef, active = true } = {}) {
       .map((p) => {
         if (p.type === "video") {
           const v = getVideo(p.name);
-          const src = pickSrc(v?.sources);
+          const src = pickSrc(v?.sources, isMobile);
           if (!src) return null;
           return { ...p, src, still: toFieldUrl(v?.poster) || null };
         }
@@ -91,7 +92,7 @@ export default function ATJ_Slider({ viewRef, active = true } = {}) {
         return { ...p, src: null, still };
       })
       .filter(Boolean);
-  }, [isLoaded, imageIds, videoIds, getImage, getVideo]);
+  }, [isLoaded, imageIds, videoIds, getImage, getVideo, isMobile]);
 
   // El medio se encaja dentro de la caja como en `videoBaseScale`: la proporción
   // sale del fotograma fijo y se afina con los metadatos del vídeo.
@@ -245,7 +246,6 @@ export default function ATJ_Slider({ viewRef, active = true } = {}) {
       clearTimeout(snapTimer);
       dragging = true;
       glide = 0;
-      glidingRef.current = false;
       sample.v = 0;
       sample.t = performance.now();
       drag.id = e.pointerId;
@@ -280,11 +280,9 @@ export default function ATJ_Slider({ viewRef, active = true } = {}) {
         const est = Math.abs(g) / (1 - GLIDE_F);
         if (est > maxDist && est > 0) g *= maxDist / est;
         glide = Math.abs(g) < 0.8 ? 0 : g;
-        glidingRef.current = glide !== 0;
         if (!glide) queueSnap();
         return;
       }
-      glidingRef.current = false;
       queueSnap();
     };
 
@@ -322,7 +320,6 @@ export default function ATJ_Slider({ viewRef, active = true } = {}) {
         glide *= GLIDE_F;
         if (Math.abs(glide) < 0.35) {
           glide = 0;
-          glidingRef.current = false;
           snapNow();
           setActiveIndex(centered.current);
           setGlideSettle((n) => n + 1);
@@ -448,7 +445,10 @@ export default function ATJ_Slider({ viewRef, active = true } = {}) {
       return d <= radius;
     };
     const videoCap = MAX_ACTIVE_VIDEOS[isMobile ? "mobile" : "desktop"];
-    const videoRadius = Math.max(1, Math.floor(videoCap / 2));
+    const playRadius = Math.max(1, Math.floor(videoCap / 2));
+    // En móvil el vecino ya está en marcha, y el siguiente ya tiene buffer,
+    // antes de que el gesto lo traiga al centro.
+    const prepRadius = isMobile ? playRadius + 1 : playRadius;
 
     itemRefs.current.forEach((el, i) => {
       const piece = pieces[i];
@@ -466,19 +466,54 @@ export default function ATJ_Slider({ viewRef, active = true } = {}) {
       const video = el.querySelector("video");
       if (!video) return;
       video.muted = true;   // la propiedad, no el atributo: es la que mira el autoplay
-      if (!near(i, videoRadius) || glidingRef.current) { video.pause(); return; }
+      if (!near(i, prepRadius)) {
+        if (!video.paused) video.pause();
+        return;
+      }
       if (!video.getAttribute("src")) {
+        video.preload = "auto";
         video.setAttribute("src", piece.src);
         video.addEventListener("loadedmetadata", () => {
           if (video.videoWidth && video.videoHeight) applyFit(i, video.videoWidth / video.videoHeight);
         }, { once: true });
       }
-      if (document.hidden || !active) video.pause();
-      else video.play().catch(() => {});
+      const shouldPlay = near(i, playRadius) && !document.hidden && active;
+      if (shouldPlay) video.play().catch(() => {});
+      else if (!video.paused) video.pause();
     });
   }, [pieces, isMobile, activeIndex, applyFit, active, glideSettle]);
 
   useEffect(() => { syncMedia(); }, [syncMedia]);
+
+  // La marca del pie hace scramble hasta que la pieza del centro puede pintarse.
+  const contentReadyRef = useRef(false);
+  useEffect(() => {
+    if (contentReadyRef.current || !pieces.length) return undefined;
+    const piece = pieces[activeIndex];
+    const el = itemRefs.current[activeIndex];
+    if (!piece || !el) return undefined;
+    let drop = false;
+    const done = () => {
+      if (drop || contentReadyRef.current) return;
+      contentReadyRef.current = true;
+      window.dispatchEvent(new Event("atj:content-ready"));
+    };
+    if (piece.type === "image") {
+      const img = el.querySelector("img");
+      if (!img) return undefined;
+      if (img.complete && img.naturalWidth) done();
+      else img.addEventListener("load", done, { once: true });
+      return () => { drop = true; img.removeEventListener("load", done); };
+    }
+    const video = el.querySelector("video");
+    const poster = video?.poster || piece.still;
+    if (!poster) { done(); return undefined; }
+    const img = new Image();
+    img.onload = done;
+    img.onerror = done;
+    img.src = poster;
+    return () => { drop = true; img.onload = null; img.onerror = null; };
+  }, [pieces, activeIndex]);
 
   useEffect(() => {
     document.addEventListener("visibilitychange", syncMedia);

@@ -109,7 +109,7 @@ export default function AboutSection7() {
   return (
     <div
       ref={containerRef}
-      className="relative w-full h-screen gap-12 flex flex-col text-[0.875rem] md:text-[0.875rem] tracking-[-0.04em] items-center justify-start pt-[16vh] md:pt-0 md:justify-center px-4 leading-none text-center"
+      className="relative w-full min-h-[100dvh] gap-12 flex flex-col text-[0.875rem] md:text-[0.875rem] tracking-[-0.04em] items-center justify-start pt-[16vh] pb-[13rem] md:pt-0 md:pb-24 md:justify-center px-4 leading-none text-center"
     >
       <div className="flex flex-col z-10 w-[100vw] md:w-[40vw] px-4">
 

@@ -152,24 +152,34 @@ export default function HeaderFooter17({ children, heroMode }) {
   }, [applyHover]);
 
   // ── Scramble ──────────────────────────────────────────────────────────────
+  // Se repite hasta que la primera pieza puede verse (`atj:content-ready`).
+  // Un tope evita quedarse en bucle si esa señal no llega.
   const words = ["allthatjazz","すべてのジャズ","όλοαυτότζαζ","वह सभी जाज है","allthatjazz"];
   useEffect(() => {
     if (!h1Ref.current) return;
     const el    = h1Ref.current;
     const chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789あいうえお漢字العربيةРусскийΑλφάβητοไทย";
     const rand  = () => chars[Math.floor(Math.random() * chars.length)];
+    let intervalId = 0;
+    let stopped = false;
+    let ready = false;
+    const onReady = () => { ready = true; };
+    window.addEventListener("atj:content-ready", onReady);
+    const cap = setTimeout(onReady, 12000);
     const scramble = (word) => new Promise(res => {
       const letters = word.split(""), out = Array(letters.length).fill(""); let it = 0;
-      const id = setInterval(() => {
+      intervalId = setInterval(() => {
         it++;
         for (let i = 0; i < letters.length; i++) out[i] = it < 7 ? rand() : letters[i];
         el.textContent = out.join("");
-        if (it >= 15) { clearInterval(id); res(); }
+        if (it >= 15 || stopped) { clearInterval(intervalId); res(); }
       }, 40);
     });
+    const pause = (ms) => new Promise((r) => setTimeout(r, ms));
     (async () => {
       el.textContent = "allthatjazz";
-      await new Promise(r => setTimeout(r, 800));
+      await pause(800);
+      if (stopped) return;
 
       // Activar efecto SVG durante el scramble
       hoveredRef.current = true;
@@ -203,7 +213,15 @@ export default function HeaderFooter17({ children, heroMode }) {
         });
       }
 
-      for (const w of words) { await scramble(w); await new Promise(r => setTimeout(r, 500)); }
+      while (!stopped && !ready) {
+        for (const w of words) {
+          if (stopped || ready) break;
+          await scramble(w);
+          if (stopped || ready) break;
+          await pause(500);
+        }
+      }
+      if (stopped) return;
       el.textContent = "allthatjazz";
 
       // Apagar efecto al terminar el scramble
@@ -234,6 +252,12 @@ export default function HeaderFooter17({ children, heroMode }) {
         });
       }
     })();
+    return () => {
+      stopped = true;
+      clearInterval(intervalId);
+      clearTimeout(cap);
+      window.removeEventListener("atj:content-ready", onReady);
+    };
   }, []);
 
   // ── Handlers modal — NO llaman applyHover(false) para no interferir con móvil

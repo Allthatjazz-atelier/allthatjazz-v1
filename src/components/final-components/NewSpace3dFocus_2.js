@@ -377,6 +377,27 @@ export default function NewSpace3dFocus_2({ damping = 0.085, active = true, view
   const [lockedId, setLockedId] = useState(null);
   const [hoverId, setHoverId] = useState(null);
   const [inFocus, setInFocus] = useState(false);
+  const [vvBox, setVvBox] = useState(null);
+
+  useEffect(() => {
+    const sync = () => {
+      const vv = window.visualViewport;
+      if (!vv) return;
+      setVvBox((prev) => {
+        if (prev && prev.top === vv.offsetTop && prev.height === vv.height) return prev;
+        return { top: vv.offsetTop, height: vv.height };
+      });
+    };
+    sync();
+    window.visualViewport?.addEventListener("resize", sync);
+    window.visualViewport?.addEventListener("scroll", sync);
+    window.addEventListener("resize", sync);
+    return () => {
+      window.visualViewport?.removeEventListener("resize", sync);
+      window.visualViewport?.removeEventListener("scroll", sync);
+      window.removeEventListener("resize", sync);
+    };
+  }, []);
   onFocusRef.current = setInFocus;
 
   const { getImage, getVideo, isLoaded, imageIds, videoIds } = useOptimizedMedia();
@@ -1120,21 +1141,46 @@ export default function NewSpace3dFocus_2({ damping = 0.085, active = true, view
     // ── Focus ────────────────────────────────────────────────────────────────
     const CLICK_PX = 8;
 
+    const viewSize = () => {
+      const vv = window.visualViewport;
+      return {
+        w: vv?.width || window.innerWidth,
+        h: vv?.height || window.innerHeight,
+      };
+    };
+
     const fitDistFor = (piece) => {
       const vFov = (camera.fov * Math.PI) / 180;
-      const margin = 0.68;
+      const { h } = viewSize();
+      // En táctil la pieza cabe entre el navbar y el lockup, no en todo el
+      // viewport: al esconderse la barra de Chrome el alto crece y, si se
+      // encaja al centro del canvas, el borde bajo entra en el pie.
+      const coarse = window.matchMedia("(hover: none) and (pointer: coarse)").matches;
+      const band = coarse ? Math.max(120, h - 88 - 168) : h * 0.68;
+      const margin = coarse ? Math.min(0.62, band / h) : 0.68;
       const distH = piece.h / (2 * Math.tan(vFov / 2) * margin);
       const distW = piece.w / (2 * Math.tan(vFov / 2) * camera.aspect * margin);
       return Math.max(distH, distW, 1.6);
     };
 
+    const camUp = new THREE.Vector3();
     // El destino es "delante de la cámara", no el origen: la pieza sale de su
     // órbita y aterriza centrada estés donde estés dentro de la galaxia.
     const placeFocus = (piece, dist) => {
       if (!piece.slot) return;
+      const { h } = viewSize();
       const p = forwardOf(new THREE.Vector3(), state.yaw, state.pitch)
         .multiplyScalar(dist)
         .add(camera.position);
+      const coarse = window.matchMedia("(hover: none) and (pointer: coarse)").matches;
+      if (coarse) {
+        const liftPx = (168 - 88) / 2;
+        const vFov = (camera.fov * Math.PI) / 180;
+        const worldPerPx = (2 * dist * Math.tan(vFov / 2)) / Math.max(1, h);
+        camera.updateMatrixWorld();
+        camUp.setFromMatrixColumn(camera.matrixWorld, 1);
+        p.addScaledVector(camUp, liftPx * worldPerPx);
+      }
       gsap.to(piece.slot.mesh.position, {
         x: p.x, y: p.y, z: p.z,
         duration: 1.05, ease: "power3.inOut", overwrite: "auto",
@@ -1398,8 +1444,7 @@ export default function NewSpace3dFocus_2({ damping = 0.085, active = true, view
     canvas.addEventListener("touchend", onTouchEnd);
 
     const onResize = () => {
-      const w = window.innerWidth;
-      const h = window.innerHeight;
+      const { w, h } = viewSize();
       renderer.setPixelRatio(Math.min(window.devicePixelRatio, dprCap));
       renderer.setSize(w, h, false);
       camera.aspect = w / h;
@@ -1409,6 +1454,9 @@ export default function NewSpace3dFocus_2({ damping = 0.085, active = true, view
       if (focus.piece) placeFocus(focus.piece, fitDistFor(focus.piece));
     };
     window.addEventListener("resize", onResize);
+    window.visualViewport?.addEventListener("resize", onResize);
+    window.visualViewport?.addEventListener("scroll", onResize);
+    onResize();
 
     const onKeyDown = (e) => {
       if (e.key === "Escape" && focus.piece) exitFocus();
@@ -1671,6 +1719,8 @@ export default function NewSpace3dFocus_2({ damping = 0.085, active = true, view
       });
 
       window.removeEventListener("resize", onResize);
+      window.visualViewport?.removeEventListener("resize", onResize);
+      window.visualViewport?.removeEventListener("scroll", onResize);
       window.removeEventListener("keydown", onKeyDown);
       document.removeEventListener("visibilitychange", onVisibility);
       canvas.removeEventListener("pointerdown", onPointerDown);
@@ -1742,7 +1792,10 @@ export default function NewSpace3dFocus_2({ damping = 0.085, active = true, view
     <div
       style={{
         position: "fixed",
-        inset: 0,
+        left: 0,
+        right: 0,
+        top: vvBox ? vvBox.top : 0,
+        height: vvBox ? vvBox.height : "100dvh",
         background: "#fff",
         overflow: "hidden",
         touchAction: "none",
@@ -1751,7 +1804,7 @@ export default function NewSpace3dFocus_2({ damping = 0.085, active = true, view
       <canvas
         ref={canvasRef}
         data-space3d-canvas="true"
-        style={{ display: "block", width: "100vw", height: "100vh" }}
+        style={{ display: "block", width: "100%", height: "100%" }}
       />
 
       <div className="cst" data-dimmed={inFocus ? "true" : "false"}>
