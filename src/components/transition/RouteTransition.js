@@ -3,6 +3,7 @@
 import { useEffect, useRef } from "react";
 import Router from "next/router";
 import gsap from "gsap";
+import { isStageRoute } from "@/components/final-components/ViewStage";
 
 /**
  * Tapa de ruta sin readback WebGL.
@@ -74,7 +75,11 @@ export default function RouteTransition() {
       };
     };
 
-    const onStart = () => {
+    const onStart = (url) => {
+      // Entre las rutas del escenario la escena no se desmonta: no hay hueco
+      // que tapar, y el plano blanco se comería el fundido entre vistas.
+      const to = (url || "").split("?")[0].replace(/\/$/, "") || "/";
+      if (isStageRoute(Router.pathname) && isStageRoute(to)) return;
       if (activeRef.current) return;
       activeRef.current = true;
       gsap.killTweensOf(overlay);

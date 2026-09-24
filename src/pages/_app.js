@@ -7,6 +7,7 @@ import gsap from "gsap";
 import { ScrollTrigger } from "gsap/dist/ScrollTrigger";
 import CustomCursor from "@/components/tools/CustomCursor";
 import RouteTransition from "@/components/transition/RouteTransition";
+import ViewStage from "@/components/final-components/ViewStage";
 
 gsap.registerPlugin(ScrollTrigger);
 
@@ -48,6 +49,9 @@ export default function App({ Component, pageProps }) {
       {/* </div> */}
       <CustomCursor />
       <RouteTransition />
+      {/* Escenario persistente: vive fuera de getLayout, así que la escena
+          sobrevive a las navegaciones y la ruta solo decide qué vista se ve. */}
+      <ViewStage />
       {getLayout(<Component {...pageProps} />)}
     </>
   );

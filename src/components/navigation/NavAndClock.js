@@ -4,11 +4,13 @@ import { useEffect, useLayoutEffect, useCallback, useRef, useState, memo } from 
 import { useRouter } from "next/router";
 import { useGSAP } from "@gsap/react";
 import gsap from "gsap";
+import { setDensityLevel, useViewPrefs } from "@/components/final-components/viewPrefs";
 
-// A Slider · B Galaxy
+// A Slider · B Grid · C Galaxy
 const NAV_ITEMS = [
   { key: "A", label: "Slider", href: "/" },
-  { key: "B", label: "Galaxy", href: "/space" },
+  { key: "B", label: "Grid", href: "/grid" },
+  { key: "C", label: "Galaxy", href: "/space" },
 ];
 
 const PILL_DUR = 0.62;
@@ -62,6 +64,9 @@ export default function NavAndClock() {
     setActiveIndex(i);
     if (pushTimer.current) clearTimeout(pushTimer.current);
     if (lagTimer.current) clearTimeout(lagTimer.current);
+    // El escenario arranca el morph en este instante: si esperáramos al
+    // router.push (tras la pastilla) las imágenes se quedarían quietas 620 ms.
+    window.dispatchEvent(new CustomEvent("atj:view-will-change", { detail: { href } }));
     // Sin lagSmoothing, un frame largo (compile de shaders) hace que GSAP
     // salte el playhead → tripón en pill. 0 = no saltar.
     gsap.ticker.lagSmoothing(0);
@@ -82,6 +87,11 @@ export default function NavAndClock() {
         </div>
         <NavPills activeIndex={activeIndex} onNavigate={handleNavigate} />
       </div>
+
+      {/* Segunda fila, solo en la rejilla: densidad. Mismo idioma de cápsula
+          que las de vista, para que se lean como una extensión y no como un
+          control nuevo. */}
+      {router.pathname === "/grid" && <DensityPills />}
 
       <style>{`
         .bcn {
@@ -106,6 +116,15 @@ export default function NavAndClock() {
 
         .bcn-nav {
           display: contents;
+        }
+
+        .bcn-bar--dens {
+          margin-top: 4px;
+          font-variant-numeric: tabular-nums;
+        }
+        .bcn-pill--dens {
+          justify-content: center;
+          padding: 0 0.62em;
         }
 
         .bcn-pill {
@@ -183,6 +202,34 @@ export default function NavAndClock() {
     </div>
   );
 }
+
+// Densidad de la rejilla. El nivel vive en un store externo porque la rejilla
+// cuelga del escenario y estas pills del layout: son dos árboles hermanos.
+const DensityPills = memo(function DensityPills() {
+  const { level, ladder } = useViewPrefs();
+  return (
+    <div className="bcn-bar bcn-bar--dens" role="group" aria-label="Densidad de la rejilla">
+      {ladder.map((cols, i) => (
+        <button
+          key={cols}
+          type="button"
+          aria-pressed={i === level}
+          aria-label={`${cols} columnas`}
+          className={`bcn-pill bcn-pill--dens${i === level ? " is-active" : ""}`}
+          onClick={() => {
+            if (i === level) return;
+            // La rejilla mide su estado actual antes de que cambie el layout:
+            // el aviso va por delante del cambio, no después.
+            window.dispatchEvent(new CustomEvent("atj:density-will-change"));
+            setDensityLevel(i);
+          }}
+        >
+          {cols}
+        </button>
+      ))}
+    </div>
+  );
+});
 
 // Reloj fuera de React: un setInterval no debe re-renderizar pills.
 const BerlinClock = memo(function BerlinClock() {

@@ -79,6 +79,22 @@ const cleanName = (originalName) =>
 
 const isHeicPath = (p) => /\.hei[cf]$/i.test(p || "");
 
+/**
+ * Derivados de imagen, de menor a mayor. `maxEdge` es el mismo que aplica
+ * optimize-media.mjs (fit: inside, sin upscale), así que el ancho real de cada
+ * fichero se puede calcular sin medirlo.
+ */
+const IMAGE_DERIVATIVES = [
+  { key: "thumb", maxEdge: 480 },
+  { key: "mobile", maxEdge: 1080 },
+  { key: "desktop", maxEdge: 1920 },
+];
+
+const derivativeWidth = (w, h, maxEdge) => {
+  if (!w || !h) return null;
+  return Math.round(w * Math.min(1, maxEdge / Math.max(w, h)));
+};
+
 const findEntry = (list, originalName) => {
   if (!list?.length) return null;
   const baseName = cleanName(originalName);
@@ -178,8 +194,16 @@ export const useOptimizedMedia = () => {
       return {
         sources,
         poster: entry.poster || null,
+        posterThumb: entry.poster_thumb || null,
+        // Copia de 480 px para rejillas: varias reproduciéndose a la vez a
+        // 1080 son varios decodificadores de más para nada.
+        thumbSrc: entry.thumb_mp4 || null,
         src: pickPlayableSrc(sources),
         hasOptimized: Boolean(entry.mobile_mp4 || entry.desktop_mp4),
+        // Del manifiesto (ffprobe sobre el póster): permite reservar el hueco
+        // con la proporción correcta antes de cargar nada.
+        width: entry.width || null,
+        height: entry.height || null,
       };
     },
     [manifest, capabilities, variantFor]
@@ -222,6 +246,56 @@ export const useOptimizedMedia = () => {
     [manifest, capabilities, variantFor]
   );
 
+  /**
+   * Juego de derivados para `srcset`. Lo usa la rejilla: la misma pieza se
+   * dibuja a 175 px en 8 columnas y a 583 en 2, y con `srcset` + `sizes` el
+   * navegador elige el fichero por sí mismo —y vuelve a elegir al cambiar la
+   * densidad— en vez de servir siempre el grande y escalarlo.
+   */
+  const getImageSet = useCallback(
+    (originalName) => {
+      const entry = findEntry(manifest?.images, originalName);
+      if (!entry) {
+        const single = getImage(originalName);
+        return single?.src
+          ? { src: single.src, srcSet: null, width: null, height: null }
+          : { src: null, srcSet: null, width: null, height: null };
+      }
+
+      // HEIC: el AVIF comparte contenedor y Chrome lo trata como imagen HEIF;
+      // el JPEG es el único derivado fiable. Misma regla que en `getImage`.
+      const heic = isHeicPath(entry.original);
+      const format = heic
+        ? "jpg"
+        : (capabilities.supportsAvif && "avif") || (capabilities.supportsWebp && "webp") || "jpg";
+
+      const seen = new Set();
+      const candidates = [];
+      for (const { key, maxEdge } of IMAGE_DERIVATIVES) {
+        const url = entry[`${key}_${format}`] || entry[`${key}_jpg`];
+        if (!url) continue;
+        const w = derivativeWidth(entry.width, entry.height, maxEdge);
+        // Un master pequeño produce derivados idénticos: repetirlos en el
+        // srcset solo confunde al selector del navegador.
+        if (!w || seen.has(w)) continue;
+        seen.add(w);
+        candidates.push({ url, w });
+      }
+      if (!candidates.length) {
+        const single = getImage(originalName);
+        return { src: single?.src || null, srcSet: null, width: entry.width, height: entry.height };
+      }
+
+      return {
+        src: candidates[0].url,
+        srcSet: candidates.map((c) => `${c.url} ${c.w}w`).join(", "),
+        width: entry.width || null,
+        height: entry.height || null,
+      };
+    },
+    [manifest, capabilities, getImage]
+  );
+
   const videoIds = useMemo(
     () => (manifest?.videos ?? []).map((v) => v.name),
     [manifest]
@@ -232,5 +306,5 @@ export const useOptimizedMedia = () => {
     [manifest]
   );
 
-  return { getVideo, getImage, isLoaded, capabilities, videoIds, imageIds };
+  return { getVideo, getImage, getImageSet, isLoaded, capabilities, videoIds, imageIds };
 };

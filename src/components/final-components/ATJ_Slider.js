@@ -1,0 +1,563 @@
+"use client";
+
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import gsap from "gsap";
+import { useOptimizedMedia } from "@/hooks/useOptimizedMedia";
+import { buildPieces } from "@/data/pieces";
+
+// ─── Slider horizontal plano ───────────────────────────────────────────────────
+// Sin WebGL: DOM + transforms. Reproduce exactamente la métrica del VideoSlider
+// de three.js. La caja sale de su cámara: fov 45, z=5 y los planos asentados en
+// z=-0.8 en desktop (z=0 en móvil) dan una altura visible de 4.8049 / 6.6274
+// unidades, y el plano de 2.0×2.5 / 3.8×4.25 ocupa 52.03vh / 64.13vh.
+// Y como allí, el medio se encaja DENTRO de la caja conservando su proporción
+// (`videoBaseScale`): la caja marca el ritmo, el medio se ve a su tamaño.
+//
+// El contenido sale de `@/data/pieces`: la misma lista y el mismo orden que usará
+// la galaxia. Las galerías van seguidas y dentro de cada una se baraja, así que
+// imágenes y vídeos se alternan sin patrón visible pero cada tramo contiguo de la
+// tira es un cúmulo — al morphar, la tira se despliega en vez de cruzarse toda la
+// pantalla. El componente publica además el rectángulo de cada pieza por
+// `viewRef`: es lo único que necesita la galaxia para continuar sin salto (FLIP).
+
+const SLIDE_VH = { desktop: 52.03, mobile: 64.13 };      // alto de la caja, en vh
+const SLIDE_AR = { desktop: 0.8, mobile: 0.894118 };     // ancho / alto de la caja
+const GAP_RATIO = { desktop: 0.025, mobile: 0.005263 };  // hueco / ancho de caja
+// Aire contra el chrome. En móvil 64vh × 0.89 desborda el ancho de un iPhone
+// y la leyenda se corta arriba: la caja se clampa a esta banda.
+const CHROME = {
+  desktop: { top: 56, bottom: 96, side: 24, cap: 22 },
+  mobile: { top: 72, bottom: 132, side: 16, cap: 22 },
+};
+
+const WHEEL_K = 1.0;      // px de recorrido por px de rueda
+const SMOOTHING = 0.22;   // mismo amortiguado que la versión WebGL
+const SNAP_DELAY = 140;   // ms de calma antes de encajar
+const SNAP_DUR = 0.55;
+const MAX_ACTIVE_VIDEOS = { desktop: 4, mobile: 2 };
+const NEAR_IMAGES = 6;    // piezas a cada lado que reciben `src` de imagen
+
+const pickSrc = (sources) => {
+  if (!sources?.length) return null;
+  if (typeof document === "undefined") return sources[0]?.src || null;
+  const v = document.createElement("video");
+  return (sources.find((s) => v.canPlayType(s.type) !== "") || sources[0])?.src || null;
+};
+
+// El póster solo se usa como miniatura: el derivado mobile sobra y pesa un tercio.
+const toFieldUrl = (url) => (url || "").replace(".desktop.", ".mobile.");
+const toWebp = (p) => (p || "").replace(/\.avif$/i, ".webp");
+
+export default function ATJ_Slider({ viewRef, active = true } = {}) {
+  const rootRef = useRef(null);
+  const trackRef = useRef(null);
+  // En un ref y no en las dependencias del efecto: cambiar de vista no debe
+  // reconstruir el slider, solo dormirlo.
+  const activeRef = useRef(active);
+  activeRef.current = active;
+  const itemRefs = useRef([]);
+  const [isMobile, setIsMobile] = useState(
+    () => typeof window !== "undefined" && window.innerWidth <= 768,
+  );
+  const [activeIndex, setActiveIndex] = useState(0);
+  const [hoverIndex, setHoverIndex] = useState(null);
+
+  const { getImage, getVideo, isLoaded, imageIds, videoIds } = useOptimizedMedia();
+
+  const pieces = useMemo(() => {
+    if (!isLoaded) return [];
+    return buildPieces(imageIds, videoIds)
+      .map((p) => {
+        if (p.type === "video") {
+          const v = getVideo(p.name);
+          const src = pickSrc(v?.sources);
+          if (!src) return null;
+          return { ...p, src, still: toFieldUrl(v?.poster) || null };
+        }
+        const img = getImage(p.name);
+        // Mismo derivado que carga la galaxia (webp mobile): al morphar, la
+        // textura sale de la caché del navegador en vez de volver a descargarse.
+        const webp = [img?.src, img?.fallback].map(toWebp).find((u) => /\.webp$/i.test(u || ""));
+        const still = toFieldUrl(webp || img?.src) || img?.src || null;
+        if (!still) return null;
+        return { ...p, src: null, still };
+      })
+      .filter(Boolean);
+  }, [isLoaded, imageIds, videoIds, getImage, getVideo]);
+
+  // El medio se encaja dentro de la caja como en `videoBaseScale`: la proporción
+  // sale del fotograma fijo y se afina con los metadatos del vídeo.
+  const applyFit = useCallback((i, mediaAspect) => {
+    const el = itemRefs.current[i]?.querySelector(".atj-slide__fit");
+    if (!el || !mediaAspect) return;
+    const box = SLIDE_AR[window.innerWidth <= 768 ? "mobile" : "desktop"];
+    const fx = mediaAspect > box ? 1 : mediaAspect / box;
+    const fy = mediaAspect > box ? box / mediaAspect : 1;
+    el.style.setProperty("--fit-x", fx.toFixed(4));
+    el.style.setProperty("--fit-y", fy.toFixed(4));
+  }, []);
+
+  useEffect(() => {
+    if (!pieces.length) return;
+    // Una medición por URL: con relleno hay nombres repetidos y no tiene sentido
+    // instanciar 120 Image() para 63 ficheros.
+    const byUrl = new Map();
+    pieces.forEach((p, i) => {
+      if (!p.still) return;
+      const list = byUrl.get(p.still) || [];
+      list.push(i);
+      byUrl.set(p.still, list);
+    });
+    const imgs = [];
+    for (const [url, indices] of byUrl) {
+      const img = new Image();
+      img.decoding = "async";
+      img.onload = () => {
+        if (!img.naturalWidth || !img.naturalHeight) return;
+        const ar = img.naturalWidth / img.naturalHeight;
+        indices.forEach((i) => applyFit(i, ar));
+      };
+      img.src = url;
+      imgs.push(img);
+    }
+    return () => imgs.forEach((img) => { img.onload = null; img.src = ""; });
+  }, [pieces, applyFit, isMobile]);
+
+  useEffect(() => {
+    const onResize = () => setIsMobile(window.innerWidth <= 768);
+    window.addEventListener("resize", onResize);
+    return () => window.removeEventListener("resize", onResize);
+  }, []);
+
+  // ── Motor: posición, bucle infinito y reparto de transforms ───────────────
+  useEffect(() => {
+    const root = rootRef.current;
+    if (!root || !pieces.length) return;
+
+    const key = isMobile ? "mobile" : "desktop";
+    const reduce = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+    const n = pieces.length;
+
+    const metrics = { w: 0, h: 0, unit: 0, total: 0, vw: 0, vh: 0 };
+    const measure = () => {
+      metrics.vw = window.innerWidth;
+      metrics.vh = window.innerHeight;
+      const chrome = CHROME[key];
+      const ar = SLIDE_AR[key];
+      const availW = Math.max(1, metrics.vw - chrome.side * 2);
+      const availH = Math.max(1, metrics.vh - chrome.top - chrome.bottom - chrome.cap);
+      let h = (metrics.vh * SLIDE_VH[key]) / 100;
+      let w = h * ar;
+      if (w > availW) { w = availW; h = w / ar; }
+      if (h > availH) { h = availH; w = h * ar; }
+      metrics.h = h;
+      metrics.w = w;
+      metrics.unit = metrics.w * (1 + GAP_RATIO[key]);
+      metrics.total = metrics.unit * n;
+      const midY = chrome.top + (metrics.vh - chrome.top - chrome.bottom) / 2;
+      root.style.setProperty("--slide-w", `${metrics.w}px`);
+      root.style.setProperty("--slide-h", `${metrics.h}px`);
+      root.style.setProperty("--slide-mid", `${midY}px`);
+    };
+    measure();
+
+    const pos = { current: 0, target: 0 };
+    let snapTimer = null;
+    let snapTween = null;
+    let dragging = false;
+
+    // Cada pieza se coloca en la ventana [-total/2, total/2) alrededor del
+    // centro: con eso el carrusel es infinito sin clonar nodos.
+    const wrapOffset = (i) => {
+      let x = i * metrics.unit - pos.current;
+      const half = metrics.total / 2;
+      x = ((x % metrics.total) + metrics.total) % metrics.total;
+      if (x >= half) x -= metrics.total;
+      return x;
+    };
+
+    const centered = { current: -1 };
+
+    const layout = () => {
+      const left = metrics.vw / 2 - metrics.w / 2;
+      let best = 0;
+      let bestDist = Infinity;
+      for (let i = 0; i < n; i++) {
+        const el = itemRefs.current[i];
+        if (!el) continue;
+        const x = wrapOffset(i);
+        const dist = Math.abs(x);
+        if (dist < bestDist) { bestDist = dist; best = i; }
+        // Fuera de pantalla con margen de una pieza: se aparca, no se pinta.
+        const visible = dist < metrics.vw / 2 + metrics.unit;
+        el.style.transform = `translate3d(${(left + x).toFixed(2)}px,0,0)`;
+        el.style.visibility = visible ? "visible" : "hidden";
+      }
+      if (best !== centered.current) {
+        centered.current = best;
+        setActiveIndex(best);
+      }
+    };
+
+    const snapNow = () => {
+      snapTween?.kill();
+      const target = Math.round(pos.target / metrics.unit) * metrics.unit;
+      if (reduce) { pos.target = target; pos.current = target; layout(); return; }
+      snapTween = gsap.to(pos, { target, duration: SNAP_DUR, ease: "power3.out" });
+    };
+
+    const queueSnap = () => {
+      clearTimeout(snapTimer);
+      snapTimer = setTimeout(snapNow, SNAP_DELAY);
+    };
+
+    const nudge = (dir) => {
+      snapTween?.kill();
+      clearTimeout(snapTimer);
+      const target = (Math.round(pos.target / metrics.unit) + dir) * metrics.unit;
+      if (reduce) { pos.target = target; pos.current = target; layout(); return; }
+      snapTween = gsap.to(pos, { target, duration: SNAP_DUR, ease: "power3.out" });
+    };
+
+    // ── Entrada ──────────────────────────────────────────────────────────────
+    const onWheel = (e) => {
+      e.preventDefault();
+      snapTween?.kill();
+      const delta = Math.abs(e.deltaX) > Math.abs(e.deltaY) ? e.deltaX : e.deltaY;
+      pos.target += (e.deltaMode === 1 ? delta * 16 : delta) * WHEEL_K;
+      queueSnap();
+    };
+
+    const drag = { id: null, x: 0, moved: false };
+    const onPointerDown = (e) => {
+      if (e.button !== undefined && e.button !== 0) return;
+      snapTween?.kill();
+      clearTimeout(snapTimer);
+      dragging = true;
+      drag.id = e.pointerId;
+      drag.x = e.clientX;
+      drag.moved = false;
+      root.setPointerCapture?.(e.pointerId);
+      root.style.cursor = "grabbing";
+    };
+    const onPointerMove = (e) => {
+      if (!dragging || e.pointerId !== drag.id) return;
+      const dx = e.clientX - drag.x;
+      drag.x = e.clientX;
+      if (Math.abs(dx) > 1) drag.moved = true;
+      pos.target -= dx;
+      pos.current -= dx;   // el arrastre va pegado al dedo, sin amortiguar
+    };
+    const endDrag = (e) => {
+      if (!dragging) return;
+      dragging = false;
+      try { root.releasePointerCapture?.(e.pointerId); } catch { /* ok */ }
+      root.style.cursor = "grab";
+      queueSnap();
+    };
+
+    const onKeyDown = (e) => {
+      if (e.key === "ArrowRight") { e.preventDefault(); nudge(1); }
+      else if (e.key === "ArrowLeft") { e.preventDefault(); nudge(-1); }
+    };
+
+    const onResize = () => {
+      const before = metrics.unit;
+      measure();
+      if (before > 0) {
+        const k = metrics.unit / before;
+        pos.current *= k;
+        pos.target *= k;
+      }
+      layout();
+    };
+
+    root.addEventListener("wheel", onWheel, { passive: false });
+    root.addEventListener("pointerdown", onPointerDown);
+    root.addEventListener("pointermove", onPointerMove);
+    root.addEventListener("pointerup", endDrag);
+    root.addEventListener("pointercancel", endDrag);
+    window.addEventListener("keydown", onKeyDown);
+    window.addEventListener("resize", onResize);
+
+    let raf = 0;
+    const tick = () => {
+      raf = requestAnimationFrame(tick);
+      if (document.hidden || !activeRef.current) return;
+      if (!dragging) pos.current += (pos.target - pos.current) * (reduce ? 1 : SMOOTHING);
+      layout();
+    };
+    raf = requestAnimationFrame(tick);
+    root.style.cursor = "grab";
+    layout();
+
+    // ── API para el morph: dónde está cada pieza en pantalla ─────────────────
+    if (viewRef) {
+      viewRef.current = {
+        view: "slider",
+        // Rectángulos en coordenadas de viewport, por nombre de pieza. Es lo
+        // que la galaxia necesita para continuar el movimiento sin salto.
+        // Clave: el índice en la lista canónica. Con relleno hay nombres
+        // repetidos, así que el nombre no identifica una pieza; la posición sí.
+        getRects() {
+          const out = new Map();
+          for (let i = 0; i < n; i++) {
+            const el = itemRefs.current[i];
+            if (!el || el.style.visibility === "hidden") continue;
+            const r = (el.querySelector(".atj-slide__fit") || el).getBoundingClientRect();
+            // Clave: el índice canónico de la lista, no la posición en este
+            // array. Las dos vistas descartan piezas que no resuelven, y si
+            // cada una numera lo suyo el morph empareja fotos distintas.
+            out.set(pieces[i].index, { x: r.left, y: r.top, w: r.width, h: r.height, name: pieces[i].name });
+          }
+          return out;
+        },
+        // Misma geometría que getRects más el fotograma: el morph DOM↔DOM
+        // clona estas imágenes a una capa de vuelo y las oculta aquí.
+        getFlyers() {
+          const out = new Map();
+          for (let i = 0; i < n; i++) {
+            const el = itemRefs.current[i];
+            if (!el || el.style.visibility === "hidden") continue;
+            const fit = el.querySelector(".atj-slide__fit") || el;
+            const r = fit.getBoundingClientRect();
+            if (r.width < 2 || r.height < 2) continue;
+            const video = fit.querySelector("video");
+            const img = fit.querySelector("img");
+            const p = pieces[i];
+            const isVideo = p.type === "video";
+            const videoSrc = isVideo
+              ? (video?.currentSrc || video?.getAttribute?.("src") || p.src)
+              : null;
+            const poster = video?.getAttribute?.("poster") || p.still || img?.currentSrc || img?.src || null;
+            const src = isVideo ? videoSrc : (img?.currentSrc || img?.src || p.still);
+            if (!src && !poster) continue;
+            out.set(p.index, {
+              x: r.left, y: r.top, w: r.width, h: r.height,
+              name: p.name,
+              kind: isVideo && videoSrc ? "video" : "image",
+              src: src || poster,
+              poster,
+              currentTime: video?.currentTime || 0,
+              el: isVideo ? video : img,
+              visible: true,
+            });
+          }
+          return out;
+        },
+        setGhost(on) {
+          root.classList.toggle("is-ghost", !!on);
+        },
+        getActive: () => {
+          const p = pieces[centered.current];
+          return p ? { index: p.index, name: p.name, gallery: p.gallery } : null;
+        },
+        goTo(target, { duration = 0.9 } = {}) {
+          const i = typeof target === "number"
+            ? pieces.findIndex((p) => p.index === target)
+            : pieces.findIndex((p) => p.name === target);
+          if (i < 0 || i >= n) return;
+          snapTween?.kill();
+          const half = metrics.total / 2;
+          let delta = i * metrics.unit - pos.target;
+          delta = ((delta % metrics.total) + metrics.total) % metrics.total;
+          if (delta >= half) delta -= metrics.total;
+          // Instantáneo: el morph de entrada necesita la tira ya colocada
+          // aunque el RAF esté dormido (capa inactiva).
+          if (!duration) {
+            pos.target += delta;
+            pos.current = pos.target;
+            layout();
+            return;
+          }
+          gsap.to(pos, { target: pos.target + delta, duration, ease: "power3.inOut" });
+        },
+      };
+    }
+
+    return () => {
+      cancelAnimationFrame(raf);
+      clearTimeout(snapTimer);
+      snapTween?.kill();
+      gsap.killTweensOf(pos);
+      root.removeEventListener("wheel", onWheel);
+      root.removeEventListener("pointerdown", onPointerDown);
+      root.removeEventListener("pointermove", onPointerMove);
+      root.removeEventListener("pointerup", endDrag);
+      root.removeEventListener("pointercancel", endDrag);
+      window.removeEventListener("keydown", onKeyDown);
+      window.removeEventListener("resize", onResize);
+      if (viewRef) viewRef.current = null;
+    };
+  }, [pieces, isMobile, viewRef]);
+
+  // ── Medios: solo carga y reproduce lo que está cerca del centro ───────────
+  // La misma función la llaman el cambio de pieza activa y el de visibilidad: si
+  // no, al volver de una pestaña en segundo plano los vídeos se quedan parados
+  // (Chrome difiere el autoplay mientras el documento está oculto).
+  const syncMedia = useCallback(() => {
+    if (!pieces.length) return;
+    const n = pieces.length;
+    const near = (i, radius) => {
+      const d = Math.abs(((i - activeIndex + n + n / 2) % n) - n / 2);
+      return d <= radius;
+    };
+    const videoCap = MAX_ACTIVE_VIDEOS[isMobile ? "mobile" : "desktop"];
+    const videoRadius = Math.max(1, Math.floor(videoCap / 2));
+
+    itemRefs.current.forEach((el, i) => {
+      const piece = pieces[i];
+      if (!el || !piece) return;
+
+      if (piece.type === "image") {
+        const img = el.querySelector("img");
+        if (!img) return;
+        // Las imágenes lejanas ni se piden: con 63 piezas, cargarlas todas sería
+        // más pesado que la galaxia entera.
+        if (near(i, NEAR_IMAGES) && !img.getAttribute("src")) img.setAttribute("src", piece.still);
+        return;
+      }
+
+      const video = el.querySelector("video");
+      if (!video) return;
+      video.muted = true;   // la propiedad, no el atributo: es la que mira el autoplay
+      if (!near(i, videoRadius)) { video.pause(); return; }
+      if (!video.getAttribute("src")) {
+        video.setAttribute("src", piece.src);
+        video.addEventListener("loadedmetadata", () => {
+          if (video.videoWidth && video.videoHeight) applyFit(i, video.videoWidth / video.videoHeight);
+        }, { once: true });
+      }
+      if (document.hidden || !active) video.pause();
+      else video.play().catch(() => {});
+    });
+  }, [pieces, isMobile, activeIndex, applyFit, active]);
+
+  useEffect(() => { syncMedia(); }, [syncMedia]);
+
+  useEffect(() => {
+    document.addEventListener("visibilitychange", syncMedia);
+    return () => document.removeEventListener("visibilitychange", syncMedia);
+  }, [syncMedia]);
+
+  const setItemRef = useCallback((el, i) => { itemRefs.current[i] = el; }, []);
+  const total = String(pieces.length).padStart(2, "0");
+
+  return (
+    <div className="atj-slider" ref={rootRef} role="group" aria-label="Portfolio" tabIndex={-1}>
+      <div className="atj-slider__track" ref={trackRef}>
+        {pieces.map((p, i) => (
+          <figure
+            key={p.index}
+            className={`atj-slide${hoverIndex === i || (isMobile && activeIndex === i) ? " is-open" : ""}`}
+            ref={(el) => setItemRef(el, i)}
+            onMouseEnter={() => setHoverIndex(i)}
+            onMouseLeave={() => setHoverIndex((v) => (v === i ? null : v))}
+          >
+            <div className="atj-slide__fit">
+              <figcaption className="atj-slide__caption">
+                <span className="atj-slide__label">
+                  {p.galleryLabel}
+                  <span className="atj-slide__sep">·</span>
+                  <span className="atj-slide__title">{p.label}</span>
+                </span>
+                <span className="atj-slide__counter">
+                  {String(i + 1).padStart(2, "0")} / {total}
+                </span>
+              </figcaption>
+              {p.type === "video" ? (
+                <video
+                  className="atj-slide__media"
+                  poster={p.still || undefined}
+                  muted
+                  loop
+                  playsInline
+                  preload="none"
+                  tabIndex={-1}
+                />
+              ) : (
+                // Derivados ya optimizados del manifiesto y carga controlada por
+                // cercanía: next/image pelearía con el posicionado absoluto.
+                // eslint-disable-next-line @next/next/no-img-element
+                <img className="atj-slide__media" alt="" decoding="async" draggable="false" />
+              )}
+            </div>
+          </figure>
+        ))}
+      </div>
+
+      <style>{`
+        .atj-slider {
+          position: fixed;
+          inset: 0;
+          background: #fff;
+          overflow: hidden;
+          touch-action: pan-y;
+          outline: none;
+        }
+        .atj-slider__track {
+          position: absolute;
+          top: var(--slide-mid, 50%);
+          left: 0;
+          width: 100%;
+          height: 0;
+        }
+        .atj-slide {
+          position: absolute;
+          top: 0;
+          left: 0;
+          width: var(--slide-w, 0px);
+          height: var(--slide-h, 0px);
+          margin: calc(var(--slide-h, 0px) / -2) 0 0 0;
+          will-change: transform;
+          backface-visibility: hidden;
+        }
+        .atj-slide__fit {
+          position: absolute;
+          left: 50%;
+          top: 50%;
+          width: calc(var(--fit-x, 1) * 100%);
+          height: calc(var(--fit-y, 1) * 100%);
+          transform: translate(-50%, -50%);
+        }
+        .atj-slide__media {
+          display: block;
+          width: 100%;
+          height: 100%;
+          object-fit: cover;
+          pointer-events: none;
+          user-select: none;
+        }
+        .atj-slide__caption {
+          position: absolute;
+          left: 0;
+          right: 0;
+          bottom: calc(100% + 6px);
+          display: flex;
+          align-items: baseline;
+          justify-content: space-between;
+          gap: 1em;
+          font: 800 12px/1 -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+          letter-spacing: -0.045em;
+          color: #111;
+          white-space: nowrap;
+          opacity: 0;
+          transition: opacity 180ms ease;
+          pointer-events: none;
+        }
+        .atj-slide.is-open .atj-slide__caption { opacity: 1; }
+        .atj-slide__counter { font-variant-numeric: tabular-nums; }
+        .atj-slide__sep { opacity: 0.35; margin: 0 0.5em; }
+        .atj-slide__title { font-weight: 400; }
+
+        /* El morph vuela clones: las piezas de aquí se ocultan el tiempo que
+           duran en el aire para no pintarlas dos veces. */
+        .atj-slider.is-ghost .atj-slide { visibility: hidden !important; }
+
+        @media (prefers-reduced-motion: reduce) {
+          .atj-slide__caption { transition: none; }
+        }
+      `}</style>
+    </div>
+  );
+}
