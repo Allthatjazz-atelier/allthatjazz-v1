@@ -40,7 +40,7 @@ const SNAP_DUR = 0.55;
 // cola de ~4 s; con esto el coast dura ~0.8 s y el snap (power3.out) cierra.
 const GLIDE_F = 0.948;
 const GLIDE_DRAG = 0.18;        // px/frame @60: mata el coasting lento
-const GLIDE_GAIN = 26;          // px/frame por cada px/ms del dedo
+const GLIDE_GAIN = 30;          // px/frame por cada px/ms del dedo
 const GLIDE_MAX_SLIDES = 8;
 const GLIDE_STOP = 0.75;        // cede al snap antes de que el glide se agote
 const MAX_ACTIVE_VIDEOS = { desktop: 4, mobile: 2 };
