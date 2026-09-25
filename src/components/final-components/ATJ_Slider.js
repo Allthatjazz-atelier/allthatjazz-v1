@@ -36,9 +36,13 @@ const SNAP_DELAY = 140;   // ms de calma antes de encajar
 const SNAP_DUR = 0.55;
 // Inercia del dedo en móvil. Un flick recorre varias piezas y luego se asienta;
 // sin esto cada gesto encaja en la siguiente y con ~120 hay que ir de una en una.
-const GLIDE_F = 0.978;
-const GLIDE_GAIN = 32;          // px/frame por cada px/ms del dedo
-const GLIDE_MAX_SLIDES = 14;
+// Fricción por frame a 60 Hz + arrastre constante: el 0.978 anterior dejaba una
+// cola de ~4 s; con esto el coast dura ~0.8 s y el snap (power3.out) cierra.
+const GLIDE_F = 0.948;
+const GLIDE_DRAG = 0.18;        // px/frame @60: mata el coasting lento
+const GLIDE_GAIN = 26;          // px/frame por cada px/ms del dedo
+const GLIDE_MAX_SLIDES = 8;
+const GLIDE_STOP = 0.75;        // cede al snap antes de que el glide se agote
 const MAX_ACTIVE_VIDEOS = { desktop: 4, mobile: 2 };
 const NEAR_IMAGES = 6;    // piezas a cada lado que reciben `src` de imagen
 
@@ -333,7 +337,7 @@ export default function ATJ_Slider({ viewRef, active = true } = {}) {
         const maxDist = metrics.unit * GLIDE_MAX_SLIDES;
         const est = Math.abs(g) / (1 - GLIDE_F);
         if (est > maxDist && est > 0) g *= maxDist / est;
-        glide = Math.abs(g) < 0.8 ? 0 : g;
+        glide = Math.abs(g) < GLIDE_STOP ? 0 : g;
         if (!glide) queueSnap();
         return;
       }
@@ -365,14 +369,21 @@ export default function ATJ_Slider({ viewRef, active = true } = {}) {
     window.addEventListener("resize", onResize);
 
     let raf = 0;
+    let lastTick = performance.now();
     const tick = () => {
       raf = requestAnimationFrame(tick);
+      const now = performance.now();
+      const steps = Math.min(2, (now - lastTick) / (1000 / 60));
+      lastTick = now;
       if (document.hidden || !activeRef.current) return;
       if (glide) {
-        pos.current += glide;
+        // Normalizado a 60 Hz: en ProMotion el glide no viaja el doble ni se
+        // apaga en la mitad de tiempo. El drag corta la cola sin un corte seco.
+        pos.current += glide * steps;
         pos.target = pos.current;
-        glide *= GLIDE_F;
-        if (Math.abs(glide) < 0.35) {
+        glide *= Math.pow(GLIDE_F, steps);
+        glide -= Math.sign(glide) * GLIDE_DRAG * steps;
+        if (Math.abs(glide) < GLIDE_STOP) {
           glide = 0;
           snapNow();
           setActiveIndex(centered.current);

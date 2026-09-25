@@ -82,20 +82,21 @@ export default function NavAndClock() {
       className="bcn relative text-[0.875rem] tracking-[-0.04em] text-[var(--atj-ink)]"
       style={{ pointerEvents: "auto" }}
     >
-      <div className="bcn-head">
-        <div className="bcn-bar">
-          <div className="bcn-pill bcn-clock" aria-live="polite">
-            <BerlinClock />
+      <div className="bcn-stack">
+        <div className="bcn-head">
+          <div className="bcn-bar">
+            <div className="bcn-pill bcn-clock" aria-live="polite">
+              <BerlinClock />
+            </div>
+            <NavPills activeIndex={activeIndex} onNavigate={handleNavigate} />
           </div>
-          <NavPills activeIndex={activeIndex} onNavigate={handleNavigate} />
+          <ThemePill />
         </div>
-        <ThemePill />
-      </div>
 
-      {/* Segunda fila, solo en la rejilla: densidad. Mismo idioma de cápsula
-          que las de vista, para que se lean como una extensión y no como un
-          control nuevo. */}
-      {router.pathname === "/grid" && <DensityPills />}
+        {/* Segunda fila, solo en la rejilla: densidad. Mismo idioma de cápsula
+            que las de vista; el stack comparte ancho con la barra superior. */}
+        {router.pathname === "/grid" && <DensityPills />}
+      </div>
 
       <style>{`
         .bcn {
@@ -120,6 +121,14 @@ export default function NavAndClock() {
 
         .bcn-nav {
           display: contents;
+        }
+
+        /* Misma caja que .bcn-bar: la fila de densidad estira al mismo ancho. */
+        .bcn-stack {
+          display: flex;
+          flex-direction: column;
+          align-items: stretch;
+          gap: 4px;
         }
 
         .bcn-head {
@@ -167,12 +176,14 @@ export default function NavAndClock() {
         }
 
         .bcn-bar--dens {
-          margin-top: 4px;
+          width: 100%;
           font-variant-numeric: tabular-nums;
         }
         .bcn-pill--dens {
+          flex: 1 1 0;
           justify-content: center;
-          padding: 0 0.62em;
+          padding: 0;
+          min-width: 0;
         }
 
         .bcn-pill {
@@ -247,8 +258,7 @@ export default function NavAndClock() {
            mide en px al montar y quedaría desfasado al rotar el dispositivo. */
         @media (max-width: 768px), (pointer: coarse) {
           .bcn { --bcn-pill: 1.8em; }
-          .bcn-bar--dens { margin-top: 6px; }
-          .bcn-pill--dens { padding: 0 0.85em; }
+          .bcn-stack { gap: 6px; }
           .bcn-pill.bcn-pill--theme { --bcn-knob: 1.2em; }
         }
 
