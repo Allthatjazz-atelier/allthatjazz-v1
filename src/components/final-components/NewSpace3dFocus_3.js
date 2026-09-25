@@ -38,7 +38,9 @@ const NEAR_MARGIN   = 7;      // nada se acerca más que esto a la cámara
 
 const PITCH_0  = 0.42;
 const YAW_0    = 0.55;
-const FOG_DEPTH = 0.78;       // cuánto se lava hacia blanco lo lejano
+const FOG_DEPTH = 0.35;       // cuánto se lava hacia el fondo lo lejano (bajo: las
+                             // piezas conservan su color; solo el borde exterior
+                             // se desvanece, vía el término `far` de depthFade)
 const FOG_NEAR_K = 0.42;
 const FOG_FAR_K  = 1.15;
 const FOG_FAR_R  = 0.9;
@@ -65,10 +67,15 @@ const ORBIT_DIST = 11;
 
 // ─── Texturas ──────────────────────────────────────────────────────────────────
 const ATLAS_COLS = 11;        // 121 celdas: cubre el catálogo objetivo de ~120
-const ATLAS_CELL = 186;
-const ATLAS_SIZE = ATLAS_COLS * ATLAS_CELL;
+// Resolución de celda del atlas. Escritorio sube a 256 px (11×256 = 2816, holgado
+// bajo el límite de 4096 de textura; ~42 MB de VRAM con mipmaps) para que la nube
+// se vea nítida sin promocionar. Móvil se queda en 186 —el baseline de siempre—
+// para no aumentar su presión de VRAM. `uCellScale` es 1/ATLAS_COLS y no depende
+// de este valor, así que el tamaño de celda se puede cambiar sin tocar los shaders.
+const ATLAS_CELL_DESKTOP = 256;
+const ATLAS_CELL_MOBILE  = 186;
 const ATLAS_CAP  = ATLAS_COLS * ATLAS_COLS;
-const HIRES_PX = ATLAS_CELL * 0.8;   // por encima de esto la celda del atlas se nota
+const HIRES_K = 0.8;   // umbral de promoción relativo a la celda: por encima se nota
 const VIDEO_PX = 90;                 // tamaño mínimo para que valga la pena reproducir
 const MIN_HIT_PX = 22;        // suelo de área de clic: una mota de 12px es inalcanzable
 
@@ -427,7 +434,12 @@ export default function NewSpace3dFocus_2({ damping = 0.085, active = true, view
     // pequeña, así que se decide por puntero.
     const coarsePointer = window.matchMedia?.("(hover: none) and (pointer: coarse)")?.matches ?? false;
     const dprCap = coarsePointer ? 1.5 : 2;
-    const POOL_SIZE = isMobile ? 6 : 14;
+    // Escritorio: más celda de atlas y más ranuras full-res a la vez. Móvil se
+    // mantiene en el baseline para proteger VRAM y batería.
+    const ATLAS_CELL = isMobile ? ATLAS_CELL_MOBILE : ATLAS_CELL_DESKTOP;
+    const ATLAS_SIZE = ATLAS_COLS * ATLAS_CELL;
+    const HIRES_PX = ATLAS_CELL * HIRES_K;
+    const POOL_SIZE = isMobile ? 6 : 18;
     const MAX_ACTIVE_VIDEOS = isMobile ? 1 : 3;
 
     // ── Media ────────────────────────────────────────────────────────────────

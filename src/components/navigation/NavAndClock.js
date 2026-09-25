@@ -102,6 +102,7 @@ export default function NavAndClock() {
         .bcn {
           --bcn-pill: 1.5em;
           --bcn-cut: 2px;
+          --bcn-ring: color-mix(in srgb, var(--atj-ink) 36%, transparent);
           display: flex;
           flex-direction: column;
           align-items: center;
@@ -114,13 +115,21 @@ export default function NavAndClock() {
           display: flex;
           align-items: stretch;
           height: var(--bcn-pill);
-          gap: var(--bcn-cut);
+          gap: 0;
           border-radius: 999px;
           overflow: hidden;
+          background: var(--atj-veil);
+          backdrop-filter: blur(20px);
+          -webkit-backdrop-filter: blur(20px);
+          transform: translateZ(0);
+          box-shadow: inset 0 0 0 1px var(--bcn-ring);
         }
 
         .bcn-nav {
-          display: contents;
+          display: flex;
+          align-items: stretch;
+          height: 100%;
+          min-width: 0;
         }
 
         /* Misma caja que .bcn-bar: la fila de densidad estira al mismo ancho. */
@@ -148,6 +157,11 @@ export default function NavAndClock() {
           height: var(--bcn-pill);
           border-radius: 999px;
           overflow: hidden;
+          background: var(--atj-veil);
+          backdrop-filter: blur(20px);
+          -webkit-backdrop-filter: blur(20px);
+          transform: translateZ(0);
+          box-shadow: inset 0 0 0 1px var(--bcn-ring);
         }
         /* Interruptor: la bolita toma --atj-ink, así que es negra en claro y
            blanca en oscuro sin lógica aparte. */
@@ -156,7 +170,7 @@ export default function NavAndClock() {
           --bcn-knob-pad: calc((var(--bcn-pill) - var(--bcn-knob)) / 2);
           width: calc(var(--bcn-pill) * 1.9);
           padding: 0 var(--bcn-knob-pad);
-          opacity: 1;
+          color: var(--atj-ink);
         }
 
         .bcn-knob {
@@ -196,31 +210,39 @@ export default function NavAndClock() {
           border: 0;
           border-radius: 0;
           background: var(--atj-hairline);
-          color: inherit;
+          color: color-mix(in srgb, var(--atj-ink) 72%, transparent);
           font: inherit;
           letter-spacing: inherit;
           line-height: 1;
           cursor: pointer;
           overflow: hidden;
-          opacity: 0.72;
-          transition: opacity 180ms ease;
+          opacity: 1;
+          transition: color 180ms ease;
         }
         .bcn-pill:hover,
         .bcn-pill:focus-visible {
-          opacity: 1;
+          color: var(--atj-ink);
           outline: none;
         }
-        .bcn-pill.is-active { opacity: 1; }
+        .bcn-pill.is-active { color: var(--atj-ink); }
+
+        /* Tras .bcn-pill: border:0 en la pill anulaba el split si iba arriba. */
+        .bcn-bar > * + * {
+          border-left: 1px solid var(--bcn-ring);
+        }
+        .bcn-nav > .bcn-pill + .bcn-pill {
+          border-left: 1px solid var(--bcn-ring);
+        }
 
         .bcn-pill.bcn-clock {
           padding: 0 0.7em;
-          opacity: 1;
+          color: var(--atj-ink);
           cursor: default;
           white-space: nowrap;
         }
         .bcn-pill.bcn-clock:hover,
         .bcn-pill.bcn-clock:focus-visible {
-          opacity: 1;
+          color: var(--atj-ink);
         }
 
         .bcn-pill__key {

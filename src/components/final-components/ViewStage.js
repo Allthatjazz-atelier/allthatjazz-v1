@@ -4,7 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/router";
 import ATJ_Slider from "@/components/final-components/ATJ_Slider";
 import ATJ_Grid from "@/components/final-components/ATJ_Grid";
-import NewSpace3dFocus_2 from "@/components/final-components/NewSpace3dFocus_2";
+import NewSpace3dFocus_3 from "@/components/final-components/NewSpace3dFocus_3";
 import {
   afterLayout,
   MORPH_MS,
@@ -272,7 +272,7 @@ export default function ViewStage() {
 
       <div className="stage__layer" data-on={shown === "galaxy" ? "true" : "false"}>
         {galaxyReady && (
-          <NewSpace3dFocus_2 viewRef={galaxyRef} active={shown === "galaxy"} />
+          <NewSpace3dFocus_3 viewRef={galaxyRef} active={shown === "galaxy"} />
         )}
       </div>
 

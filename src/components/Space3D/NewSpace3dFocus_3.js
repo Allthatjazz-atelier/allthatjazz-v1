@@ -3,68 +3,18 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import * as THREE from "three";
 import gsap from "gsap";
-import { useOptimizedMedia } from "@/hooks/useOptimizedMedia";
-import { SPACE_IMAGES, ALL_VIDEOS } from "@/data/mediaCatalog";
+import {
+  pickImageUrlForDisplayWidth,
+  useOptimizedMedia,
+} from "@/hooks/useOptimizedMediaNew";
+import { onThemeChange, readThemeColor } from "@/hooks/useTheme";
+import { buildPieces, GALLERIES } from "@/data/pieces";
 
-// ─── Constelaciones ────────────────────────────────────────────────────────────
-// Sin polvo: cada sprite es una pieza real, clicable y enfocable. `shape` es la
-// silueta del cúmulo — es lo que hace reconocible cada galería de lejos.
-// PROVISIONAL: sustituir `label` e `images` por las galerías reales.
-const CONSTELLATIONS = [
-  {
-    id: "adec",
-    label: "AdeC",
-    shape: "ring",
-    images: ["adec-scroll-11", "adec-scroll-12", "adec-scroll-13", "atj-webcontent-002", "atj-webcontent-003"],
-  },
-  {
-    id: "galaxy-bar",
-    label: "Galaxy Bar",
-    shape: "ball",
-    images: ["galaxy-bar-stickers", "galaxybar-explo-serviellets02", "atj-webcontent-001", "atj-webcontent-004", "atj-webcontent-005"],
-  },
-  {
-    id: "johnny",
-    label: "Johnny Carretes",
-    shape: "spindle",
-    images: ["atj-webcontent-006", "atj-webcontent-007", "atj-webcontent-008", "atj-webcontent-009", "atj-webcontent-010"],
-  },
-  {
-    id: "bisbis",
-    label: "Bis Bis",
-    shape: "lattice",
-    images: ["atj-webcontent-011", "atj-webcontent-012", "atj-webcontent-013", "atj-webcontent-014", "atj-webcontent-015"],
-  },
-  {
-    id: "socarrat",
-    label: "Socarrat",
-    shape: "shell",
-    images: ["atj-webcontent-016", "atj-webcontent-017", "atj-webcontent-018", "atj-webcontent-019", "atj-webcontent-020"],
-  },
-  {
-    id: "dfny",
-    label: "DFNY",
-    shape: "disc",
-    images: ["atj-webcontent-021", "atj-webcontent-022", "atj-webcontent-023", "atj-webcontent-024", "atj-webcontent-025"],
-  },
-  {
-    id: "playground",
-    label: "Playground",
-    shape: "swarm",
-    images: ["atj-webcontent-026", "atj-webcontent-027", "atj-webcontent-028", "atj-webcontent-029", "atj-webcontent-030"],
-  },
-  {
-    id: "archive",
-    label: "Archive",
-    shape: "arc",
-    images: ["img-3514", "img-3623", "img-3777-3", "img-5434", "img-5438", "img-5447", "texture-ballon-9-bitmap", "atj-paper-mockup-02-nobg"],
-  },
-];
-
-// Piezas totales en la galaxia. El catálogo actual tiene 63 activos, así que se
-// rellena ciclando el catálogo (nunca dos veces la misma pieza dentro de una
-// constelación). Cuando haya 120 originales, el relleno desaparece solo.
-const TARGET_PIECES = 120;
+// ─── Contenido ─────────────────────────────────────────────────────────────────
+// Las piezas y su orden vienen de `@/data/pieces`, la misma lista que recorre el
+// slider. Sin polvo: cada sprite es una pieza real, clicable y enfocable, y su
+// posición en la lista es su identidad — que es lo que permitirá el morph entre
+// vistas. La silueta de cada cúmulo sale del `shape` de su galería.
 
 // ─── Galaxia ───────────────────────────────────────────────────────────────────
 // Núcleo compacto y volumétrico: las constelaciones se reparten sobre una
@@ -91,11 +41,7 @@ const NEAR_MARGIN   = 7;      // nada se acerca más que esto a la cámara
 
 const PITCH_0  = 0.42;
 const YAW_0    = 0.55;
-const FOG_DEPTH = 0.78;       // cuánto se lava hacia blanco lo lejano
-const FOG_NEAR_K = 0.42;
-const FOG_FAR_K  = 1.15;
-const FOG_FAR_R  = 0.9;
-const FAR_R      = 2.8;
+const FAR_R      = 2.8;       // corte lejano del hit-test (sin niebla visual)
 
 const VIEW_AXIS = { x: Math.sin(YAW_0), z: Math.cos(YAW_0) };
 
@@ -117,11 +63,10 @@ const MIN_DIST   = 3.6;
 const ORBIT_DIST = 11;
 
 // ─── Texturas ──────────────────────────────────────────────────────────────────
-const ATLAS_COLS = 11;        // 121 celdas: cubre el catálogo objetivo de ~120
-const ATLAS_CELL = 186;
-const ATLAS_SIZE = ATLAS_COLS * ATLAS_CELL;
-const ATLAS_CAP  = ATLAS_COLS * ATLAS_COLS;
-const HIRES_PX = ATLAS_CELL * 0.8;   // por encima de esto la celda del atlas se nota
+// Miniaturas en GPU: una capa por nombre único (texture2DArray), sin atlas 2D.
+const THUMB_TEX = 512;
+const THUMB_LOAD_CONCURRENCY = 4;
+const HIRES_PX = 195;   // por encima de esto la pieza sale del array al pool hi-res
 const VIDEO_PX = 90;                 // tamaño mínimo para que valga la pena reproducir
 const MIN_HIT_PX = 22;        // suelo de área de clic: una mota de 12px es inalcanzable
 
@@ -219,8 +164,8 @@ const SHAPES = {
 };
 
 // ─── Shaders ───────────────────────────────────────────────────────────────────
-// Color opaco (mezcla hacia blanco): basta el z-buffer, no hay que ordenar. Lo
-// filtrado encoge a cero en vez de quedar fantasma, si no taparía en blanco.
+// Color directo del mapa (alpha sobre el clear del canvas). Sin niebla ni
+// mezcla a uBg en el fragment — paridad con un <img> / MeshBasicMaterial.
 const FILTER_GLSL = /* glsl */ `
   uniform float uActive;
   uniform float uFilterMix;
@@ -252,173 +197,167 @@ const MOTION_GLSL = /* glsl */ `
   }
 `;
 
-const DEPTH_GLSL = /* glsl */ `
-  uniform float uFogNear;
-  uniform float uFogFar;
-  uniform float uFar;
+const FILTER_GLSL3 = FILTER_GLSL.replace(/uniform float uActive;/, "uniform float uActive;")
+  .replace(/float groupFactor/g, "float groupFactor");
 
-  float depthFade(float d) {
-    float fog = 1.0 - smoothstep(uFogNear, uFogFar, d) * ${FOG_DEPTH.toFixed(2)};
-    float far = 1.0 - smoothstep(uFar * 0.84, uFar, d);
-    return fog * far;
-  }
-`;
+const MOTION_GLSL3 = MOTION_GLSL;
 
-const CLOUD_VERT = /* glsl */ `
-  attribute vec3  iOffset;
-  attribute vec2  iSize;
-  attribute vec2  iCell;
-  attribute float iGroup;
-  attribute float iSeed;
-  attribute float iIndex;
+const CLOUD_VERT = `
+precision highp float;
+in vec3 iOffset;
+in vec2 iSize;
+in float iLayer;
+in float iGroup;
+in float iSeed;
+in float iIndex;
+in vec3 iFrom;
+in vec2 iFromSize;
+in float iDelay;
+in vec4 iUvRect;
 
-  uniform float uCloud;
-  uniform float uHoverIndex;
+uniform float uCloud;
+uniform float uHoverIndex;
+uniform float uMorph;
 
-  varying vec2  vUv;
-  varying vec2  vCell;
-  varying float vAlpha;
+out vec2 vSampleUv;
+out float vLayer;
+out float vAlpha;
 
-  ${FILTER_GLSL}
-  ${DEPTH_GLSL}
-  ${MOTION_GLSL}
+${FILTER_GLSL3}
+${MOTION_GLSL3}
 
-  void main() {
-    float grp = groupFactor(iGroup);
-    float isHover = abs(iIndex - uHoverIndex) < 0.5 ? 1.0 : 0.0;
-    float grow = 1.0 + ${HOVER_GROW.toFixed(3)} * isHover;
+void main() {
+  float grp = groupFactor(iGroup);
+  float isHover = abs(iIndex - uHoverIndex) < 0.5 ? 1.0 : 0.0;
+  float grow = 1.0 + ${HOVER_GROW.toFixed(3)} * isHover;
 
-    vec4 mvCenter = modelViewMatrix * vec4(iOffset + motionOf(iOffset, iSeed, isHover), 1.0);
-    vec4 mvPos    = mvCenter + vec4(position.xy * iSize * grp * grow, 0.0, 0.0);
-    gl_Position   = projectionMatrix * mvPos;
+  float m = clamp((uMorph - iDelay) / max(0.0001, 1.0 - iDelay), 0.0, 1.0);
+  m = m * m * (3.0 - 2.0 * m);
+  vec3 basePos  = mix(iFrom, iOffset, m);
+  vec2 baseSize = mix(iFromSize, iSize, m);
 
-    vAlpha = depthFade(-mvCenter.z) * grp * uCloud;
-    vUv    = uv;
-    vCell  = iCell;
-  }
-`;
+  vec4 mvCenter = modelViewMatrix * vec4(basePos + motionOf(basePos, iSeed, isHover) * m, 1.0);
+  vec4 mvPos    = mvCenter + vec4(position.xy * baseSize * grp * grow, 0.0, 0.0);
+  gl_Position   = projectionMatrix * mvPos;
 
-const CLOUD_FRAG = /* glsl */ `
-  uniform sampler2D uAtlas;
-  uniform float uCellScale;
+  vAlpha = grp * uCloud;
+  vSampleUv = uv * iUvRect.zw + iUvRect.xy;
+  vLayer = iLayer;
+}`;
 
-  varying vec2  vUv;
-  varying vec2  vCell;
-  varying float vAlpha;
+const CLOUD_FRAG = `
+precision highp float;
+precision highp sampler2DArray;
 
-  void main() {
-    if (vAlpha < 0.012) discard;
-    vec2 uv = (vCell + vec2(vUv.x, 1.0 - vUv.y)) * uCellScale;
-    vec4 texel = texture2D(uAtlas, uv);
-    gl_FragColor = vec4(mix(vec3(1.0), texel.rgb, texel.a * vAlpha), 1.0);
-  }
-`;
+uniform sampler2DArray uThumbArray;
 
-const PIECE_VERT = /* glsl */ `
-  uniform vec2  uSize;
-  uniform float uGroup;
-  uniform float uFocused;
-  uniform float uOpacity;
-  uniform float uSeed;
-  uniform float uIsHover;
+in vec2 vSampleUv;
+in float vLayer;
+in float vAlpha;
+out vec4 fragColor;
 
-  varying vec2  vUv;
-  varying float vAlpha;
+void main() {
+  if (vAlpha < 0.012) discard;
+  vec4 texel = texture(uThumbArray, vec3(vSampleUv.x, 1.0 - vSampleUv.y, floor(vLayer + 0.5)));
+  float a = texel.a * vAlpha;
+  if (a < 0.004) discard;
+  fragColor = vec4(texel.rgb, a);
+}`;
 
-  ${FILTER_GLSL}
-  ${DEPTH_GLSL}
-  ${MOTION_GLSL}
+const PIECE_VERT = `
+precision highp float;
 
-  void main() {
-    float grp = mix(groupFactor(uGroup), 1.0, uFocused);
-    float grow = 1.0 + ${HOVER_GROW.toFixed(3)} * uIsHover * (1.0 - uFocused);
+uniform vec2 uSize;
+uniform float uGroup;
+uniform float uFocused;
+uniform float uOpacity;
+uniform float uSeed;
+uniform float uIsHover;
+uniform vec3 uFrom;
+uniform vec2 uFromSize;
+uniform float uMorph;
+uniform float uDelay;
 
-    // La matriz de modelo es una traslación pura, así que pasar el
-    // desplazamiento con w=1 ya lo suma a la posición de la mesh.
-    vec3 disp = motionOf(modelMatrix[3].xyz, uSeed, uIsHover) * (1.0 - uFocused);
-    vec4 mvCenter = modelViewMatrix * vec4(disp, 1.0);
-    vec4 mvPos    = mvCenter + vec4(position.xy * uSize * grp * grow, 0.0, 0.0);
-    gl_Position   = projectionMatrix * mvPos;
+out vec2 vUv;
+out float vAlpha;
 
-    float env = mix(depthFade(-mvCenter.z), 1.0, uFocused);
-    vAlpha = env * grp * uOpacity;
-    vUv    = uv;
-  }
-`;
+${FILTER_GLSL3}
+${MOTION_GLSL3}
 
-const PIECE_FRAG = /* glsl */ `
-  uniform sampler2D uTex;
-  uniform float uUseAtlas;
-  uniform vec2  uCell;
-  uniform float uCellScale;
-  uniform float uFlipV;
-  uniform float uExpandRange;
+void main() {
+  float grp = mix(groupFactor(uGroup), 1.0, uFocused);
+  float grow = 1.0 + ${HOVER_GROW.toFixed(3)} * uIsHover * (1.0 - uFocused);
 
-  varying vec2  vUv;
-  varying float vAlpha;
+  float m = clamp((uMorph - uDelay) / max(0.0001, 1.0 - uDelay), 0.0, 1.0);
+  m = m * m * (3.0 - 2.0 * m);
+  vec3 target = modelMatrix[3].xyz;
+  vec3 basePos = mix(uFrom, target, m);
+  vec3 disp = motionOf(target, uSeed, uIsHover) * (1.0 - uFocused) * m;
+  vec2 baseSize = mix(uFromSize, uSize, m);
+  vec4 mvCenter = viewMatrix * vec4(basePos + disp, 1.0);
+  vec4 mvPos    = mvCenter + vec4(position.xy * baseSize * grp * grow, 0.0, 0.0);
+  gl_Position   = projectionMatrix * mvPos;
 
-  void main() {
-    if (vAlpha < 0.006) discard;
+  vAlpha = grp * uOpacity;
+  vUv    = uv;
+}`;
 
-    vec2 own  = vec2(vUv.x, mix(vUv.y, 1.0 - vUv.y, uFlipV));
-    vec2 cell = (uCell + vec2(vUv.x, 1.0 - vUv.y)) * uCellScale;
-    vec2 uv   = mix(own, cell, uUseAtlas);
+const PIECE_FRAG = `
+precision highp float;
+precision highp sampler2DArray;
 
-    vec4 texel = texture2D(uTex, uv);
-    vec3 rgb = mix(
-      texel.rgb,
-      clamp((texel.rgb - 0.062745) / 0.858824, 0.0, 1.0),
-      uExpandRange
-    );
-    float a = texel.a * vAlpha;
-    gl_FragColor = vec4(mix(vec3(1.0), rgb, a), 1.0);
-  }
-`;
+uniform sampler2DArray uThumbArray;
+uniform sampler2D uTex;
+uniform float uUseThumb;
+uniform float uLayer;
+uniform float uFlipV;
+uniform vec4 uUvRect;
+
+in vec2 vUv;
+in float vAlpha;
+out vec4 fragColor;
+
+void main() {
+  if (vAlpha < 0.006) discard;
+
+  vec2 thumbUv = vUv * uUvRect.zw + uUvRect.xy;
+  vec2 own = uUseThumb > 0.5
+    ? vec2(thumbUv.x, mix(thumbUv.y, 1.0 - thumbUv.y, uFlipV))
+    : vec2(vUv.x, mix(vUv.y, 1.0 - vUv.y, uFlipV));
+  vec4 texel = uUseThumb > 0.5
+    ? texture(uThumbArray, vec3(own, floor(uLayer + 0.5)))
+    : texture(uTex, own);
+  float a = texel.a * vAlpha;
+  if (a < 0.004) discard;
+  fragColor = vec4(texel.rgb, a);
+}`;
 
 // ─── Reparto ───────────────────────────────────────────────────────────────────
-function buildGroups(imageNames, videoNames) {
-  const imgPool = new Set(imageNames);
-  const groups = CONSTELLATIONS.map((c) => ({
-    id: c.id,
-    label: c.label,
-    shape: SHAPES[c.shape] ? c.shape : "swarm",
-    members: c.images.filter((n) => imgPool.has(n)).map((name) => ({ name, type: "image" })),
-  }));
-  if (!groups.length) return [];
-
-  const claimed = new Set(groups.flatMap((g) => g.members.map((m) => m.name)));
-  imageNames.filter((n) => !claimed.has(n)).forEach((name, i) => {
-    groups[(groups.length - 1 + i) % groups.length].members.push({ name, type: "image" });
-  });
-  videoNames.forEach((name, i) => {
-    groups[i % groups.length].members.push({ name, type: "video" });
-  });
-
-  // Relleno hasta TARGET_PIECES ciclando el catálogo, sin repetir dentro de un
-  // mismo grupo. Es andamiaje: con 120 originales no entra aquí nunca.
-  // El relleno usa solo imágenes: los vídeos son los que hay, no se multiplican.
-  const catalog = imageNames.map((name) => ({ name, type: "image" }));
-  if (catalog.length) {
-    const taken = groups.map((g) => new Set(g.members.map((m) => m.name)));
-    let total = groups.reduce((a, g) => a + g.members.length, 0);
-    let cursor = 0;
-    let guard = TARGET_PIECES * catalog.length;
-    while (total < TARGET_PIECES && guard-- > 0) {
-      const gi = groups.reduce((best, g, i) => (g.members.length < groups[best].members.length ? i : best), 0);
-      const asset = catalog[cursor % catalog.length];
-      cursor += 1;
-      if (taken[gi].has(asset.name)) continue;
-      taken[gi].add(asset.name);
-      groups[gi].members.push({ ...asset, filler: true });
-      total += 1;
+// Agrupa la lista canónica por galería SIN reordenarla: las galerías ya vienen
+// seguidas, así que al aplanar los grupos se recupera exactamente el mismo orden.
+// De ahí que el índice de instancia coincida con el índice canónico, que es lo
+// que hará que la pieza 47 sea la pieza 47 también en el slider.
+function groupPieces(pieces) {
+  const byId = new Map();
+  for (const p of pieces) {
+    let g = byId.get(p.gallery);
+    if (!g) {
+      const meta = GALLERIES.find((x) => x.id === p.gallery);
+      g = {
+        id: p.gallery,
+        label: p.galleryLabel,
+        shape: SHAPES[meta?.shape] ? meta.shape : "swarm",
+        members: [],
+      };
+      byId.set(p.gallery, g);
     }
+    g.members.push(p);
   }
-
-  return groups.filter((g) => g.members.length);
+  return [...byId.values()];
 }
 
 // ─── Componente ────────────────────────────────────────────────────────────────
-export default function NewSpace3dFocus_2({ damping = 0.085 } = {}) {
+export default function NewSpace3dFocus_3({ damping = 0.085, active = true, viewRef } = {}) {
   const canvasRef = useRef(null);
   const apiRef = useRef(null);
   const onFocusRef = useRef(null);
@@ -426,27 +365,55 @@ export default function NewSpace3dFocus_2({ damping = 0.085 } = {}) {
   const [lockedId, setLockedId] = useState(null);
   const [hoverId, setHoverId] = useState(null);
   const [inFocus, setInFocus] = useState(false);
+  const [vvBox, setVvBox] = useState(null);
+
+  useEffect(() => {
+    const sync = () => {
+      const vv = window.visualViewport;
+      if (!vv) return;
+      setVvBox((prev) => {
+        if (prev && prev.top === vv.offsetTop && prev.height === vv.height) return prev;
+        return { top: vv.offsetTop, height: vv.height };
+      });
+    };
+    sync();
+    window.visualViewport?.addEventListener("resize", sync);
+    window.visualViewport?.addEventListener("scroll", sync);
+    window.addEventListener("resize", sync);
+    return () => {
+      window.visualViewport?.removeEventListener("resize", sync);
+      window.visualViewport?.removeEventListener("scroll", sync);
+      window.removeEventListener("resize", sync);
+    };
+  }, []);
   onFocusRef.current = setInFocus;
 
-  const { getImage, getVideo, isLoaded, imageIds, videoIds } = useOptimizedMedia();
+  const { getImage, getVideo, getImageSet, isLoaded, imageIds, videoIds } = useOptimizedMedia();
 
-  const groups = useMemo(() => {
-    const imgs = imageIds?.length ? imageIds : SPACE_IMAGES;
-    const vids = videoIds?.length ? videoIds : ALL_VIDEOS;
-    return buildGroups(imgs, vids);
-  }, [imageIds, videoIds]);
+  const groups = useMemo(
+    () => groupPieces(buildPieces(imageIds, videoIds)),
+    [imageIds, videoIds],
+  );
 
   const getImageRef = useRef(getImage);
   const getVideoRef = useRef(getVideo);
+  const getImageSetRef = useRef(getImageSet);
   getImageRef.current = getImage;
   getVideoRef.current = getVideo;
+  getImageSetRef.current = getImageSet;
 
   useEffect(() => {
     const canvas = canvasRef.current;
     if (!canvas || !isLoaded || !groups.length) return;
 
     const isMobile = window.innerWidth <= 768;
-    const dprCap = isMobile ? 1 : 2;
+    // El DPR no se capa por ancho de ventana: con la regla anterior, cualquier
+    // ventana estrecha en una pantalla Retina renderizaba a la mitad de
+    // resolución y la galaxia se veía blanda al lado del DOM. Lo que justifica
+    // bajar el DPR es un dispositivo táctil de gama media, no una ventana
+    // pequeña, así que se decide por puntero.
+    const coarsePointer = window.matchMedia?.("(hover: none) and (pointer: coarse)")?.matches ?? false;
+    const dprCap = coarsePointer ? 1.5 : 2;
     const POOL_SIZE = isMobile ? 6 : 14;
     const MAX_ACTIVE_VIDEOS = isMobile ? 1 : 3;
 
@@ -458,7 +425,13 @@ export default function NewSpace3dFocus_2({ damping = 0.085 } = {}) {
         if (m.type === "video") {
           if (videoSrc.has(m.name)) continue;
           const v = getVideoRef.current(m.name);
-          if (v?.sources?.length) videoSrc.set(m.name, { sources: v.sources, poster: v.poster || null });
+          if (v?.sources?.length) {
+            videoSrc.set(m.name, {
+              sources: v.sources,
+              poster: v.poster || null,
+              thumb: v.thumbSrc || null,
+            });
+          }
           continue;
         }
         if (imageSrc.has(m.name)) continue;
@@ -471,6 +444,10 @@ export default function NewSpace3dFocus_2({ damping = 0.085 } = {}) {
     }
 
     // ── Renderer ─────────────────────────────────────────────────────────────
+    // El fondo es el mismo token que pinta el DOM: las piezas se funden contra
+    // él por profundidad, así que la galaxia y la página comparten un solo valor.
+    const bgColor = new THREE.Color(readThemeColor("--atj-bg"));
+
     const renderer = new THREE.WebGLRenderer({
       canvas,
       antialias: !isMobile,
@@ -482,7 +459,14 @@ export default function NewSpace3dFocus_2({ damping = 0.085 } = {}) {
     renderer.setPixelRatio(Math.min(window.devicePixelRatio, dprCap));
     renderer.setSize(window.innerWidth, window.innerHeight, false);
     renderer.outputColorSpace = THREE.SRGBColorSpace;
-    renderer.setClearColor(0xffffff, 1);
+    renderer.toneMapping = THREE.NoToneMapping;
+    renderer.setClearColor(bgColor, 1);
+    if (!renderer.capabilities.isWebGL2) {
+      console.error("[Galaxy] WebGL2 es necesario para texture2DArray.");
+      renderer.dispose();
+      return undefined;
+    }
+    const maxAniso = renderer.capabilities.getMaxAnisotropy();
 
     const scene = new THREE.Scene();
     const camera = new THREE.PerspectiveCamera(
@@ -527,40 +511,71 @@ export default function NewSpace3dFocus_2({ damping = 0.085 } = {}) {
       return hi;
     };
 
-    // ── Atlas ────────────────────────────────────────────────────────────────
-    // Un solo archivo para toda la galaxia: 121 celdas ≈ 21 MB de VRAM frente a
-    // ~200 MB de texturas sueltas. La resolución completa llega por cercanía.
-    const atlasCanvas = document.createElement("canvas");
-    atlasCanvas.width = ATLAS_SIZE;
-    atlasCanvas.height = ATLAS_SIZE;
-    const atlasCtx = atlasCanvas.getContext("2d", { alpha: false });
-    atlasCtx.fillStyle = "#ffffff";
-    atlasCtx.fillRect(0, 0, ATLAS_SIZE, ATLAS_SIZE);
-
-    const atlasTex = new THREE.CanvasTexture(atlasCanvas);
-    atlasTex.colorSpace = THREE.SRGBColorSpace;
-    atlasTex.flipY = false;              // la v se invierte en el shader
-    atlasTex.premultiplyAlpha = false;
-    atlasTex.generateMipmaps = true;
-    atlasTex.minFilter = THREE.LinearMipmapLinearFilter;
-    atlasTex.magFilter = THREE.LinearFilter;
-    atlasTex.anisotropy = 1;
-
-    const cellOf = new Map();
+    // ── Miniaturas (texture2DArray) ───────────────────────────────────────────
+    const uniqueNames = [
+      ...new Set([
+        ...imageSrc.keys(),
+        ...videoSrc.keys(),
+        ...groups.flatMap((g) => g.members.map((m) => m.name)),
+      ]),
+    ].sort();
+    const layerOf = new Map(uniqueNames.map((name, i) => [name, i]));
     const aspectOf = new Map();
     const aspectHooks = new Map();
-    const atlasImgs = [];
-    let atlasSlot = 0;
-    let atlasDirty = false;
-    let atlasStamp = 0;
+    const thumbReady = new Set();
+    const thumbLoading = new Set();
+    const thumbQueue = [];
+    let thumbInflight = 0;
 
-    const takeCell = (name) => {
-      if (cellOf.has(name)) return cellOf.get(name);
-      if (atlasSlot >= ATLAS_CAP) return null;
-      const cell = [atlasSlot % ATLAS_COLS, Math.floor(atlasSlot / ATLAS_COLS)];
-      atlasSlot += 1;
-      cellOf.set(name, cell);
-      return cell;
+    const fillThumbBg = (data) => {
+      for (let i = 0; i < data.length; i += 4) {
+        data[i] = 0;
+        data[i + 1] = 0;
+        data[i + 2] = 0;
+        data[i + 3] = 0;
+      }
+    };
+
+    const layerUvRect = new Map();
+    const UV_FULL = new THREE.Vector4(0, 0, 1, 1);
+
+    const thumbDepth = Math.max(1, uniqueNames.length);
+    const thumbData = new Uint8Array(THUMB_TEX * THUMB_TEX * 4 * thumbDepth);
+    fillThumbBg(thumbData);
+    const thumbArray = new THREE.DataArrayTexture(thumbData, THUMB_TEX, THUMB_TEX, thumbDepth);
+    thumbArray.format = THREE.RGBAFormat;
+    thumbArray.type = THREE.UnsignedByteType;
+    thumbArray.colorSpace = THREE.SRGBColorSpace;
+    thumbArray.minFilter = THREE.LinearFilter;
+    thumbArray.magFilter = THREE.LinearFilter;
+    thumbArray.generateMipmaps = false;
+    thumbArray.needsUpdate = true;
+    renderer.initTexture(thumbArray);
+
+    const blitThumbLayer = (layer, img) => {
+      const paint = document.createElement("canvas");
+      paint.width = THUMB_TEX;
+      paint.height = THUMB_TEX;
+      const ctx = paint.getContext("2d", { alpha: true });
+      ctx.clearRect(0, 0, THUMB_TEX, THUMB_TEX);
+      const iw = img.naturalWidth || img.width || 1;
+      const ih = img.naturalHeight || img.height || 1;
+      const scale = Math.min(THUMB_TEX / iw, THUMB_TEX / ih);
+      const dw = iw * scale;
+      const dh = ih * scale;
+      const px = (THUMB_TEX - dw) / 2;
+      const py = (THUMB_TEX - dh) / 2;
+      ctx.drawImage(img, px, py, dw, dh);
+      const slice = ctx.getImageData(0, 0, THUMB_TEX, THUMB_TEX);
+      const off = layer * THUMB_TEX * THUMB_TEX * 4;
+      thumbData.set(slice.data, off);
+      thumbArray.needsUpdate = true;
+      layerUvRect.set(layer, new THREE.Vector4(
+        px / THUMB_TEX,
+        py / THUMB_TEX,
+        dw / THUMB_TEX,
+        dh / THUMB_TEX,
+      ));
     };
 
     const onAspect = (name, fn) => {
@@ -570,45 +585,100 @@ export default function NewSpace3dFocus_2({ damping = 0.085 } = {}) {
       aspectHooks.set(name, list);
     };
 
-    const loadIntoAtlas = (name, url) => {
-      if (!url) return;
-      const cell = takeCell(name);
-      if (!cell) return;
-      const img = new Image();
-      img.decoding = "async";
-      atlasImgs.push(img);
-      img.onload = () => {
-        // Estirada a la celda cuadrada; el quad la devuelve a su proporción.
-        atlasCtx.drawImage(img, cell[0] * ATLAS_CELL, cell[1] * ATLAS_CELL, ATLAS_CELL, ATLAS_CELL);
-        atlasDirty = true;
-        const ar = THREE.MathUtils.clamp((img.naturalWidth || 1) / (img.naturalHeight || 1), 0.4, 2.6);
-        aspectOf.set(name, ar);
-        (aspectHooks.get(name) || []).forEach((fn) => fn(ar));
-        aspectHooks.delete(name);
-        img.onload = null;
-        img.onerror = null;
-      };
-      img.onerror = () => { img.onload = null; img.onerror = null; };
-      img.src = url;
+    const thumbUrlFor = (name) => {
+      const devicePx = THUMB_TEX * renderer.getPixelRatio();
+      if (videoSrc.has(name)) {
+        const poster = videoSrc.get(name)?.poster;
+        return poster ? toFieldUrl(poster) : null;
+      }
+      const set = getImageSetRef.current(name);
+      let url = pickImageUrlForDisplayWidth(set, devicePx);
+      if (url && !isWebglSafe(url)) {
+        const fb = imageSrc.get(name);
+        url = fb ? pickWebglUrl(getImageRef.current(name)) || fb.hi : null;
+      }
+      return url || imageSrc.get(name)?.field || null;
     };
 
-    for (const [name, src] of imageSrc) loadIntoAtlas(name, src.field);
-    for (const [name, src] of videoSrc) loadIntoAtlas(name, toFieldUrl(src.poster));
+    const finishThumb = (name, img) => {
+      const layer = layerOf.get(name);
+      if (layer === undefined) return;
+      blitThumbLayer(layer, img);
+      const ar = THREE.MathUtils.clamp((img.naturalWidth || 1) / (img.naturalHeight || 1), 0.4, 2.6);
+      aspectOf.set(name, ar);
+      (aspectHooks.get(name) || []).forEach((fn) => fn(ar));
+      aspectHooks.delete(name);
+      thumbReady.add(name);
+      for (const p of pieces) {
+        if (p.name === name) writeUvRect(p);
+      }
+      for (const s of pool) {
+        if (s.piece?.name === name) applySlotUvRect(s);
+      }
+    };
+
+    const pumpThumbs = () => {
+      while (thumbInflight < THUMB_LOAD_CONCURRENCY && thumbQueue.length) {
+        const name = thumbQueue.shift();
+        if (!name || thumbReady.has(name) || thumbLoading.has(name)) continue;
+        const url = thumbUrlFor(name);
+        if (!url) continue;
+        thumbLoading.add(name);
+        thumbInflight += 1;
+        const img = new Image();
+        img.crossOrigin = "anonymous";
+        img.decoding = "async";
+        const done = () => {
+          thumbLoading.delete(name);
+          thumbInflight -= 1;
+          pumpThumbs();
+        };
+        img.onload = () => {
+          finishThumb(name, img);
+          done();
+          img.onload = null;
+          img.onerror = null;
+        };
+        img.onerror = () => {
+          const fb = imageSrc.get(name)?.hiFb || imageSrc.get(name)?.field;
+          if (fb && fb !== url) {
+            img.src = fb;
+            return;
+          }
+          done();
+          img.onload = null;
+          img.onerror = null;
+        };
+        img.src = url;
+      }
+    };
+
+    const queueThumb = (name, front = false) => {
+      if (!layerOf.has(name) || thumbReady.has(name) || thumbLoading.has(name)) return;
+      if (thumbQueue.includes(name)) {
+        if (front) {
+          const i = thumbQueue.indexOf(name);
+          thumbQueue.splice(i, 1);
+          thumbQueue.unshift(name);
+        }
+        return;
+      }
+      if (front) thumbQueue.unshift(name);
+      else thumbQueue.push(name);
+      pumpThumbs();
+    };
 
     // ── Uniforms compartidos ─────────────────────────────────────────────────
     const shared = {
       uActive:    { value: -1 },
       uFilterMix: { value: 0 },
-      uFogNear:   { value: 20 },
-      uFogFar:    { value: 60 },
-      uFar:       { value: 120 },
-      uCellScale: { value: 1 / ATLAS_COLS },
       uTime:         { value: 0 },
       uCursorPoint:  { value: new THREE.Vector3(0, 0, 0) },
       uCursorPush:   { value: 0 },
       uCursorRadius: { value: CURSOR_RADIUS },
     };
     const cloudMaster = { value: 1 };
+    const morph = { value: 1 };   // 1 = la galaxia en su sitio
 
     // ── Siembra ──────────────────────────────────────────────────────────────
     const centers = [];
@@ -660,6 +730,10 @@ export default function NewSpace3dFocus_2({ damping = 0.085 } = {}) {
         pieces.push({
           name: m.name,
           type: m.type,
+          // Posición en la lista canónica: es la identidad compartida con el
+          // slider. `index` (más abajo) es la posición de instancia, que puede
+          // diferir si alguna pieza no resuelve su URL.
+          canonical: m.index,
           group: gi,
           pos: new THREE.Vector3(
             cx + bx.x * lx + by.x * ly + bz.x * lz,
@@ -688,10 +762,14 @@ export default function NewSpace3dFocus_2({ damping = 0.085 } = {}) {
     const n = pieces.length;
     const offsets = new Float32Array(n * 3);
     const sizes = new Float32Array(n * 2);
-    const cells = new Float32Array(n * 2);
+    const layers = new Float32Array(n);
     const gIdx = new Float32Array(n);
     const seeds = new Float32Array(n);
     const idx = new Float32Array(n);
+    const froms = new Float32Array(n * 3);
+    const fromSizes = new Float32Array(n * 2);
+    const delays = new Float32Array(n);
+    const uvRects = new Float32Array(n * 4);
 
     pieces.forEach((p, i) => {
       p.index = i;
@@ -703,6 +781,10 @@ export default function NewSpace3dFocus_2({ damping = 0.085 } = {}) {
       gIdx[i] = p.group;
       seeds[i] = p.seed;
       idx[i] = i;
+      uvRects[i * 4] = 0;
+      uvRects[i * 4 + 1] = 0;
+      uvRects[i * 4 + 2] = 1;
+      uvRects[i * 4 + 3] = 1;
     });
 
     const cloudGeo = new THREE.InstancedBufferGeometry();
@@ -712,35 +794,44 @@ export default function NewSpace3dFocus_2({ damping = 0.085 } = {}) {
     cloudGeo.setAttribute("iOffset", new THREE.InstancedBufferAttribute(offsets, 3));
     const sizeAttr = new THREE.InstancedBufferAttribute(sizes, 2);
     cloudGeo.setAttribute("iSize", sizeAttr);
-    const cellAttr = new THREE.InstancedBufferAttribute(cells, 2);
-    cloudGeo.setAttribute("iCell", cellAttr);
+    const layerAttr = new THREE.InstancedBufferAttribute(layers, 1);
+    cloudGeo.setAttribute("iLayer", layerAttr);
     cloudGeo.setAttribute("iGroup", new THREE.InstancedBufferAttribute(gIdx, 1));
     cloudGeo.setAttribute("iSeed", new THREE.InstancedBufferAttribute(seeds, 1));
     cloudGeo.setAttribute("iIndex", new THREE.InstancedBufferAttribute(idx, 1));
+    const fromAttr = new THREE.InstancedBufferAttribute(froms, 3);
+    const fromSizeAttr = new THREE.InstancedBufferAttribute(fromSizes, 2);
+    const delayAttr = new THREE.InstancedBufferAttribute(delays, 1);
+    cloudGeo.setAttribute("iFrom", fromAttr);
+    cloudGeo.setAttribute("iFromSize", fromSizeAttr);
+    cloudGeo.setAttribute("iDelay", delayAttr);
+    const uvRectAttr = new THREE.InstancedBufferAttribute(uvRects, 4);
+    cloudGeo.setAttribute("iUvRect", uvRectAttr);
     cloudGeo.instanceCount = n;
 
     const cloudMat = new THREE.ShaderMaterial({
+      glslVersion: THREE.GLSL3,
       vertexShader: CLOUD_VERT,
       fragmentShader: CLOUD_FRAG,
       uniforms: {
-        uAtlas:      { value: atlasTex },
+        uThumbArray: { value: thumbArray },
         uCloud:      cloudMaster,
         uHoverIndex: { value: -1 },
+        uMorph:      morph,
         uActive:       shared.uActive,
         uFilterMix:    shared.uFilterMix,
-        uFogNear:      shared.uFogNear,
-        uFogFar:       shared.uFogFar,
-        uFar:          shared.uFar,
-        uCellScale:    shared.uCellScale,
         uTime:         shared.uTime,
         uCursorPoint:  shared.uCursorPoint,
         uCursorPush:   shared.uCursorPush,
         uCursorRadius: shared.uCursorRadius,
       },
-      toneMapped: true,
+      toneMapped: false,
+      transparent: true,
+      depthWrite: false,
     });
 
     const cloud = new THREE.Mesh(cloudGeo, cloudMat);
+    cloud.renderOrder = 0;
     cloud.frustumCulled = false;
     scene.add(cloud);
 
@@ -751,16 +842,33 @@ export default function NewSpace3dFocus_2({ damping = 0.085 } = {}) {
       sizeAttr.needsUpdate = true;
     };
 
-    const applyCell = (p) => {
-      const cell = cellOf.get(p.name);
-      cells[p.index * 2] = cell ? cell[0] : 0;
-      cells[p.index * 2 + 1] = cell ? cell[1] : 0;
-      cellAttr.needsUpdate = true;
+    const applyLayer = (p) => {
+      layers[p.index] = layerOf.get(p.name) ?? 0;
+      layerAttr.needsUpdate = true;
+    };
+
+    const writeUvRect = (p) => {
+      const layer = layerOf.get(p.name);
+      const r = layer !== undefined ? (layerUvRect.get(layer) || UV_FULL) : UV_FULL;
+      const i = p.index;
+      uvRects[i * 4] = r.x;
+      uvRects[i * 4 + 1] = r.y;
+      uvRects[i * 4 + 2] = r.z;
+      uvRects[i * 4 + 3] = r.w;
+      uvRectAttr.needsUpdate = true;
+    };
+
+    const applySlotUvRect = (slot) => {
+      const piece = slot.piece;
+      if (!piece) return;
+      const layer = layerOf.get(piece.name);
+      const r = layer !== undefined ? (layerUvRect.get(layer) || UV_FULL) : UV_FULL;
+      slot.mat.uniforms.uUvRect.value.copy(r);
     };
 
     const byName = new Map();
     pieces.forEach((p) => {
-      applyCell(p);
+      applyLayer(p);
       const list = byName.get(p.name) || [];
       list.push(p);
       byName.set(p.name, list);
@@ -776,60 +884,84 @@ export default function NewSpace3dFocus_2({ damping = 0.085 } = {}) {
           else writeInstance(p);
         }
       });
+      list.forEach((p) => writeUvRect(p));
     }
 
     // ── Pool de piezas promocionadas ─────────────────────────────────────────
     // Lo que está cerca, en vídeo o en focus sale de la nube y pasa a su propia
     // mesh con textura completa. Acota la memoria y deja los draw calls en
     // 1 + lo promocionado.
-    const whiteTex = new THREE.DataTexture(
-      new Uint8Array([255, 255, 255, 255]), 1, 1, THREE.RGBAFormat,
+    // Relleno mientras la textura real no ha llegado. Va del color de fondo, así
+    // que la pieza aún no cargada no parpadea: simplemente no se ve.
+    const blankTex = new THREE.DataTexture(
+      new Uint8Array(4), 1, 1, THREE.RGBAFormat,
     );
-    whiteTex.needsUpdate = true;
+    const paintBlank = () => {
+      const px = blankTex.image.data;
+      px[0] = Math.round(bgColor.r * 255);
+      px[1] = Math.round(bgColor.g * 255);
+      px[2] = Math.round(bgColor.b * 255);
+      px[3] = 0;
+      blankTex.needsUpdate = true;
+    };
+    paintBlank();
+
+    const offTheme = onThemeChange(() => {
+      bgColor.set(readThemeColor("--atj-bg"));
+      renderer.setClearColor(bgColor, 1);
+      paintBlank();
+    });
 
     const loader = new THREE.TextureLoader();
     const pool = [];
     for (let i = 0; i < POOL_SIZE; i++) {
       const mat = new THREE.ShaderMaterial({
+        glslVersion: THREE.GLSL3,
         vertexShader: PIECE_VERT,
         fragmentShader: PIECE_FRAG,
         uniforms: {
-          uTex:         { value: whiteTex },
-          uUseAtlas:    { value: 0 },
-          uCell:        { value: new THREE.Vector2() },
+          uThumbArray: { value: thumbArray },
+          uTex:         { value: blankTex },
+          uUseThumb:    { value: 0 },
+          uLayer:       { value: 0 },
+          uUvRect:      { value: new THREE.Vector4(0, 0, 1, 1) },
           uSize:        { value: new THREE.Vector2(1, 1) },
           uOpacity:     { value: 1 },
           uGroup:       { value: 0 },
           uFocused:     { value: 0 },
           uFlipV:       { value: 0 },
-          uExpandRange: { value: 0 },
           uSeed:        { value: 0 },
           uIsHover:     { value: 0 },
+          uFrom:        { value: new THREE.Vector3() },
+          uFromSize:    { value: new THREE.Vector2() },
+          uDelay:       { value: 0 },
+          uMorph:       morph,
           uActive:       shared.uActive,
           uFilterMix:    shared.uFilterMix,
-          uFogNear:      shared.uFogNear,
-          uFogFar:       shared.uFogFar,
-          uFar:          shared.uFar,
-          uCellScale:    shared.uCellScale,
           uTime:         shared.uTime,
           uCursorPoint:  shared.uCursorPoint,
           uCursorPush:   shared.uCursorPush,
           uCursorRadius: shared.uCursorRadius,
         },
-        toneMapped: true,
+        toneMapped: false,
+        transparent: true,
+        depthWrite: false,
       });
       const mesh = new THREE.Mesh(plane, mat);
+      mesh.renderOrder = 1;
       mesh.frustumCulled = false;
       mesh.visible = false;
       scene.add(mesh);
       pool.push({ mesh, mat, piece: null, hiTex: null, token: 0 });
     }
 
+    uniqueNames.forEach((name) => queueThumb(name));
+
     const focus = { piece: null, slot: null, locked: false, savedFilter: null };
 
     const bindHiRes = (slot, piece, tex) => {
       tex.colorSpace = THREE.SRGBColorSpace;
-      tex.anisotropy = 1;
+      tex.anisotropy = maxAniso;
       tex.generateMipmaps = true;
       tex.minFilter = THREE.LinearMipmapLinearFilter;
       tex.magFilter = THREE.LinearFilter;
@@ -837,7 +969,7 @@ export default function NewSpace3dFocus_2({ damping = 0.085 } = {}) {
       tex.premultiplyAlpha = false;
       slot.hiTex = tex;
       slot.mat.uniforms.uTex.value = tex;
-      slot.mat.uniforms.uUseAtlas.value = 0;
+      slot.mat.uniforms.uUseThumb.value = 0;
       const im = tex.image;
       if (im?.width && im?.height) {
         const ar = THREE.MathUtils.clamp(im.width / im.height, 0.4, 2.6);
@@ -848,16 +980,79 @@ export default function NewSpace3dFocus_2({ damping = 0.085 } = {}) {
       }
     };
 
+    // Hasta que hay un frame decodificado la malla sigue en el póster del atlas.
+    // Cambiar ya al VideoTexture deja la casilla negra durante el vuelo al centro.
+    const revealVideo = (piece) => {
+      const slot = piece.slot;
+      if (!slot || slot.piece !== piece || !piece.videoTex) return;
+      if (piece.video.readyState < 2) return;
+      if (slot.mat.uniforms.uTex.value === piece.videoTex) return;
+      piece.videoTex.needsUpdate = true;
+      slot.mat.uniforms.uTex.value = piece.videoTex;
+      slot.mat.uniforms.uUseThumb.value = 0;
+      slot.mat.uniforms.uFlipV.value = 1;
+    };
+
+    const bindSlotThumb = (slot, piece) => {
+      const layer = layerOf.get(piece.name);
+      if (layer === undefined) {
+        slot.mat.uniforms.uUseThumb.value = 0;
+        slot.mat.uniforms.uTex.value = blankTex;
+        return;
+      }
+      slot.mat.uniforms.uLayer.value = layer;
+      slot.mat.uniforms.uUseThumb.value = 1;
+      applySlotUvRect(slot);
+    };
+
+    const pickFieldSrc = (sources) => {
+      if (!sources?.length) return null;
+      const mp4 = sources.find((s) => s.type === "video/mp4");
+      // En táctil el H.264 va por hardware. El VP9 (sources[0] si hay WebM)
+      // alarga justo la espera del primer frame.
+      if (coarsePointer && mp4) return mp4.src;
+      const probe = document.createElement("video");
+      return (sources.find((s) => probe.canPlayType(s.type) !== "") || sources[0]).src;
+    };
+
+    const fieldSrcOf = (name) => {
+      const meta = videoSrc.get(name);
+      if (!meta) return null;
+      return meta.thumb || pickFieldSrc(meta.sources);
+    };
+    const focusSrcOf = (name) => pickFieldSrc(videoSrc.get(name)?.sources);
+
+    const holdPoster = (piece) => {
+      const slot = piece.slot;
+      if (!slot) return;
+      bindSlotThumb(slot, piece);
+      slot.mat.uniforms.uFlipV.value = 0;
+    };
+
+    const playSrc = (piece, src) => {
+      if (!piece.video || !src) return;
+      let current = piece.video.src || "";
+      try { current = decodeURI(current); } catch { /* ok */ }
+      if (current.endsWith(src)) {
+        piece.wantsVideo = true;
+        if (piece.video.paused) piece.video.play().catch(() => { piece.wantsVideo = false; });
+        return;
+      }
+      // Al cambiar de archivo el texture se vacía: el póster del atlas tapa el hueco.
+      holdPoster(piece);
+      piece.wantsVideo = true;
+      piece.video.src = encodeURI(src);
+      piece.video.play().catch(() => { piece.wantsVideo = false; });
+    };
+
     const startVideo = (slot, piece) => {
       if (!piece.video) {
-        const src = videoSrc.get(piece.name)?.sources?.[0]?.src;
         const vid = document.createElement("video");
         vid.muted = true;
         vid.loop = true;
         vid.playsInline = true;
         vid.preload = "auto";
         vid.crossOrigin = "anonymous";
-        if (src) vid.src = encodeURI(src);
         vid.style.display = "none";
         document.body.appendChild(vid);
 
@@ -883,14 +1078,10 @@ export default function NewSpace3dFocus_2({ damping = 0.085 } = {}) {
         piece.video = vid;
         piece.videoTex = vtex;
       }
-      slot.mat.uniforms.uTex.value = piece.videoTex;
-      slot.mat.uniforms.uUseAtlas.value = 0;
-      slot.mat.uniforms.uFlipV.value = 1;
-      slot.mat.uniforms.uExpandRange.value = 1;
-      piece.video.play().catch(() => {});
+      playSrc(piece, fieldSrcOf(piece.name));
     };
 
-    const promote = (slot, piece) => {
+    const promote = (slot, piece, fieldFirst = false) => {
       slot.piece = piece;
       piece.slot = slot;
       slot.token += 1;
@@ -898,10 +1089,7 @@ export default function NewSpace3dFocus_2({ damping = 0.085 } = {}) {
 
       slot.mesh.position.copy(piece.pos);
       slot.mesh.visible = true;
-      const cell = cellOf.get(piece.name);
-      slot.mat.uniforms.uCell.value.set(cell ? cell[0] : 0, cell ? cell[1] : 0);
-      slot.mat.uniforms.uTex.value = cell ? atlasTex : whiteTex;
-      slot.mat.uniforms.uUseAtlas.value = cell ? 1 : 0;
+      bindSlotThumb(slot, piece);
       slot.mat.uniforms.uSize.value.set(piece.w, piece.h);
       slot.mat.uniforms.uGroup.value = piece.group;
       slot.mat.uniforms.uSeed.value = piece.seed;
@@ -909,7 +1097,13 @@ export default function NewSpace3dFocus_2({ damping = 0.085 } = {}) {
       slot.mat.uniforms.uOpacity.value = focus.piece && focus.piece !== piece ? 0 : 1;
       slot.mat.uniforms.uFocused.value = 0;
       slot.mat.uniforms.uFlipV.value = 0;
-      slot.mat.uniforms.uExpandRange.value = 0;
+      // Hereda el morph de su instancia: así se puede promocionar a mitad de
+      // transición —que es justo cuando la pieza es grande y necesita su
+      // textura— sin que dé un salto.
+      const k = piece.index;
+      slot.mat.uniforms.uFrom.value.set(froms[k * 3], froms[k * 3 + 1], froms[k * 3 + 2]);
+      slot.mat.uniforms.uFromSize.value.set(fromSizes[k * 2], fromSizes[k * 2 + 1]);
+      slot.mat.uniforms.uDelay.value = delays[k];
       writeInstance(piece);
 
       if (piece.type === "video") {
@@ -918,9 +1112,22 @@ export default function NewSpace3dFocus_2({ damping = 0.085 } = {}) {
       }
       const src = imageSrc.get(piece.name);
       if (!src) return;
+      // En el morph la pieza es enorme desde el primer frame, así que se ata
+      // primero el derivado que el slider ya tiene en caché —aparece sin espera—
+      // y por detrás se pide el grande, que la reemplaza al llegar.
+      const upgrade = () => {
+        if (!fieldFirst || src.hi === src.field) return;
+        loader.load(src.hi, (tex) => {
+          if (slot.token === token && slot.piece === piece) bindHiRes(slot, piece, tex);
+          else tex.dispose();
+        });
+      };
       loader.load(
-        src.hi,
-        (tex) => { if (slot.token === token && slot.piece === piece) bindHiRes(slot, piece, tex); else tex.dispose(); },
+        fieldFirst ? src.field : src.hi,
+        (tex) => {
+          if (slot.token === token && slot.piece === piece) { bindHiRes(slot, piece, tex); upgrade(); }
+          else tex.dispose();
+        },
         undefined,
         () => {
           if (!src.hiFb) return;
@@ -940,25 +1147,50 @@ export default function NewSpace3dFocus_2({ damping = 0.085 } = {}) {
       slot.mesh.visible = false;
       slot.hiTex?.dispose();
       slot.hiTex = null;
-      slot.mat.uniforms.uTex.value = whiteTex;
-      slot.mat.uniforms.uUseAtlas.value = 0;
+      slot.mat.uniforms.uTex.value = blankTex;
+      slot.mat.uniforms.uUseThumb.value = 0;
       slot.mat.uniforms.uFlipV.value = 0;
-      slot.mat.uniforms.uExpandRange.value = 0;
       slot.mat.uniforms.uOpacity.value = 1;
-      if (piece.type === "video") piece.video?.pause();
+      if (piece.type === "video") {
+        piece.wantsVideo = false;
+        piece.video?.pause();
+      }
       writeInstance(piece);
     };
 
     const visibleGroup = (g) =>
       shared.uFilterMix.value < 0.5 || Math.abs(g - shared.uActive.value) < 0.5;
 
+    // Tamaño y posición efectivos: durante la transición la pieza no está en su
+    // sitio de galaxia sino a medio camino, y es ahí donde se pone grande. Sin
+    // esto, la promoción mediría el tamaño de destino y dejaría en 186px del
+    // atlas justo a las piezas que más resolución necesitan.
+    const effPos = new THREE.Vector3();
+    const effSize = { w: 0, h: 0 };
+    const effectiveOf = (p) => {
+      if (!morphing) { effPos.copy(p.pos); effSize.w = p.w; effSize.h = p.h; return effSize; }
+      const k = p.index;
+      const d = delays[k];
+      let m = THREE.MathUtils.clamp((morph.value - d) / Math.max(0.0001, 1 - d), 0, 1);
+      m = m * m * (3 - 2 * m);
+      effPos.set(
+        froms[k * 3] + (p.pos.x - froms[k * 3]) * m,
+        froms[k * 3 + 1] + (p.pos.y - froms[k * 3 + 1]) * m,
+        froms[k * 3 + 2] + (p.pos.z - froms[k * 3 + 2]) * m,
+      );
+      effSize.w = fromSizes[k * 2] + (p.w - fromSizes[k * 2]) * m;
+      effSize.h = fromSizes[k * 2 + 1] + (p.h - fromSizes[k * 2 + 1]) * m;
+      return effSize;
+    };
+
     const updatePool = () => {
       if (focus.piece) return;
       const camPos = camera.position;
       const focal = (renderer.domElement.clientHeight / 2) / Math.tan((camera.fov * Math.PI) / 360);
       for (const p of pieces) {
-        p.d = camPos.distanceTo(p.pos);
-        p.px = (focal * Math.max(p.w, p.h)) / Math.max(0.001, p.d);
+        const eff = effectiveOf(p);
+        p.d = camPos.distanceTo(effPos);
+        p.px = (focal * Math.max(eff.w, eff.h)) / Math.max(0.001, p.d);
       }
 
       const wanted = new Set();
@@ -999,6 +1231,7 @@ export default function NewSpace3dFocus_2({ damping = 0.085 } = {}) {
       maxDist: startDist * 1.25,
     };
     const nav = { animating: false };
+    let sceneActive = true;   // la vista está delante; si no, el loop duerme
     const tmpV = new THREE.Vector3();
 
     const forwardOf = (out, yaw, pitch) => {
@@ -1077,21 +1310,82 @@ export default function NewSpace3dFocus_2({ damping = 0.085 } = {}) {
     // ── Focus ────────────────────────────────────────────────────────────────
     const CLICK_PX = 8;
 
+    const viewSize = () => {
+      const vv = window.visualViewport;
+      return {
+        w: vv?.width || window.innerWidth,
+        h: vv?.height || window.innerHeight,
+      };
+    };
+
+    const focusDisplayPx = () => {
+      const { w } = viewSize();
+      const cap = 400 * 1.25;
+      return Math.min(Math.round(Math.min(w * 0.92, cap) * renderer.getPixelRatio()), 2048);
+    };
+
+    const ensureFocusMedia = (slot, piece, token) => {
+      if (piece.type === "video") {
+        playSrc(piece, focusSrcOf(piece.name));
+        return;
+      }
+      const set = getImageSetRef.current(piece.name);
+      let url = pickImageUrlForDisplayWidth(set, focusDisplayPx());
+      if (url && !isWebglSafe(url)) url = null;
+      const src = imageSrc.get(piece.name);
+      if (!url) url = src?.hi || src?.field;
+      if (!url) return;
+      loader.load(
+        url,
+        (tex) => {
+          if (slot.token === token && slot.piece === piece && focus.piece === piece) {
+            bindHiRes(slot, piece, tex);
+          } else tex.dispose();
+        },
+        undefined,
+        () => {
+          if (!src?.hiFb) return;
+          loader.load(src.hiFb, (tex) => {
+            if (slot.token === token && slot.piece === piece && focus.piece === piece) {
+              bindHiRes(slot, piece, tex);
+            } else tex.dispose();
+          });
+        },
+      );
+    };
+
     const fitDistFor = (piece) => {
       const vFov = (camera.fov * Math.PI) / 180;
-      const margin = 0.68;
+      const { h } = viewSize();
+      // En táctil la pieza cabe entre el navbar y el lockup, no en todo el
+      // viewport: al esconderse la barra de Chrome el alto crece y, si se
+      // encaja al centro del canvas, el borde bajo entra en el pie.
+      const coarse = window.matchMedia("(hover: none) and (pointer: coarse)").matches;
+      const band = coarse ? Math.max(120, h - 88 - 168) : h * 0.68;
+      const margin = coarse ? Math.min(0.62, band / h) : 0.68;
       const distH = piece.h / (2 * Math.tan(vFov / 2) * margin);
       const distW = piece.w / (2 * Math.tan(vFov / 2) * camera.aspect * margin);
       return Math.max(distH, distW, 1.6);
     };
 
+    const camUp = new THREE.Vector3();
     // El destino es "delante de la cámara", no el origen: la pieza sale de su
     // órbita y aterriza centrada estés donde estés dentro de la galaxia.
     const placeFocus = (piece, dist) => {
       if (!piece.slot) return;
+      const { h } = viewSize();
       const p = forwardOf(new THREE.Vector3(), state.yaw, state.pitch)
         .multiplyScalar(dist)
         .add(camera.position);
+      const coarse = window.matchMedia("(hover: none) and (pointer: coarse)").matches;
+      if (coarse) {
+        const liftPx = (168 - 88) / 2;
+        const vFov = (camera.fov * Math.PI) / 180;
+        const worldPerPx = (2 * dist * Math.tan(vFov / 2)) / Math.max(1, h);
+        camera.updateMatrixWorld();
+        camUp.setFromMatrixColumn(camera.matrixWorld, 1);
+        p.addScaledVector(camUp, liftPx * worldPerPx);
+      }
       gsap.to(piece.slot.mesh.position, {
         x: p.x, y: p.y, z: p.z,
         duration: 1.05, ease: "power3.inOut", overwrite: "auto",
@@ -1121,14 +1415,17 @@ export default function NewSpace3dFocus_2({ damping = 0.085 } = {}) {
         gsap.killTweensOf(s.mat.uniforms.uFocused);
       });
 
-      gsap.to(slot.mat.uniforms.uFocused, { value: 1, duration: 0.5, ease: "power2.out" });
+      gsap.to(slot.mat.uniforms.uFocused, { value: 1, duration: 1.05, ease: "power3.inOut" });
       for (const s of pool) {
         if (s === slot) continue;
-        gsap.to(s.mat.uniforms.uOpacity, { value: 0, duration: 0.5, ease: "power2.out" });
+        gsap.to(s.mat.uniforms.uOpacity, { value: 0, duration: 0.55, ease: "power2.out" });
       }
       gsap.to(cloudMaster, { value: 0, duration: 0.45, ease: "power2.out" });
 
-      placeFocus(piece, fitDistFor(piece));
+      slot.mesh.visible = true;
+      const focusDist = fitDistFor(piece);
+      placeFocus(piece, focusDist);
+      ensureFocusMedia(slot, piece, slot.token);
       canvas.style.cursor = "default";
       onFocusRef.current?.(true);
     };
@@ -1152,6 +1449,7 @@ export default function NewSpace3dFocus_2({ damping = 0.085 } = {}) {
           focus.piece = null;
           focus.slot = null;
           focus.locked = false;
+          if (piece.type === "video") playSrc(piece, fieldSrcOf(piece.name));
         },
       });
       for (const s of pool) {
@@ -1167,6 +1465,7 @@ export default function NewSpace3dFocus_2({ damping = 0.085 } = {}) {
         });
         focus.savedFilter = null;
       }
+      slot.mesh.visible = true;
       onFocusRef.current?.(false);
     };
 
@@ -1236,7 +1535,8 @@ export default function NewSpace3dFocus_2({ damping = 0.085 } = {}) {
         ndc.copy(hitPos).project(camera);
         if (ndc.z < -1 || ndc.z > 1) continue;
         const dist = camera.position.distanceTo(hitPos);
-        if (dist > shared.uFar.value * 0.92) continue;
+        const farClip = Math.max(state.dist, 6) + GALAXY_RADIUS * FAR_R;
+        if (dist > farClip * 0.92) continue;
 
         const sx = (ndc.x * 0.5 + 0.5) * w;
         const sy = (-ndc.y * 0.5 + 0.5) * h;
@@ -1355,17 +1655,21 @@ export default function NewSpace3dFocus_2({ damping = 0.085 } = {}) {
     canvas.addEventListener("touchend", onTouchEnd);
 
     const onResize = () => {
-      const w = window.innerWidth;
-      const h = window.innerHeight;
-      renderer.setPixelRatio(Math.min(window.devicePixelRatio, w <= 768 ? 1 : 2));
+      const { w, h } = viewSize();
+      renderer.setPixelRatio(Math.min(window.devicePixelRatio, dprCap));
       renderer.setSize(w, h, false);
       camera.aspect = w / h;
       camera.updateProjectionMatrix();
       refreshRect();
       state.maxDist = Math.max(state.maxDist, fitGalaxyDist(state.yaw, state.pitch) * 1.25);
-      if (focus.piece) placeFocus(focus.piece, fitDistFor(focus.piece));
+      if (focus.piece && focus.slot) {
+        placeFocus(focus.piece, fitDistFor(focus.piece));
+      }
     };
     window.addEventListener("resize", onResize);
+    window.visualViewport?.addEventListener("resize", onResize);
+    window.visualViewport?.addEventListener("scroll", onResize);
+    onResize();
 
     const onKeyDown = (e) => {
       if (e.key === "Escape" && focus.piece) exitFocus();
@@ -1380,8 +1684,105 @@ export default function NewSpace3dFocus_2({ damping = 0.085 } = {}) {
     };
     document.addEventListener("visibilitychange", onVisibility);
 
-    // ── API para las pills ───────────────────────────────────────────────────
+    // ── Morph entre vistas ───────────────────────────────────────────────────
+    // El puente es puramente geométrico: un rectángulo de pantalla del slider se
+    // convierte en posición y tamaño de mundo a una profundidad fija, la pieza
+    // arranca ahí y el shader interpola hasta su sitio en la galaxia. No hay
+    // captura, ni fundido cruzado, ni doble render: es la misma pieza moviéndose.
+    const MORPH_DEPTH = 13;
+    const morphTmp = { pos: new THREE.Vector3(), w: 0, h: 0 };
+    const mRight = new THREE.Vector3();
+    const mUp = new THREE.Vector3();
+    let morphTween = null;
+    let morphing = false;
+
+    const rectToWorld = (rect, out) => {
+      const vw = renderer.domElement.clientWidth || window.innerWidth;
+      const vh = renderer.domElement.clientHeight || window.innerHeight;
+      const tanV = Math.tan((camera.fov * Math.PI) / 360);
+      const perPx = (2 * MORPH_DEPTH * tanV) / vh;
+      const ndcX = ((rect.x + rect.w / 2) / vw) * 2 - 1;
+      const ndcY = -(((rect.y + rect.h / 2) / vh) * 2 - 1);
+
+      forwardOf(tmpV, state.yaw, state.pitch);
+      mRight.crossVectors(tmpV, UP_AXIS).normalize();
+      mUp.crossVectors(mRight, tmpV);
+
+      out.pos.copy(camera.position)
+        .addScaledVector(tmpV, MORPH_DEPTH)
+        .addScaledVector(mRight, ndcX * tanV * camera.aspect * MORPH_DEPTH)
+        .addScaledVector(mUp, ndcY * tanV * MORPH_DEPTH);
+      out.w = rect.w * perPx;
+      out.h = rect.h * perPx;
+      return out;
+    };
+
+    // Rellena el estado "de donde viene / a donde va" de cada pieza. Las que el
+    // slider tiene en pantalla llevan su rectángulo y van primero; el resto nace
+    // en su propio sitio con tamaño cero, escalonado de dentro a fuera, así la
+    // galaxia florece alrededor de las que sí viajan.
+    const setMorphSource = (rects) => {
+      let maxR = 1;
+      for (const p of pieces) maxR = Math.max(maxR, p.pos.length());
+      for (const p of pieces) {
+        const i = p.index;
+        const rect = rects?.get?.(p.canonical);
+        if (rect) {
+          rectToWorld(rect, morphTmp);
+          froms[i * 3] = morphTmp.pos.x;
+          froms[i * 3 + 1] = morphTmp.pos.y;
+          froms[i * 3 + 2] = morphTmp.pos.z;
+          fromSizes[i * 2] = morphTmp.w;
+          fromSizes[i * 2 + 1] = morphTmp.h;
+          delays[i] = 0;
+        } else {
+          froms[i * 3] = p.pos.x;
+          froms[i * 3 + 1] = p.pos.y;
+          froms[i * 3 + 2] = p.pos.z;
+          fromSizes[i * 2] = 0;
+          fromSizes[i * 2 + 1] = 0;
+          delays[i] = 0.06 + 0.46 * (p.pos.length() / maxR);
+        }
+      }
+      fromAttr.needsUpdate = true;
+      fromSizeAttr.needsUpdate = true;
+      delayAttr.needsUpdate = true;
+    };
+
+    // Durante la transición todo vuelve a la nube instanciada: las piezas
+    // promocionadas tienen mesh propia y no seguirían la interpolación.
+    const beginMorph = (rects) => {
+      // La escena puede venir de dormir: sin esto, la cámara que usa el puente
+      // de coordenadas sería la de la última vez que se pintó.
+      applyCamera();
+      camera.updateMatrixWorld(true);
+      if (focus.piece) exitFocus();
+      morphTween?.kill();
+      morphing = true;
+      setHoverPiece(null);
+      for (const slot of pool) release(slot);
+
+      // Las piezas que viajan se sacan de la nube: ahí se verían a la
+      // resolución del atlas (186px) y a tamaño de slider eso se nota.
+      // `setMorphSource` ya ha escrito el estado de partida de cada pieza, así
+      // que promote lo hereda solo.
+      for (const piece of pieces) {
+        if (!rects?.get?.(piece.canonical)) continue;
+        const slot = pool.find((s) => !s.piece);
+        if (!slot) break;
+        promote(slot, piece, true);
+      }
+    };
+
+    const endMorph = () => {
+      morphing = false;
+      morph.value = 1;
+    };
+
+    // ── API: las pills la usan por dentro y el escenario por fuera ──────────
     apiRef.current = {
+      view: "galaxy",
+      exitFocus,
       setHover(id) {
         if (focus.piece) return;
         const gi = groups.findIndex((g) => g.id === id);
@@ -1400,7 +1801,68 @@ export default function NewSpace3dFocus_2({ damping = 0.085 } = {}) {
         setFilter(null);
         flyTo(new THREE.Vector3(), fitGalaxyDist(state.yaw, state.pitch));
       },
+      // Entrada desde el slider: las piezas visibles arrancan en sus
+      // rectángulos y el resto florece alrededor.
+      morphIn(rects, duration = 1.35) {
+        setMorphSource(rects);
+        morph.value = 0;
+        beginMorph(rects);
+        morphTween = gsap.to(morph, {
+          value: 1, duration, ease: "power3.inOut", onComplete: endMorph,
+        });
+        return duration;
+      },
+      // Salida hacia el slider: mismas piezas, camino inverso. Devuelve una
+      // promesa para que el escenario no cambie de capa antes de tiempo.
+      morphOut(rects, duration = 1.05) {
+        setMorphSource(rects);
+        morph.value = 1;
+        beginMorph(rects);
+        return new Promise((resolve) => {
+          morphTween = gsap.to(morph, {
+            value: 0, duration, ease: "power3.inOut",
+            onComplete: () => { morphing = false; resolve(); },
+          });
+        });
+      },
+      // Rectángulos en pantalla de cada pieza, por índice: el equivalente al
+      // `getRects` del slider, para que el traspaso funcione en los dos sentidos.
+      getRects() {
+        const out = new Map();
+        applyCamera();
+        camera.updateMatrixWorld(true);
+        const r = canvas.getBoundingClientRect();
+        const v = new THREE.Vector3();
+        const tanHalf = Math.tan((camera.fov * Math.PI) / 360);
+        for (const p of pieces) {
+          v.copy(p.pos).project(camera);
+          if (v.z < -1 || v.z > 1) continue;
+          const d = camera.position.distanceTo(p.pos);
+          const perPx = (2 * d * tanHalf) / r.height;
+          const w = p.w / perPx;
+          const h = p.h / perPx;
+          out.set(p.canonical, {
+            x: (v.x * 0.5 + 0.5) * r.width - w / 2,
+            y: (-v.y * 0.5 + 0.5) * r.height - h / 2,
+            w, h, name: p.name,
+          });
+        }
+        return out;
+      },
+      // Dormir en vez de desmontar: la escena se queda entera —texturas, atlas,
+      // contexto— para que volver a ella sea instantáneo.
+      setActive(on) {
+        sceneActive = on;
+        if (on && !morphing) morph.value = 1;
+        for (const slot of pool) {
+          const piece = slot.piece;
+          if (!piece || piece.type !== "video" || !piece.video) continue;
+          if (on) piece.video.play().catch(() => {});
+          else piece.video.pause();
+        }
+      },
     };
+    if (viewRef) viewRef.current = apiRef.current;
 
     // ── Loop ─────────────────────────────────────────────────────────────────
     let raf = 0;
@@ -1410,7 +1872,7 @@ export default function NewSpace3dFocus_2({ damping = 0.085 } = {}) {
 
     const tick = () => {
       raf = requestAnimationFrame(tick);
-      if (document.hidden) return;
+      if (document.hidden || !sceneActive) return;
 
       if (!focus.locked && !nav.animating) {
         state.yaw += (state.targetYaw - state.yaw) * damping;
@@ -1422,20 +1884,19 @@ export default function NewSpace3dFocus_2({ damping = 0.085 } = {}) {
       shared.uTime.value = (performance.now() - t0) / 1000;
       updateCursorPoint();
 
-      const ref = Math.max(state.dist, 6);
-      shared.uFogNear.value = ref * FOG_NEAR_K;
-      shared.uFogFar.value  = ref * FOG_FAR_K + GALAXY_RADIUS * FOG_FAR_R;
-      shared.uFar.value     = ref + GALAXY_RADIUS * FAR_R;
-
-      if (atlasDirty && performance.now() - atlasStamp > 150) {
-        atlasTex.needsUpdate = true;
-        atlasDirty = false;
-        atlasStamp = performance.now();
+      if (morphing || frame % 12 === 0) updatePool();
+      if (frame % 48 === 0) {
+        const near = pieces
+          .filter((p) => visibleGroup(p.group) && p.px < HIRES_PX * 1.4)
+          .sort((a, b) => a.d - b.d)
+          .slice(0, 8);
+        near.forEach((p) => queueThumb(p.name, true));
       }
-
-      if (frame % 12 === 0) updatePool();
       for (const p of pieces) {
-        if (p.slot && p.videoTex && p.video && !p.video.paused) p.videoTex.needsUpdate = true;
+        if (!p.slot || !p.videoTex || !p.video || !p.wantsVideo) continue;
+        if (p.video.readyState < 2) continue;
+        revealVideo(p);
+        if (!p.video.paused) p.videoTex.needsUpdate = true;
       }
       frame += 1;
 
@@ -1452,6 +1913,7 @@ export default function NewSpace3dFocus_2({ damping = 0.085 } = {}) {
     return () => {
       cancelAnimationFrame(raf);
       apiRef.current = null;
+      if (viewRef) viewRef.current = null;
       onFocusRef.current?.(false);
       filterTween?.kill();
       gsap.killTweensOf(state);
@@ -1466,7 +1928,10 @@ export default function NewSpace3dFocus_2({ damping = 0.085 } = {}) {
         gsap.killTweensOf(s.mesh.position);
       });
 
+      offTheme();
       window.removeEventListener("resize", onResize);
+      window.visualViewport?.removeEventListener("resize", onResize);
+      window.visualViewport?.removeEventListener("scroll", onResize);
       window.removeEventListener("keydown", onKeyDown);
       document.removeEventListener("visibilitychange", onVisibility);
       canvas.removeEventListener("pointerdown", onPointerDown);
@@ -1479,7 +1944,6 @@ export default function NewSpace3dFocus_2({ damping = 0.085 } = {}) {
       canvas.removeEventListener("touchmove", onTouchMove);
       canvas.removeEventListener("touchend", onTouchEnd);
 
-      atlasImgs.forEach((img) => { img.onload = null; img.onerror = null; img.src = ""; });
       pool.forEach((s) => { s.hiTex?.dispose(); s.mat.dispose(); });
       pieces.forEach((p) => {
         if (p.videoTex) p.videoTex.dispose();
@@ -1493,11 +1957,13 @@ export default function NewSpace3dFocus_2({ damping = 0.085 } = {}) {
       cloudGeo.dispose();
       cloudMat.dispose();
       plane.dispose();
-      atlasTex.dispose();
-      whiteTex.dispose();
+      thumbArray.dispose();
+      blankTex.dispose();
       renderer.dispose();
     };
-  }, [isLoaded, groups, damping]);
+  }, [isLoaded, groups, damping, viewRef]);
+
+  useEffect(() => { apiRef.current?.setActive(active); }, [active]);
 
   // ── Pills ──────────────────────────────────────────────────────────────────
   const handleEnter = useCallback((id) => {
@@ -1536,8 +2002,11 @@ export default function NewSpace3dFocus_2({ damping = 0.085 } = {}) {
     <div
       style={{
         position: "fixed",
-        inset: 0,
-        background: "#fff",
+        left: 0,
+        right: 0,
+        top: vvBox ? vvBox.top : 0,
+        height: vvBox ? vvBox.height : "100dvh",
+        background: "var(--atj-bg)",
         overflow: "hidden",
         touchAction: "none",
       }}
@@ -1545,7 +2014,7 @@ export default function NewSpace3dFocus_2({ damping = 0.085 } = {}) {
       <canvas
         ref={canvasRef}
         data-space3d-canvas="true"
-        style={{ display: "block", width: "100vw", height: "100vh" }}
+        style={{ display: "block", width: "100%", height: "100%" }}
       />
 
       <div className="cst" data-dimmed={inFocus ? "true" : "false"}>
@@ -1577,9 +2046,13 @@ export default function NewSpace3dFocus_2({ damping = 0.085 } = {}) {
       </div>
 
       <style>{`
+        /* --cst-pill replica --bcn-pill del navbar: misma altura y colocada
+           justo debajo de él en cada punto de ruptura. */
         .cst {
+          --cst-pill: 1.5em;
+          --cst-ring: color-mix(in srgb, var(--atj-ink) 36%, transparent);
           position: fixed;
-          top: calc(16px + 1.5em + 4px);
+          top: calc(16px + var(--cst-pill) + 4px);
           left: 0;
           width: 100%;
           display: flex;
@@ -1588,7 +2061,7 @@ export default function NewSpace3dFocus_2({ damping = 0.085 } = {}) {
           pointer-events: none;
           font-size: 0.875rem;
           letter-spacing: -0.04em;
-          color: #111;
+          color: var(--atj-ink);
           transition: opacity 240ms ease;
         }
         .cst[data-dimmed="true"] { opacity: 0; }
@@ -1596,38 +2069,55 @@ export default function NewSpace3dFocus_2({ damping = 0.085 } = {}) {
         .cst-bar {
           display: flex;
           align-items: stretch;
-          gap: 2px;
+          height: var(--cst-pill);
+          gap: 0;
           max-width: min(94vw, 1040px);
+          border-radius: 999px;
           overflow-x: auto;
           overflow-y: hidden;
           scrollbar-width: none;
           pointer-events: auto;
+          background: var(--atj-veil);
+          backdrop-filter: blur(20px);
+          -webkit-backdrop-filter: blur(20px);
+          transform: translateZ(0);
+          box-shadow: inset 0 0 0 1px var(--cst-ring);
         }
         .cst-bar::-webkit-scrollbar { display: none; }
 
         .cst-pill {
           flex: 0 0 auto;
-          height: 1.5em;
+          position: relative;
+          height: var(--cst-pill);
           display: flex;
           align-items: center;
           padding: 0 0.7em;
           border: 0;
           border-radius: 0;
-          background: rgba(17, 17, 17, 0.06);
-          color: inherit;
+          background: var(--atj-hairline);
+          color: color-mix(in srgb, var(--atj-ink) 72%, transparent);
           font: inherit;
           letter-spacing: inherit;
           line-height: 1;
           white-space: nowrap;
           cursor: pointer;
-          opacity: 0.55;
-          transition: opacity 180ms ease;
+          opacity: 1;
+          transition: color 180ms ease;
         }
-        .cst-pill:first-child { border-radius: 999px 0 0 999px; }
-        .cst-pill:last-child  { border-radius: 0 999px 999px 0; }
+        .cst-bar > .cst-pill + .cst-pill {
+          border-left: 1px solid var(--cst-ring);
+        }
         .cst-pill:hover,
-        .cst-pill:focus-visible { opacity: 1; outline: none; }
-        .cst-pill.is-active { opacity: 1; }
+        .cst-pill:focus-visible {
+          color: var(--atj-ink);
+          outline: none;
+        }
+        .cst-pill.is-active { color: var(--atj-ink); }
+
+        @media (max-width: 768px), (pointer: coarse) {
+          .cst { --cst-pill: 1.8em; top: calc(16px + var(--cst-pill) + 6px); }
+          .cst-pill { padding: 0 0.85em; }
+        }
 
         @media (prefers-reduced-motion: reduce) {
           .cst, .cst-pill { transition: none; }

@@ -74,6 +74,9 @@ export default function ATJ_Slider({ viewRef, active = true } = {}) {
   const [activeIndex, setActiveIndex] = useState(0);
   const [glideSettle, setGlideSettle] = useState(0);
   const [hoverIndex, setHoverIndex] = useState(null);
+  // Dedo o inercia en curso: syncMedia no lanza play() a mitad de gesto
+  // (Safari iOS corta el swipe si un <video> arranca en ese momento).
+  const interactingRef = useRef(false);
 
   // Proporción real de cada medio, por índice. El motor la usa para que el hueco
   // entre bordes visibles sea siempre el mismo, sea cual sea el encaje.
@@ -260,8 +263,15 @@ export default function ATJ_Slider({ viewRef, active = true } = {}) {
         el.style.visibility = visible ? "visible" : "hidden";
       }
       if (best !== centered.current) {
+        const prev = centered.current;
         centered.current = best;
-        setActiveIndex(best);
+        if (key === "mobile") {
+          if (prev >= 0) itemRefs.current[prev]?.classList.remove("is-open");
+          itemRefs.current[best]?.classList.add("is-open");
+        }
+        // Sin setState a mitad de swipe: un render de toda la tira + play()
+        // de vídeo es el hitch que Safari enseña como glitch.
+        if (!dragging && !glide) setActiveIndex(best);
       }
     };
 
@@ -298,19 +308,34 @@ export default function ATJ_Slider({ viewRef, active = true } = {}) {
     };
 
     const drag = { id: null, x: 0, moved: false };
+    // move/up en window: setPointerCapture en iOS dispara pointercancel y
+    // suelta el gesto. El id del pointer sigue bastando para filtrar.
+    const bindDrag = () => {
+      window.addEventListener("pointermove", onPointerMove);
+      window.addEventListener("pointerup", onPointerUp);
+      window.addEventListener("pointercancel", onPointerCancel);
+    };
+    const unbindDrag = () => {
+      window.removeEventListener("pointermove", onPointerMove);
+      window.removeEventListener("pointerup", onPointerUp);
+      window.removeEventListener("pointercancel", onPointerCancel);
+    };
+
     const onPointerDown = (e) => {
       if (e.button !== undefined && e.button !== 0) return;
+      if (dragging) return;
       snapTween?.kill();
       clearTimeout(snapTimer);
       dragging = true;
+      interactingRef.current = true;
       glide = 0;
       sample.v = 0;
       sample.t = performance.now();
       drag.id = e.pointerId;
       drag.x = e.clientX;
       drag.moved = false;
-      root.setPointerCapture?.(e.pointerId);
       root.style.cursor = "grabbing";
+      bindDrag();
     };
     const onPointerMove = (e) => {
       if (!dragging || e.pointerId !== drag.id) return;
@@ -325,11 +350,19 @@ export default function ATJ_Slider({ viewRef, active = true } = {}) {
       pos.target -= dx;
       pos.current -= dx;   // el arrastre va pegado al dedo, sin amortiguar
     };
-    const endDrag = (e) => {
-      if (!dragging) return;
+    const settleAfterDrag = () => {
+      interactingRef.current = false;
+      queueSnap();
+      setActiveIndex(centered.current);
+    };
+    const endDrag = (e, cancelled) => {
+      if (!dragging || e.pointerId !== drag.id) return;
       dragging = false;
-      try { root.releasePointerCapture?.(e.pointerId); } catch { /* ok */ }
+      unbindDrag();
       root.style.cursor = "grab";
+      if (pendingResize) applyResize();
+      // Safari robó el gesto (barra, rubber-band, captura): asentar, no lanzar.
+      if (cancelled) { settleAfterDrag(); return; }
       if (key === "mobile" && !reduce && drag.moved) {
         const age = performance.now() - sample.t;
         const v = age < 100 ? sample.v : 0;
@@ -338,10 +371,15 @@ export default function ATJ_Slider({ viewRef, active = true } = {}) {
         const est = Math.abs(g) / (1 - GLIDE_F);
         if (est > maxDist && est > 0) g *= maxDist / est;
         glide = Math.abs(g) < GLIDE_STOP ? 0 : g;
-        if (!glide) queueSnap();
+        if (!glide) settleAfterDrag();
         return;
       }
-      queueSnap();
+      settleAfterDrag();
+    };
+    const onPointerUp = (e) => endDrag(e, false);
+    const onPointerCancel = (e) => endDrag(e, true);
+    const onTouchMove = (e) => {
+      if (e.cancelable) e.preventDefault();
     };
 
     const onKeyDown = (e) => {
@@ -349,22 +387,30 @@ export default function ATJ_Slider({ viewRef, active = true } = {}) {
       else if (e.key === "ArrowLeft") { e.preventDefault(); nudge(-1); }
     };
 
-    const onResize = () => {
+    let pendingResize = false;
+    const applyResize = () => {
+      pendingResize = false;
       const before = metrics.w;
+      const prevVw = metrics.vw;
       measure();
-      if (before > 0) {
+      if (before > 0 && metrics.vw !== prevVw) {
         const k = metrics.w / before;
         pos.current *= k;
         pos.target *= k;
       }
       layout();
     };
+    const onResize = () => {
+      // iOS: esconder la barra cambia innerHeight y, si reescalamos, la tira
+      // salta. El ancho solo cambia de verdad (giro, split view).
+      if (window.innerWidth === metrics.vw) return;
+      if (dragging) { pendingResize = true; return; }
+      applyResize();
+    };
 
     root.addEventListener("wheel", onWheel, { passive: false });
     root.addEventListener("pointerdown", onPointerDown);
-    root.addEventListener("pointermove", onPointerMove);
-    root.addEventListener("pointerup", endDrag);
-    root.addEventListener("pointercancel", endDrag);
+    root.addEventListener("touchmove", onTouchMove, { passive: false });
     window.addEventListener("keydown", onKeyDown);
     window.addEventListener("resize", onResize);
 
@@ -385,6 +431,7 @@ export default function ATJ_Slider({ viewRef, active = true } = {}) {
         glide -= Math.sign(glide) * GLIDE_DRAG * steps;
         if (Math.abs(glide) < GLIDE_STOP) {
           glide = 0;
+          interactingRef.current = false;
           snapNow();
           setActiveIndex(centered.current);
           setGlideSettle((n) => n + 1);
@@ -485,11 +532,11 @@ export default function ATJ_Slider({ viewRef, active = true } = {}) {
       clearTimeout(snapTimer);
       snapTween?.kill();
       gsap.killTweensOf(pos);
+      interactingRef.current = false;
+      unbindDrag();
       root.removeEventListener("wheel", onWheel);
       root.removeEventListener("pointerdown", onPointerDown);
-      root.removeEventListener("pointermove", onPointerMove);
-      root.removeEventListener("pointerup", endDrag);
-      root.removeEventListener("pointercancel", endDrag);
+      root.removeEventListener("touchmove", onTouchMove);
       window.removeEventListener("keydown", onKeyDown);
       window.removeEventListener("resize", onResize);
       if (viewRef) viewRef.current = null;
@@ -541,7 +588,7 @@ export default function ATJ_Slider({ viewRef, active = true } = {}) {
           if (video.videoWidth && video.videoHeight) applyFit(i, video.videoWidth / video.videoHeight);
         }, { once: true });
       }
-      const shouldPlay = near(i, playRadius) && !document.hidden && active;
+      const shouldPlay = near(i, playRadius) && !document.hidden && active && !interactingRef.current;
       if (shouldPlay) video.play().catch(() => {});
       else if (!video.paused) video.pause();
     });
@@ -636,7 +683,11 @@ export default function ATJ_Slider({ viewRef, active = true } = {}) {
           inset: 0;
           background: var(--atj-bg);
           overflow: hidden;
-          touch-action: pan-y;
+          touch-action: none;
+          overscroll-behavior: none;
+          -webkit-user-select: none;
+          user-select: none;
+          -webkit-tap-highlight-color: transparent;
           outline: none;
         }
         .atj-slider__track {
