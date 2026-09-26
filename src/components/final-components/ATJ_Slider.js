@@ -486,11 +486,26 @@ export default function ATJ_Slider({ viewRef, active = true } = {}) {
         },
         // Misma geometría que getRects más el fotograma: el morph DOM↔DOM
         // clona estas imágenes a una capa de vuelo y las oculta aquí.
+        // Publica TODAS las slides, también las que están fuera de cuadro.
+        //
+        // Antes se saltaba las ocultas, y eso tenía una consecuencia que no era
+        // intencionada: al morphar desde la rejilla, una celda cuya pieza no
+        // fuera una de las tres visibles aquí no tenía destino, así que en vez
+        // de viajar a su sitio en la tira se desvanecía. Se veía como si la
+        // mitad de la rejilla se borrase.
+        //
+        // Una slide oculta conserva su geometría —`visibility: hidden` no la
+        // saca del flujo— y el motor ya le escribe su transform en cada
+        // disposición, así que su rectángulo es correcto y gratis de leer. El
+        // clon vuela con la imagen del ORIGEN (ver resolveStill), de modo que
+        // el destino solo aporta coordenadas: no hace falta que su media esté
+        // cargada.
         getFlyers() {
           const out = new Map();
           for (let i = 0; i < n; i++) {
             const el = itemRefs.current[i];
-            if (!el || el.style.visibility === "hidden") continue;
+            if (!el) continue;
+            const oculta = el.style.visibility === "hidden";
             const fit = el.querySelector(".atj-slide__fit") || el;
             const r = fit.getBoundingClientRect();
             if (r.width < 2 || r.height < 2) continue;
@@ -503,7 +518,8 @@ export default function ATJ_Slider({ viewRef, active = true } = {}) {
               : null;
             const poster = video?.getAttribute?.("poster") || p.still || img?.currentSrc || img?.src || null;
             const src = isVideo ? videoSrc : (img?.currentSrc || img?.src || p.still);
-            if (!src && !poster) continue;
+            // Solo se exige media a la que se ve: la oculta viaja como destino.
+            if (!oculta && !src && !poster) continue;
             out.set(p.index, {
               x: r.left, y: r.top, w: r.width, h: r.height,
               name: p.name,
@@ -512,7 +528,7 @@ export default function ATJ_Slider({ viewRef, active = true } = {}) {
               poster,
               currentTime: video?.currentTime || 0,
               el: isVideo ? video : img,
-              visible: true,
+              visible: !oculta,
             });
           }
           return out;

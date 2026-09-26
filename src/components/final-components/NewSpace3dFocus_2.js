@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { prefersReduce } from "@/components/final-components/morphSliderGrid";
 import * as THREE from "three";
 import gsap from "gsap";
 import { useOptimizedMedia } from "@/hooks/useOptimizedMedia";
@@ -172,6 +173,37 @@ const SHAPES = {
   },
 };
 
+// ─── Entrada y salto ───────────────────────────────────────────────────────────
+// Dos gestos, un mecanismo: un uniform que el vertex shader convierte en
+// desplazamiento. Las cien piezas de la nube ya se dibujan en UNA llamada
+// instanciada, así que mover todas cuesta unas operaciones más por vértice —
+// ni draw calls nuevos, ni texturas, ni readback.
+
+/** Ensamblado: de dónde viene la pieza, en múltiplos de su propia órbita. */
+const ASSEMBLE_SPREAD = 2.6;
+/** Retraso por cúmulo. Ocho galerías → ocho olas; la última entra a 0.385. */
+const ASSEMBLE_STAGGER = 0.055;
+/** Cuánto del recorrido total ocupa la llegada de una pieza. */
+const ASSEMBLE_SPAN = 0.6;
+
+/** Duración del ensamblado. La última ola entra a 0.385 y ocupa 0.6, así que
+ *  el recorrido cabe entero dentro del maestro. */
+const ASSEMBLE_MS = 1500;
+
+/** Salto: cuánto se va la pieza de cuadro, y cuánto se estira al irse. */
+const WARP_PUSH = 1.35;      // proporcional a su distancia al centro de pantalla
+const WARP_BASE = 2.5;       // empuje mínimo, para las que están casi centradas
+const WARP_NEAR = 5.0;       // acercamiento a cámara: pasan de largo, no se alejan
+const WARP_STRETCH = 2.2;    // estirado del quad en la dirección de fuga
+
+/** Entrada al foco: el campo se va acelerando; salida: vuelve y se asienta. */
+const WARP_IN_S = 0.55;
+const WARP_OUT_S = 0.9;
+
+// Se reutiliza el criterio del morph slider↔rejilla en vez de duplicarlo: es la
+// misma pregunta y debe responderse igual en toda la pieza.
+const prefersReducedMotion = () => prefersReduce();
+
 // ─── Shaders ───────────────────────────────────────────────────────────────────
 // Color opaco (mezcla hacia blanco): basta el z-buffer, no hay que ordenar. Lo
 // filtrado encoge a cero en vez de quedar fantasma, si no taparía en blanco.
@@ -206,6 +238,50 @@ const MOTION_GLSL = /* glsl */ `
   }
 `;
 
+// Los dos gestos viven en un solo chunk que comparten nube y piezas
+// promocionadas: si divergieran, una pieza cambiaría de forma al promocionarse.
+const ENTRY_GLSL = /* glsl */ `
+  uniform float uAssemble;
+  uniform float uWarp;
+
+  // Progreso de ESTA pieza dentro del ensamblado. Cada cúmulo arranca un poco
+  // más tarde que el anterior, así que el archivo entra por galerías.
+  float assembleWave(float group) {
+    float t = (uAssemble - group * ${ASSEMBLE_STAGGER.toFixed(3)}) / ${ASSEMBLE_SPAN.toFixed(3)};
+    return clamp(t, 0.0, 1.0);
+  }
+
+  // La pieza llega desde fuera de la niebla hasta su órbita. El ease va aquí y
+  // no en el tween: el maestro avanza lineal y cada ola lo suaviza por su
+  // cuenta, que es lo que hace que no lleguen todas a la vez.
+  vec3 assembleOf(vec3 wpos, float group) {
+    float w = assembleWave(group);
+    float e = 1.0 - pow(1.0 - w, 3.0);
+    return wpos * mix(${ASSEMBLE_SPREAD.toFixed(3)}, 1.0, e);
+  }
+
+  // Dirección radial en espacio de vista: hacia fuera de cuadro desde el centro
+  // de pantalla. Es por donde huye la pieza y por donde se estira.
+  vec2 warpDir(vec2 xy) {
+    float r = length(xy);
+    return r > 0.0001 ? xy / r : vec2(1.0, 0.0);
+  }
+
+  // Empuja el centro de la pieza fuera de cuadro y hacia la cámara: no se aleja,
+  // pasa de largo. En reposo amount es 0, o sea que esto es la identidad.
+  vec3 warpCenter(vec3 mv, vec2 dir, float amount) {
+    mv.xy += dir * amount * (length(mv.xy) * ${WARP_PUSH.toFixed(3)} + ${WARP_BASE.toFixed(3)});
+    mv.z  += amount * ${WARP_NEAR.toFixed(3)};
+    return mv;
+  }
+
+  // Estira el quad solo a lo largo de la fuga: el resto de la pieza no se
+  // deforma, así que se lee como velocidad y no como escala.
+  vec2 warpQuad(vec2 quad, vec2 dir, float amount) {
+    return quad + dir * dot(quad, dir) * amount * ${WARP_STRETCH.toFixed(3)};
+  }
+`;
+
 const DEPTH_GLSL = /* glsl */ `
   uniform float uFogNear;
   uniform float uFogFar;
@@ -236,17 +312,25 @@ const CLOUD_VERT = /* glsl */ `
   ${FILTER_GLSL}
   ${DEPTH_GLSL}
   ${MOTION_GLSL}
+  ${ENTRY_GLSL}
 
   void main() {
     float grp = groupFactor(iGroup);
     float isHover = abs(iIndex - uHoverIndex) < 0.5 ? 1.0 : 0.0;
     float grow = 1.0 + ${HOVER_GROW.toFixed(3)} * isHover;
 
-    vec4 mvCenter = modelViewMatrix * vec4(iOffset + motionOf(iOffset, iSeed, isHover), 1.0);
-    vec4 mvPos    = mvCenter + vec4(position.xy * iSize * grp * grow, 0.0, 0.0);
-    gl_Position   = projectionMatrix * mvPos;
+    vec3 wpos = assembleOf(iOffset, iGroup) + motionOf(iOffset, iSeed, isHover);
+    vec3 mvCenter = (modelViewMatrix * vec4(wpos, 1.0)).xyz;
 
-    vAlpha = depthFade(-mvCenter.z) * grp * uCloud;
+    vec2 dir = warpDir(mvCenter.xy);
+    mvCenter = warpCenter(mvCenter, dir, uWarp);
+
+    vec2 quad = warpQuad(position.xy * iSize * grp * grow, dir, uWarp);
+    gl_Position = projectionMatrix * vec4(mvCenter + vec3(quad, 0.0), 1.0);
+
+    // La pieza que aún no ha salido de la niebla no se ve: la ola también manda
+    // en su alfa, si no aparecerían todas de golpe y solo viajarían.
+    vAlpha = depthFade(-mvCenter.z) * grp * uCloud * assembleWave(iGroup);
     vUv    = uv;
     vCell  = iCell;
   }
@@ -283,6 +367,7 @@ const PIECE_VERT = /* glsl */ `
   ${FILTER_GLSL}
   ${DEPTH_GLSL}
   ${MOTION_GLSL}
+  ${ENTRY_GLSL}
 
   void main() {
     float grp = mix(groupFactor(uGroup), 1.0, uFocused);
@@ -290,12 +375,18 @@ const PIECE_VERT = /* glsl */ `
 
     vec3 target = modelMatrix[3].xyz;
     vec3 disp = motionOf(target, uSeed, uIsHover) * (1.0 - uFocused);
-    vec4 mvCenter = viewMatrix * vec4(target + disp, 1.0);
-    vec4 mvPos    = mvCenter + vec4(position.xy * uSize * grp * grow, 0.0, 0.0);
-    gl_Position   = projectionMatrix * mvPos;
+    vec3 mvCenter = (viewMatrix * vec4(assembleOf(target, uGroup) + disp, 1.0)).xyz;
+
+    // La elegida no salta: es la que se queda mientras el campo se va.
+    float w = uWarp * (1.0 - uFocused);
+    vec2 dir = warpDir(mvCenter.xy);
+    mvCenter = warpCenter(mvCenter, dir, w);
+
+    vec2 quad = warpQuad(position.xy * uSize * grp * grow, dir, w);
+    gl_Position = projectionMatrix * vec4(mvCenter + vec3(quad, 0.0), 1.0);
 
     float env = mix(depthFade(-mvCenter.z), 1.0, uFocused);
-    vAlpha = env * grp * uOpacity;
+    vAlpha = env * grp * uOpacity * mix(assembleWave(uGroup), 1.0, uFocused);
     vUv    = uv;
   }
 `;
@@ -590,6 +681,10 @@ export default function NewSpace3dFocus_2({ damping = 0.085, active = true, view
       uCursorPush:   { value: 0 },
       uCursorRadius: { value: CURSOR_RADIUS },
       uBg:           { value: bgColor },
+      // 1 = la galaxia está montada. Arranca a 0 al entrar en la vista.
+      uAssemble:     { value: 1 },
+      // 0 = campo quieto; 1 = salto. Lo sube el foco y lo baja al salir.
+      uWarp:         { value: 0 },
     };
     const cloudMaster = { value: 1 };
 
@@ -724,6 +819,8 @@ export default function NewSpace3dFocus_2({ damping = 0.085, active = true, view
         uCursorPush:   shared.uCursorPush,
         uCursorRadius: shared.uCursorRadius,
         uBg:           shared.uBg,
+        uAssemble:     shared.uAssemble,
+        uWarp:         shared.uWarp,
       },
       toneMapped: true,
     });
@@ -822,6 +919,8 @@ export default function NewSpace3dFocus_2({ damping = 0.085, active = true, view
           uCursorPush:   shared.uCursorPush,
           uCursorRadius: shared.uCursorRadius,
           uBg:           shared.uBg,
+          uAssemble:     shared.uAssemble,
+          uWarp:         shared.uWarp,
         },
         toneMapped: true,
       });
@@ -1180,7 +1279,7 @@ export default function NewSpace3dFocus_2({ damping = 0.085, active = true, view
     const camUp = new THREE.Vector3();
     // El destino es "delante de la cámara", no el origen: la pieza sale de su
     // órbita y aterriza centrada estés donde estés dentro de la galaxia.
-    const placeFocus = (piece, dist) => {
+    const placeFocus = (piece, dist, { entry = false } = {}) => {
       if (!piece.slot) return;
       const { h } = viewSize();
       const p = forwardOf(new THREE.Vector3(), state.yaw, state.pitch)
@@ -1195,9 +1294,17 @@ export default function NewSpace3dFocus_2({ damping = 0.085, active = true, view
         camUp.setFromMatrixColumn(camera.matrixWorld, 1);
         p.addScaledVector(camUp, liftPx * worldPerPx);
       }
+      // La entrada y un reajuste no son lo mismo. Al entrar, la pieza llega
+      // mientras el campo huye: `expo.out` la deja aterrizar de una pieza, con
+      // un respiro para que el salto empiece antes que la llegada. Un reajuste
+      // —cambio de tamaño de ventana, textura en alta que cambia la proporción—
+      // solo recoloca, y ahí ese ease sería un aspaviento.
       gsap.to(piece.slot.mesh.position, {
         x: p.x, y: p.y, z: p.z,
-        duration: 1.05, ease: "power3.inOut", overwrite: "auto",
+        duration: entry ? 0.95 : 1.05,
+        delay: entry ? 0.12 : 0,
+        ease: entry ? "expo.out" : "power3.inOut",
+        overwrite: "auto",
       });
     };
 
@@ -1231,6 +1338,15 @@ export default function NewSpace3dFocus_2({ damping = 0.085, active = true, view
       }
       gsap.to(cloudMaster, { value: 0, duration: 0.45, ease: "power2.out" });
 
+      // El campo no se apaga: se va. Las piezas salen radialmente de cuadro
+      // estirándose en la dirección de fuga mientras pierden opacidad, así que
+      // el vacío que queda alrededor de la elegida se ha ganado en vez de
+      // aparecer. `power2.in` porque un salto acelera, no frena.
+      gsap.killTweensOf(shared.uWarp);
+      if (!prefersReducedMotion()) {
+        gsap.to(shared.uWarp, { value: 1, duration: WARP_IN_S, ease: "power2.in" });
+      }
+
       // El resto de la escena queda invisible (opacidad 0, nube oculta), pero sus
       // vídeos seguirían decodificando. Se pausan: durante el foco solo trabaja el
       // vídeo enfocado. `wantsVideo` se conserva para reanudarlos al salir.
@@ -1238,7 +1354,7 @@ export default function NewSpace3dFocus_2({ damping = 0.085, active = true, view
         if (s !== slot) s.piece?.video?.pause();
       }
 
-      placeFocus(piece, fitDistFor(piece));
+      placeFocus(piece, fitDistFor(piece), { entry: true });
       if (piece.type === "video") playSrc(piece, focusSrcOf(piece.name));
       canvas.style.cursor = "default";
       onFocusRef.current?.(true);
@@ -1277,6 +1393,13 @@ export default function NewSpace3dFocus_2({ damping = 0.085, active = true, view
         gsap.to(s.mat.uniforms.uOpacity, { value: 1, duration: 0.9, delay: 0.35, ease: "power2.out" });
       }
       gsap.to(cloudMaster, { value: 1, duration: 0.8, delay: 0.3, ease: "power2.out" });
+
+      // Y vuelve por donde se fue. `expo.out` para que entren rápido y se
+      // asienten, no para que frenen a la vista.
+      gsap.killTweensOf(shared.uWarp);
+      gsap.to(shared.uWarp, {
+        value: 0, duration: WARP_OUT_S, delay: 0.25, ease: "expo.out",
+      });
 
       if (focus.savedFilter) {
         shared.uActive.value = focus.savedFilter.active;
@@ -1536,6 +1659,7 @@ export default function NewSpace3dFocus_2({ damping = 0.085, active = true, view
       // Dormir en vez de desmontar: la escena se queda entera —texturas, atlas,
       // contexto— para que volver a ella sea instantáneo.
       setActive(on) {
+        const entering = on && !sceneActive;
         sceneActive = on;
         for (const slot of pool) {
           const piece = slot.piece;
@@ -1543,6 +1667,21 @@ export default function NewSpace3dFocus_2({ damping = 0.085, active = true, view
           if (on) piece.video.play().catch(() => {});
           else piece.video.pause();
         }
+        // Entrar en la galaxia es el momento en que se monta: las piezas llegan
+        // desde fuera de la niebla hasta su órbita, por galerías. Se dispara
+        // aquí y no al montar el componente porque la escena se precalienta en
+        // segundo plano mientras se mira la home — montarla no es entrar en ella.
+        if (!entering) return;
+        gsap.killTweensOf(shared.uAssemble);
+        if (prefersReducedMotion()) {
+          shared.uAssemble.value = 1;
+          return;
+        }
+        shared.uAssemble.value = 0;
+        // Lineal a propósito: el ease de cada pieza lo pone el shader dentro de
+        // su ola. Si se suavizara también aquí, las olas se comprimirían al
+        // final y llegarían todas juntas.
+        gsap.to(shared.uAssemble, { value: 1, duration: ASSEMBLE_MS / 1000, ease: "none" });
       },
     };
     if (viewRef) viewRef.current = apiRef.current;
@@ -1579,6 +1718,10 @@ export default function NewSpace3dFocus_2({ damping = 0.085, active = true, view
         state.pivot.distanceToSquared(state.targetPivot) < 1e-6;
       const transitioning =
         gsap.isTweening(cloudMaster) ||
+        // Sin esto los dos gestos nuevos se reproducirían a la tasa de reposo:
+        // nada más se mueve mientras corren, así que `idle` los daría por quietos.
+        gsap.isTweening(shared.uAssemble) ||
+        gsap.isTweening(shared.uWarp) ||
         gsap.isTweening(shared.uFilterMix) ||
         gsap.isTweening(shared.uCursorPush) ||
         (focus.slot && (
@@ -1644,6 +1787,8 @@ export default function NewSpace3dFocus_2({ damping = 0.085, active = true, view
       gsap.killTweensOf(shared.uFilterMix);
       gsap.killTweensOf(cloudMaster);
       gsap.killTweensOf(shared.uCursorPush);
+      gsap.killTweensOf(shared.uAssemble);
+      gsap.killTweensOf(shared.uWarp);
       pool.forEach((s) => {
         gsap.killTweensOf(s.mat.uniforms.uOpacity);
         gsap.killTweensOf(s.mat.uniforms.uFocused);

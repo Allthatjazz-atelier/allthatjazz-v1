@@ -267,15 +267,17 @@ export default function ATJ_Grid({ viewRef, active = true, onSelect } = {}) {
     if (geomRef.current) return geomRef.current;
     const scroller = rootRef.current;
     if (!scroller || !pieces.length) return null;
-    // Un elemento pasa de coordenadas de viewport a las del contenido sumando
-    // esto, que se lee una sola vez por pasada.
-    const base = scroller.scrollTop - scroller.getBoundingClientRect().top;
     const out = new Array(pieces.length);
     for (let i = 0; i < pieces.length; i += 1) {
       const el = itemRefs.current[i];
       if (!el) continue;
-      const r = el.getBoundingClientRect();
-      out[i] = { top: r.top + base, h: r.height };
+      // offsetTop y no getBoundingClientRect: el rectángulo incluye el transform
+      // y el FLIP del cambio de densidad tiene uno puesto durante 0,72 s. Si la
+      // caché se rellenaba en esa ventana guardaba posiciones falsas y la criba
+      // de `getFlyers` dejaba fuera piezas que sí estaban en pantalla. `offset*`
+      // ignora los transforms y ya viene en coordenadas del contenido, que es
+      // justo lo que esta caché necesita.
+      out[i] = { top: el.offsetTop, h: el.offsetHeight };
     }
     geomRef.current = out;
     return out;
@@ -529,19 +531,27 @@ export default function ATJ_Grid({ viewRef, active = true, onSelect } = {}) {
   const captureFlip = useCallback(() => {
     const root = rootRef.current;
     if (!root) return;
+    // `content-visibility` se apaga ANTES de medir y durante todo el relevo.
+    // Con el containment puesto, la celda fuera de pantalla no está maquetada
+    // con su contenido y `getBoundingClientRect` devuelve la caja reservada, no
+    // la real: el FLIP medía celdas de 663 px de alto donde había 169 y dejaba
+    // sin animar a más de la mitad. Aquí no cuesta nada: el containment está
+    // para que el scroll no recalcule cien celdas, y durante 0,72 s de
+    // transición no se está scroleando.
+    root.classList.add("is-flipping");
     const top = TOP_INSET[breakpointOf(window.innerWidth)];
     const before = new Map();
     let anchor = -1;
-    let anchorTop = 0;
+    let anchorRect = null;
     let bestDist = Infinity;
     itemRefs.current.forEach((el, i) => {
       if (!el) return;
       const r = el.getBoundingClientRect();
       before.set(i, r);
       const dist = Math.abs(r.top - top);
-      if (r.bottom > top && dist < bestDist) { bestDist = dist; anchor = i; anchorTop = r.top; }
+      if (r.bottom > top && dist < bestDist) { bestDist = dist; anchor = i; anchorRect = r; }
     });
-    flipRef.current = { before, anchor, anchorTop };
+    flipRef.current = { before, anchor, anchorRect };
   }, []);
 
   useLayoutEffect(() => {
@@ -559,26 +569,59 @@ export default function ATJ_Grid({ viewRef, active = true, onSelect } = {}) {
     gsap.set(els, { clearProps: "transform" });
 
     // 2. El scroll: el FLIP tiene que medirse contra la posición final.
-    if (flip.anchor >= 0) {
-      const el = itemRefs.current[flip.anchor];
-      if (el) root.scrollTop += el.getBoundingClientRect().top - flip.anchorTop;
+    const anchorEl = flip.anchor >= 0 ? itemRefs.current[flip.anchor] : null;
+    if (anchorEl && flip.anchorRect) {
+      root.scrollTop += anchorEl.getBoundingClientRect().top - flip.anchorRect.top;
     }
 
     // 3. Cada pieza viaja de donde estaba a donde está. Las dos rejillas
     //    respetan la proporción, así que la escala es uniforme y la imagen no
     //    se deforma por el camino.
     const h = window.innerHeight;
-    if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) return;
+    // El containment vuelve cuando el relevo ha terminado (o ya, si no lo hay).
+    const soltarContainment = () => root.classList.remove("is-flipping");
+    if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) {
+      soltarContainment();
+      return;
+    }
+    let animadas = 0;
+
+    // Escala entre las dos densidades, medida en la celda de referencia.
+    const anchorAfter = anchorEl ? anchorEl.getBoundingClientRect() : null;
+    const S = anchorAfter && anchorAfter.width > 0 && flip.anchorRect
+      ? flip.anchorRect.width / anchorAfter.width
+      : 1;
+
+    // Dónde se habría visto una caja de la rejilla NUEVA si la vieja siguiera
+    // puesta. Es el punto de partida de las piezas que antes no estaban en
+    // pantalla, y es lo que faltaba: sin esto arrancaban ya en su tamaño final
+    // mientras las pocas que sí estaban ocupaban la pantalla ampliadas, así que
+    // durante los 0,72 s convivían las dos densidades —arriba la vieja, abajo la
+    // nueva—. Con esto todas entran a la misma escala y cada una sigue viajando
+    // por su cuenta a su hueco.
+    const comoAntes = (r) => ({
+      left: flip.anchorRect.left + (r.left - anchorAfter.left) * S,
+      top: flip.anchorRect.top + (r.top - anchorAfter.top) * S,
+      bottom: flip.anchorRect.top + (r.bottom - anchorAfter.top) * S,
+      width: r.width * S,
+    });
+
     itemRefs.current.forEach((el, i) => {
-      const b = flip.before.get(i);
-      if (!el || !b) return;
+      const real = flip.before.get(i);
+      if (!el || !real) return;
       const a = el.getBoundingClientRect();
       const onScreen = (r) => r.bottom > -200 && r.top < h + 200;
+      // La que ya estaba en pantalla viaja desde su caja real: ese es el FLIP
+      // exacto, y es el que sigue el ojo. La que no estaba no tiene caja real
+      // que valga —la suya queda a miles de píxeles bajo el pliegue— y entra
+      // desde donde la rejilla vieja la habría puesto.
+      const b = anchorAfter && !onScreen(real) ? comoAntes(a) : real;
       if (!onScreen(a) && !onScreen(b)) return;
       const dx = b.left - a.left;
       const dy = b.top - a.top;
       const s = a.width > 0 ? b.width / a.width : 1;
       if (Math.abs(dx) < 0.5 && Math.abs(dy) < 0.5 && Math.abs(s - 1) < 0.005) return;
+      animadas += 1;
       gsap.fromTo(
         el,
         { x: dx, y: dy, scale: s, transformOrigin: "0 0" },
@@ -593,6 +636,8 @@ export default function ATJ_Grid({ viewRef, active = true, onSelect } = {}) {
         },
       );
     });
+    if (!animadas) soltarContainment();
+    else gsap.delayedCall(FLIP_DUR + 0.05, soltarContainment);
   }, [cols]);
 
   // El nivel lo cambia el navbar, que no puede medir la rejilla: se captura
@@ -938,6 +983,9 @@ export default function ATJ_Grid({ viewRef, active = true, onSelect } = {}) {
           cursor: var(--cell-cursor, pointer);
           content-visibility: auto;
         }
+        /* Mientras la rejilla cambia de densidad no hay containment: el FLIP
+           necesita medir las celdas de verdad, no su caja reservada. */
+        .atj-grid.is-flipping .atj-grid__cell { content-visibility: visible; }
         /* Longhands y no el shorthand background: el color y el LQIP los pone el
            style inline de cada celda, y un shorthand aquí le reiniciaría el
            background-size a cada uno. */

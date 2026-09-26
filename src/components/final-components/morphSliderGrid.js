@@ -17,6 +17,10 @@ const STAGGER_RANKS = 7;
 const RECEDE_EASE = "expo.in";
 const BLOOM_EASE = "expo.out";
 const COMPRESS = 0.22;
+// El tamaño llega después que la posición: la pieza se separa de sus vecinas
+// antes de crecer, así que se abren sin pisarse en el centro. Sin esto, todas
+// alcanzan su tamaño final mientras siguen amontonadas junto al punto de fuga.
+const BLOOM_SIZE_LAG = 0.28;
 const CLUSTER_MIN = 48;
 const CLUSTER_MAX = 96;
 
@@ -28,6 +32,17 @@ const COARSE = {
   stagger: 0.045,
   ranks: 3,
 };
+
+// Tope de clones en vuelo. Es una válvula, no una decisión de estilo: vuelan
+// todas las piezas que estén en pantalla, y en la práctica eso son 60 en el peor
+// caso real (escritorio de 1440 a 12 columnas) y unas 30 en móvil a 4. Los topes
+// quedan por encima a propósito, para que no muerdan salvo en una pantalla
+// absurdamente grande. Sesenta clones son sesenta escrituras de transform por
+// frame; el slider hacía doscientas sin despeinarse.
+const MAX_FLYERS = { fine: 96, coarse: 48 };
+
+/** El ease de apertura como función: hace falta aplicarlo a mano sobre `t`. */
+const BLOOM_EASE_FN = gsap.parseEase(BLOOM_EASE);
 
 const coarsePointer = () =>
   typeof window !== "undefined" &&
@@ -102,6 +117,17 @@ function applyBox(el, start, box) {
   // medio, así que el alto cae solo. Evita aplastar el fotograma.
   const s = start.w > 0 ? box.w / start.w : 1;
   el.style.transform = `translate3d(${box.x.toFixed(2)}px,${box.y.toFixed(2)}px,0) scale(${s.toFixed(4)})`;
+  // Profundidad por tamaño: la más grande es la que está más cerca, así que va
+  // delante. Antes el z-index se fijaba al salir, por distancia al punto de
+  // fuga, y no se volvía a tocar: una miniatura ya encogida conservaba su
+  // prioridad y pintaba por encima de otra ya desplegada.
+  //
+  // El criterio es el ÁREA y no el ancho: dos piezas del mismo ancho y distinta
+  // proporción ocupan superficies muy distintas, y ordenarlas por ancho las deja
+  // empatadas —decide el orden del DOM, que no tiene nada que ver con cuál se
+  // ve más grande—.
+  const z = String(Math.round(Math.sqrt(Math.max(0, box.w * box.h))));
+  if (el.style.zIndex !== z) el.style.zIndex = z;
 }
 
 function styleFlyer(el, start) {
@@ -153,6 +179,21 @@ export function runMorph({ fromFlyers, toFlyers, layer, onComplete }) {
   fromFlyers.forEach((f, k) => { if (f.visible !== false) keys.add(k); });
   toFlyers.forEach((f, k) => { if (f.visible) keys.add(k); });
 
+  // Si alguna vez hubiera más de las que caben, se quedan las de más cerca del
+  // centro: son las que se están mirando y las que más se notan si faltan.
+  const cap = MAX_FLYERS[coarsePointer() ? "coarse" : "fine"];
+  if (keys.size > cap) {
+    const rank = (k) => {
+      const r = fromFlyers.get(k) || toFlyers.get(k);
+      if (!r) return Infinity;
+      const c = centerOf(r);
+      return Math.hypot(c.x - vanish.x, c.y - vanish.y);
+    };
+    const ordenadas = [...keys].sort((a, b) => rank(a) - rank(b)).slice(0, cap);
+    keys.clear();
+    ordenadas.forEach((k) => keys.add(k));
+  }
+
   const clones = [];
   const tl = gsap.timeline({
     defaults: { ease: RECEDE_EASE },
@@ -188,8 +229,6 @@ export function runMorph({ fromFlyers, toFlyers, layer, onComplete }) {
     const bloomDelay = bloomRank * motion.stagger;
 
     const flyer = makeClone(src, start);
-    // El centro viaja encima: la ola se lee en profundidad.
-    flyer.style.zIndex = String(20 - recedeRank);
     flyer.style.opacity = arrivesFromCluster ? "0" : "1";
     layer.appendChild(flyer);
     clones.push(flyer);
@@ -210,11 +249,29 @@ export function runMorph({ fromFlyers, toFlyers, layer, onComplete }) {
 
     const bloomAt = recedeDelay + motion.recedeDur - motion.overlap + bloomDelay;
     if (lands) {
+      // La apertura interpola el CENTRO y el TAMAÑO por separado, con el tamaño
+      // un poco retrasado. Se recorre con un progreso propio (`t`) y el ease va
+      // dentro: así las dos curvas salen del mismo reloj y no hay dos tweens
+      // peleándose por las mismas propiedades durante el solape de fases.
+      const c0 = { x: mid.x + mid.w / 2, y: mid.y + mid.h / 2 };
+      const c1 = { x: end.x + end.w / 2, y: end.y + end.h / 2 };
+      const box = { x: 0, y: 0, w: 0, h: 0 };
+      proxy.t = 0;
       tl.to(proxy, {
-        x: end.x, y: end.y, w: end.w, h: end.h,
+        t: 1,
         duration: motion.bloomDur,
-        ease: BLOOM_EASE,
-        onUpdate: () => applyBox(flyer, start, proxy),
+        ease: "none",
+        onUpdate: () => {
+          const p = BLOOM_EASE_FN(proxy.t);
+          const q = BLOOM_EASE_FN(
+            Math.min(1, Math.max(0, (proxy.t - BLOOM_SIZE_LAG) / (1 - BLOOM_SIZE_LAG))),
+          );
+          box.w = mid.w + (end.w - mid.w) * q;
+          box.h = mid.h + (end.h - mid.h) * q;
+          box.x = c0.x + (c1.x - c0.x) * p - box.w / 2;
+          box.y = c0.y + (c1.y - c0.y) * p - box.h / 2;
+          applyBox(flyer, start, box);
+        },
       }, Math.max(0, bloomAt));
       if (arrivesFromCluster) {
         tl.to(flyer, { opacity: 1, duration: coarsePointer() ? 0.24 : 0.36, ease: "power2.out" }, Math.max(0, bloomAt));
