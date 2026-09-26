@@ -60,6 +60,21 @@ const VIDEO_THUMB_MAX_PX = 560;
  *  se aprobó, pero el archivo por tramos está a un `true` de distancia. */
 const SHOW_GALLERY_MARKS = false;
 
+/**
+ * Aviso de carga de la celda. Los dos valores vienen del manifiesto y no cuestan
+ * una petición, así que están pintados antes de que se pida el derivado:
+ *
+ *   "lqip"  el proxy de 20 px sobre el color — siempre se ve algo, también en las
+ *           piezas cuyo dominante es casi blanco (que son unas cuantas: el
+ *           dominante de una foto sobre fondo claro es ese fondo).
+ *   "color" solo el color percibido de la pieza. Más seco y más cerca del
+ *           lenguaje de la casa, pero mudo en las piezas claras.
+ *   "none"  el gris de trabajo de siempre (--atj-surface).
+ *
+ * El medio entra con un fundido corto encima; sin él el relevo es un corte.
+ */
+const PLACEHOLDER = "lqip";
+
 // ── Vista de detalle ──────────────────────────────────────────────────────────
 // Solo en los dos escalones densos: en 6 y 3 columnas la pieza ya se ve.
 const DETAIL_LEVELS = [0, 1];
@@ -129,19 +144,35 @@ export default function ATJ_Grid({ viewRef, active = true, onSelect } = {}) {
           return {
             ...p,
             src: poster,
-            // El póster grande solo se pide si la celda crece lo bastante.
-            srcSet: v.posterThumb && v.poster
-              ? `${v.posterThumb} 384w, ${v.poster} ${v.width || 864}w`
-              : null,
+            // Las dos copias, sin resolver: cuál toca depende de la densidad y
+            // eso cambia sin rehacer la lista (ver `posterFor`).
+            poster: v.poster || null,
+            posterThumb: v.posterThumb || null,
+            posterThumbW: v.posterThumbWidth || null,
             videoThumb: v.thumbSrc || null,
             videoFull: toFieldUrl(pickSrc(v.sources)),
+            // Medidas del póster real, no del contenedor: son las que reservan
+            // el hueco con la proporción correcta. Antes faltaban en 19 de 20
+            // vídeos y la celda caía en FALLBACK_AR, así que las piezas de 9:16
+            // se recortaban por arriba y por abajo.
             w: v.width,
             h: v.height,
           };
         }
         const set = getImageSet(p.name);
         if (!set?.src) return null;
-        return { ...p, src: set.src, srcSet: set.srcSet, w: set.width, h: set.height, heic: set.heic };
+        return {
+          ...p,
+          src: set.src,
+          srcSet: set.srcSet,
+          w: set.width,
+          h: set.height,
+          heic: set.heic,
+          // Sin color en las piezas con transparencia de verdad: ahí el hueco lo
+          // sostiene el LQIP, que conserva su alfa, sobre --atj-surface.
+          color: PLACEHOLDER === "none" ? null : set.color,
+          lqip: PLACEHOLDER === "lqip" ? set.lqip : null,
+        };
       })
       .filter(Boolean);
   }, [isLoaded, imageIds, videoIds, getImageSet, getVideo]);
@@ -152,6 +183,28 @@ export default function ATJ_Grid({ viewRef, active = true, onSelect } = {}) {
     (p) => {
       if (!p.videoThumb) return p.videoFull;
       return cellDevicePx > VIDEO_THUMB_MAX_PX ? p.videoFull || p.videoThumb : p.videoThumb;
+    },
+    [cellDevicePx],
+  );
+
+  // Qué copia del póster toca para el tamaño de celda actual. Por debajo del
+  // ancho real de la miniatura no se ofrece el póster grande ni como candidato:
+  // el slider ya lo tiene en caché, y cuando hay uno mayor cacheado el navegador
+  // lo reutiliza en vez de pedir el pequeño. Se ahorra la descarga y paga el
+  // decode —864×1080 en una celda de 113 px—, que es justo al revés de lo que le
+  // conviene a la rejilla.
+  const posterFor = useCallback(
+    (p) => {
+      if (!p.posterThumb) return { src: p.poster || p.src, srcSet: null };
+      const thumbW = p.posterThumbW || 306;
+      // El margen es del 20% sobre el ideal en píxeles de dispositivo: una
+      // miniatura al 0,8× de lo que pide la pantalla no se distingue, y la
+      // alternativa es saltar al póster de 1080 en una celda de 113.
+      if (!p.poster || thumbW >= cellDevicePx * 0.8) return { src: p.posterThumb, srcSet: null };
+      return {
+        src: p.posterThumb,
+        srcSet: `${p.posterThumb} ${thumbW}w, ${p.poster} ${p.w || 864}w`,
+      };
     },
     [cellDevicePx],
   );
@@ -538,6 +591,27 @@ export default function ATJ_Grid({ viewRef, active = true, onSelect } = {}) {
     return () => { viewRef.current = null; };
   }, [pieces, viewRef, videoSrcFor]);
 
+  // El fundido de entrada no puede depender solo de `onLoad`: si la imagen ya
+  // estaba en caché el evento pudo dispararse antes de que React engancahara el
+  // handler, y la celda se quedaría en opacidad 0 para siempre. El ref mira
+  // `complete` al montar y el evento cubre el resto. Una imagen que falla se
+  // queda sin revelar a propósito: se ve su aviso de carga, que es mejor que el
+  // icono de roto.
+  const revealImg = useCallback((el) => {
+    if (el?.complete && el.naturalWidth) el.dataset.ready = "true";
+  }, []);
+
+  const onImgLoad = useCallback((e) => {
+    const img = e.currentTarget;
+    img.dataset.ready = "true";
+    // Solo el HEIC: el manifiesto puede traer el sensor sin girar, así que la
+    // caja se reajusta a la proporción real del fichero al conocerla.
+    if (img.dataset.heic !== "1") return;
+    const box = img.parentElement;
+    if (!box || !img.naturalWidth || !img.naturalHeight) return;
+    box.style.aspectRatio = String(img.naturalWidth / img.naturalHeight);
+  }, []);
+
   const setItemRef = useCallback((el, i) => { itemRefs.current[i] = el; }, []);
   const setMediaRef = useCallback((el, i) => { mediaRefs.current[i] = el; }, []);
   const setVideoRef = useCallback((el, i) => { videoRefs.current[i] = el; }, []);
@@ -567,6 +641,7 @@ export default function ATJ_Grid({ viewRef, active = true, onSelect } = {}) {
           if (mark) lastGallery = p.galleryLabel;
           const ar = p.w && p.h ? p.w / p.h : FALLBACK_AR;
           const isVideo = Boolean(p.videoThumb || p.videoFull);
+          const still = isVideo ? posterFor(p) : { src: p.src, srcSet: p.srcSet };
           return (
             <Fragment key={p.index}>
               {mark && (
@@ -584,25 +659,26 @@ export default function ATJ_Grid({ viewRef, active = true, onSelect } = {}) {
                   className="atj-grid__media"
                   ref={(el) => setMediaRef(el, i)}
                   data-i={i}
-                  style={{ aspectRatio: String(ar) }}
+                  style={{
+                    aspectRatio: String(ar),
+                    backgroundColor: p.color || undefined,
+                    backgroundImage: p.lqip ? `url("${p.lqip}")` : undefined,
+                  }}
                 >
                   {/* Derivados del manifiesto y `sizes` exacto: next/image no
                       aporta nada aquí y pelearía con el ratio natural. */}
                   {/* eslint-disable-next-line @next/next/no-img-element */}
                   <img
                     className="atj-grid__img"
-                    src={p.src}
-                    srcSet={p.srcSet || undefined}
+                    ref={revealImg}
+                    src={still.src}
+                    srcSet={still.srcSet || undefined}
                     sizes={sizes}
                     alt={p.label}
                     loading="lazy"
                     decoding="async"
-                    onLoad={p.heic ? (e) => {
-                      const img = e.currentTarget;
-                      const box = img.parentElement;
-                      if (!box || !img.naturalWidth || !img.naturalHeight) return;
-                      box.style.aspectRatio = String(img.naturalWidth / img.naturalHeight);
-                    } : undefined}
+                    data-heic={p.heic ? "1" : undefined}
+                    onLoad={onImgLoad}
                   />
                   {isVideo && (
                     // Sin `src` hasta que entra en pantalla: un <video> vacío no
@@ -656,7 +732,14 @@ export default function ATJ_Grid({ viewRef, active = true, onSelect } = {}) {
                   {/* La miniatura ya está decodificada: se ve en el mismo frame
                       y tapa el hueco mientras llega el derivado grande. */}
                   {/* eslint-disable-next-line @next/next/no-img-element */}
-                  <img className="atj-grid__detailBase" src={p.src} alt="" aria-hidden="true" />
+                  <img
+                    className="atj-grid__detailBase"
+                    src={p.src}
+                    srcSet={p.srcSet || undefined}
+                    sizes={sizes}
+                    alt=""
+                    aria-hidden="true"
+                  />
                   {esVideo ? (
                     <video
                       className="atj-grid__detailFull"
@@ -721,11 +804,17 @@ export default function ATJ_Grid({ viewRef, active = true, onSelect } = {}) {
           min-width: 0;   /* deja que el pie recorte en vez de empujar */
           cursor: var(--cell-cursor, pointer);
         }
+        /* Longhands y no el shorthand background: el color y el LQIP los pone el
+           style inline de cada celda, y un shorthand aquí le reiniciaría el
+           background-size a cada uno. */
         .atj-grid__media {
           position: relative;
           width: 100%;
           overflow: hidden;
-          background: var(--atj-surface);
+          background-color: var(--atj-surface);
+          background-size: cover;
+          background-position: center;
+          background-repeat: no-repeat;
         }
         .atj-grid__img,
         .atj-grid__video {
@@ -737,6 +826,13 @@ export default function ATJ_Grid({ viewRef, active = true, onSelect } = {}) {
           object-fit: cover;
           user-select: none;
         }
+        /* El medio se revela sobre su aviso de carga. El relevo es corto: lo que
+           se quiere es que no haya un corte, no una entrada. */
+        .atj-grid__img {
+          opacity: 0;
+          transition: opacity 240ms ease;
+        }
+        .atj-grid__img[data-ready="true"] { opacity: 1; }
         .atj-grid__video {
           opacity: 0;
           transition: opacity 260ms ease;
@@ -836,7 +932,7 @@ export default function ATJ_Grid({ viewRef, active = true, onSelect } = {}) {
         .atj-grid.is-ghost .atj-grid__scrim { visibility: hidden; }
 
         @media (prefers-reduced-motion: reduce) {
-          .atj-grid__cap, .atj-grid__video, .atj-grid__detailFull { transition: none; }
+          .atj-grid__cap, .atj-grid__img, .atj-grid__video, .atj-grid__detailFull { transition: none; }
           .atj-grid__detail { animation: none; }
         }
       `}</style>

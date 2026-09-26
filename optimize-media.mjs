@@ -18,6 +18,8 @@
  *   .webm VP9
  *   .poster.jpg
  *   .thumb.mp4   H.264 480  (rejilla densa y campo de la galaxia)
+ *   .micro.{avif,webp,jpg}  256  (rejilla a 4 columnas en movil)
+ *   .thumb.{avif,webp,jpg}  480  (rejilla a 3 y 2 columnas en movil)
  *   .poster.thumb.jpg  384
  *
  * Escribe /public/media-manifest.json para useOptimizedMedia.
@@ -55,7 +57,28 @@ const CONFIG = {
     extensions: [".mp4", ".mov", ".webm", ".avi", ".mkv", ".m4v"],
   },
 
+  // Los dos escalones pequenos son para la rejilla densa. Sin ellos el
+  // navegador no tiene candidato por debajo de 1080 y sirve el derivado grande
+  // en una celda de 118 px: ~88 KB y ~0,9 MP de decode por pieza, cien veces.
+  // El `srcSet` de useOptimizedMedia ya los pedia (IMAGE_DERIVATIVES) desde
+  // antes de que existieran.
   image: {
+    micro: {
+      maxEdge: 256,
+      avifQuality: 58,
+      webpQuality: 82,
+      jpgQuality: 84,
+      // 4:4:4 en los escalones pequenos: el fichero pesa poco de todas formas y
+      // a 256 px el submuestreo de croma se lee como color sucio en los bordes.
+      chroma: "4:4:4",
+    },
+    thumb: {
+      maxEdge: 480,
+      avifQuality: 55,
+      webpQuality: 82,
+      jpgQuality: 84,
+      chroma: "4:4:4",
+    },
     mobile: {
       maxEdge: 1080,
       avifQuality: 52,
@@ -75,6 +98,9 @@ const CONFIG = {
 
   imageConcurrency: 3,
 };
+
+/** Escalones de imagen, de menor a mayor. El orden es el del `srcSet`. */
+const IMAGE_VARIANTS = ["micro", "thumb", "mobile", "desktop"];
 
 const log = {
   info: (msg) => console.log(`\x1b[36m[INFO]\x1b[0m ${msg}`),
@@ -262,7 +288,7 @@ const extractPosterThumb = async (inputPath, outputPath) => {
   ]);
 };
 
-const processVideo = async (inputPath, slug) => {
+const processVideo = async (sharp, inputPath, slug) => {
   const out = CONFIG.outputVideos;
   const result = {
     original: `/new-assets/${path.basename(inputPath)}`,
@@ -298,12 +324,32 @@ const processVideo = async (inputPath, slug) => {
       if (fs.existsSync(posterPath)) {
         log.ok(`poster: ${getFileSize(posterPath)}`);
         result.poster = publicPath("videos", posterName);
+        // Las dimensiones salen del poster ya extraido, no de ffprobe: es el
+        // fichero que la rejilla pinta mientras el video no corre, asi que es
+        // el que manda la proporcion de la celda y los descriptores del
+        // `srcSet`. Sin esto la rejilla caia en FALLBACK_AR (0.8) y las piezas
+        // verticales de 9:16 se recortaban por arriba y por abajo.
+        try {
+          const pm = await sharp(posterPath).metadata();
+          if (pm.width && pm.height) {
+            result.width = pm.width;
+            result.height = pm.height;
+          }
+        } catch (err) {
+          log.skip(`${slug}: sin dimensiones de poster (${err.message})`);
+        }
         const thumbPosterName = `${slug}.poster.thumb.jpg`;
         const thumbPosterPath = path.join(out, thumbPosterName);
         await extractPosterThumb(posterPath, thumbPosterPath);
         if (fs.existsSync(thumbPosterPath)) {
           log.ok(`poster thumb: ${getFileSize(thumbPosterPath)}`);
           result.poster_thumb = publicPath("videos", thumbPosterName);
+          try {
+            const tm = await sharp(thumbPosterPath).metadata();
+            if (tm.width) result.poster_thumb_width = tm.width;
+          } catch {
+            /* el descriptor cae al calculado */
+          }
         }
       }
     }
@@ -365,10 +411,41 @@ const processImage = async (sharp, inputPath, slug) => {
     result.width = meta.width;
     result.height = meta.height;
 
-    for (const [variant, cfg] of [
-      ["mobile", CONFIG.image.mobile],
-      ["desktop", CONFIG.image.desktop],
-    ]) {
+    // Aviso de carga: un color y un LQIP diminuto que viajan DENTRO del
+    // manifiesto, asi que estan en pantalla antes de que se pida el primer
+    // derivado. Los dos salen de una sola reduccion a 64 px: volver a leer el
+    // master es lo unico caro, y asi se paga una vez y no tres.
+    try {
+      const small = await sharp(decodedPath, { failOn: "none" })
+        .rotate()
+        .resize(64, 64, { fit: "inside" })
+        .toBuffer();
+      // El dominante de la reduccion es el color que se percibe, no el pixel
+      // mas repetido del master.
+      //
+      // La decision va por `isOpaque`, no por `hasAlpha`: casi todos los PNG del
+      // archivo traen canal alfa y lo tienen entero a 255, asi que `hasAlpha`
+      // habria dejado sin color 39 de 43 piezas. Cuando la transparencia es de
+      // verdad no se publica color —el histograma cuenta los pixeles
+      // transparentes y devuelve el de un fondo que no se va a ver— y esas caen
+      // en --atj-surface con el LQIP, que si conserva su alfa.
+      const stats = await sharp(small).stats();
+      if (stats.isOpaque) {
+        const { dominant } = stats;
+        result.color = `#${[dominant.r, dominant.g, dominant.b]
+          .map((c) => c.toString(16).padStart(2, "0"))
+          .join("")}`;
+      }
+      const lqip = await sharp(small)
+        .resize(20, 20, { fit: "inside" })
+        .webp({ quality: 45, alphaQuality: 60 })
+        .toBuffer();
+      result.lqip = `data:image/webp;base64,${lqip.toString("base64")}`;
+    } catch (err) {
+      log.skip(`${slug}: sin placeholder (${err.message})`);
+    }
+
+    for (const [variant, cfg] of IMAGE_VARIANTS.map((v) => [v, CONFIG.image[v]])) {
       const base = sharp(decodedPath, { failOn: "none", sequentialRead: true })
         .rotate()
         .resize(cfg.maxEdge, cfg.maxEdge, {
@@ -495,7 +572,7 @@ const main = async () => {
     for (const file of videoFiles) {
       const inputPath = path.join(CONFIG.sourceDir, file);
       const slug = slugify(path.parse(file).name);
-      const result = await processVideo(inputPath, slug);
+      const result = await processVideo(sharp, inputPath, slug);
       manifest.videos.push(result);
       const remaining = pendingStubs.filter(
         (s) => !manifest.videos.some((v) => v.name === s.name)

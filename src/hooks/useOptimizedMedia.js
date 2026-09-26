@@ -83,8 +83,14 @@ const isHeicPath = (p) => /\.hei[cf]$/i.test(p || "");
  * Derivados de imagen, de menor a mayor. `maxEdge` es el mismo que aplica
  * optimize-media.mjs (fit: inside, sin upscale), así que el ancho real de cada
  * fichero se puede calcular sin medirlo.
+ *
+ * Los dos escalones pequeños son los que sostienen la rejilla densa: en un móvil
+ * a 3 columnas la celda mide ~118 px y sin ellos el candidato más bajo del
+ * `srcSet` era el de 1080 — ~88 KB y ~0,9 MP de decode por pieza, cien veces,
+ * que es lo que hacía que el scroll se atascara.
  */
 const IMAGE_DERIVATIVES = [
+  { key: "micro", maxEdge: 256 },
   { key: "thumb", maxEdge: 480 },
   { key: "mobile", maxEdge: 1080 },
   { key: "desktop", maxEdge: 1920 },
@@ -195,13 +201,14 @@ export const useOptimizedMedia = () => {
         sources,
         poster: entry.poster || null,
         posterThumb: entry.poster_thumb || null,
+        posterThumbWidth: entry.poster_thumb_width || null,
         // Copia de 480 px para rejillas: varias reproduciéndose a la vez a
         // 1080 son varios decodificadores de más para nada.
         thumbSrc: entry.thumb_mp4 || null,
         src: pickPlayableSrc(sources),
         hasOptimized: Boolean(entry.mobile_mp4 || entry.desktop_mp4),
-        // Del manifiesto (ffprobe sobre el póster): permite reservar el hueco
-        // con la proporción correcta antes de cargar nada.
+        // Del manifiesto (medidas del póster ya extraído): permite reservar el
+        // hueco con la proporción correcta antes de cargar nada.
         width: entry.width || null,
         height: entry.height || null,
       };
@@ -257,7 +264,15 @@ export const useOptimizedMedia = () => {
       const entry = findEntry(manifest?.images, originalName);
       if (!entry) {
         const single = getImage(originalName);
-        return { src: single.src, srcSet: null, width: null, height: null, heic: false };
+        return {
+          src: single.src,
+          srcSet: null,
+          width: null,
+          height: null,
+          heic: false,
+          color: null,
+          lqip: null,
+        };
       }
 
       // HEIC: el AVIF comparte contenedor y Chrome lo trata como imagen HEIF;
@@ -281,7 +296,15 @@ export const useOptimizedMedia = () => {
       }
       if (!candidates.length) {
         const single = getImage(originalName);
-        return { src: single?.src || null, srcSet: null, width: entry.width, height: entry.height, heic };
+        return {
+          src: single?.src || null,
+          srcSet: null,
+          width: entry.width,
+          height: entry.height,
+          heic,
+          color: entry.color || null,
+          lqip: entry.lqip || null,
+        };
       }
 
       return {
@@ -290,6 +313,11 @@ export const useOptimizedMedia = () => {
         width: entry.width || null,
         height: entry.height || null,
         heic,
+        // Aviso de carga, ya dentro del manifiesto: el color percibido de la
+        // pieza y un LQIP de 20 px en base64. No cuestan una peticion, asi que
+        // estan en pantalla antes de que se pida el primer derivado.
+        color: entry.color || null,
+        lqip: entry.lqip || null,
       };
     },
     [manifest, capabilities, getImage]
