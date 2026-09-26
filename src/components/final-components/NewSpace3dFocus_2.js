@@ -38,7 +38,9 @@ const NEAR_MARGIN   = 7;      // nada se acerca más que esto a la cámara
 
 const PITCH_0  = 0.42;
 const YAW_0    = 0.55;
-const FOG_DEPTH = 0.78;       // cuánto se lava hacia blanco lo lejano
+const FOG_DEPTH = 0.35;       // cuánto se lava hacia el fondo lo lejano (bajo: las
+                             // piezas conservan su color; solo el borde exterior
+                             // se desvanece, vía el término `far` de depthFade)
 const FOG_NEAR_K = 0.42;
 const FOG_FAR_K  = 1.15;
 const FOG_FAR_R  = 0.9;
@@ -65,10 +67,15 @@ const ORBIT_DIST = 11;
 
 // ─── Texturas ──────────────────────────────────────────────────────────────────
 const ATLAS_COLS = 11;        // 121 celdas: cubre el catálogo objetivo de ~120
-const ATLAS_CELL = 186;
-const ATLAS_SIZE = ATLAS_COLS * ATLAS_CELL;
+// Resolución de celda del atlas. Escritorio sube a 256 px (11×256 = 2816, holgado
+// bajo el límite de 4096 de textura; ~42 MB de VRAM con mipmaps) para que la nube
+// se vea nítida sin promocionar. Móvil se queda en 186 —el baseline de siempre—
+// para no aumentar su presión de VRAM. `uCellScale` es 1/ATLAS_COLS y no depende
+// de este valor, así que el tamaño de celda se puede cambiar sin tocar los shaders.
+const ATLAS_CELL_DESKTOP = 256;
+const ATLAS_CELL_MOBILE  = 186;
 const ATLAS_CAP  = ATLAS_COLS * ATLAS_COLS;
-const HIRES_PX = ATLAS_CELL * 0.8;   // por encima de esto la celda del atlas se nota
+const HIRES_K = 0.8;   // umbral de promoción relativo a la celda: por encima se nota
 const VIDEO_PX = 90;                 // tamaño mínimo para que valga la pena reproducir
 const MIN_HIT_PX = 22;        // suelo de área de clic: una mota de 12px es inalcanzable
 
@@ -218,13 +225,9 @@ const CLOUD_VERT = /* glsl */ `
   attribute float iGroup;
   attribute float iSeed;
   attribute float iIndex;
-  attribute vec3  iFrom;      // posición de partida del morph (mundo)
-  attribute vec2  iFromSize;  // tamaño de partida; 0 = la pieza nace de la nada
-  attribute float iDelay;     // escalona la entrada
 
   uniform float uCloud;
   uniform float uHoverIndex;
-  uniform float uMorph;       // 0 = en los rectángulos del slider · 1 = en la galaxia
 
   varying vec2  vUv;
   varying vec2  vCell;
@@ -239,17 +242,8 @@ const CLOUD_VERT = /* glsl */ `
     float isHover = abs(iIndex - uHoverIndex) < 0.5 ? 1.0 : 0.0;
     float grow = 1.0 + ${HOVER_GROW.toFixed(3)} * isHover;
 
-    // Cada pieza recorre su tramo del morph con su propio retardo, así la nube
-    // florece en vez de moverse en bloque.
-    float m = clamp((uMorph - iDelay) / max(0.0001, 1.0 - iDelay), 0.0, 1.0);
-    m = m * m * (3.0 - 2.0 * m);
-    vec3 basePos  = mix(iFrom, iOffset, m);
-    vec2 baseSize = mix(iFromSize, iSize, m);
-
-    // El movimiento propio (respiración e imán) entra con el morph: durante la
-    // transición las piezas no deben temblar.
-    vec4 mvCenter = modelViewMatrix * vec4(basePos + motionOf(basePos, iSeed, isHover) * m, 1.0);
-    vec4 mvPos    = mvCenter + vec4(position.xy * baseSize * grp * grow, 0.0, 0.0);
+    vec4 mvCenter = modelViewMatrix * vec4(iOffset + motionOf(iOffset, iSeed, isHover), 1.0);
+    vec4 mvPos    = mvCenter + vec4(position.xy * iSize * grp * grow, 0.0, 0.0);
     gl_Position   = projectionMatrix * mvPos;
 
     vAlpha = depthFade(-mvCenter.z) * grp * uCloud;
@@ -282,10 +276,6 @@ const PIECE_VERT = /* glsl */ `
   uniform float uOpacity;
   uniform float uSeed;
   uniform float uIsHover;
-  uniform vec3  uFrom;       // de dónde viene en el morph
-  uniform vec2  uFromSize;
-  uniform float uMorph;
-  uniform float uDelay;      // mismo escalonado que su instancia en la nube
 
   varying vec2  vUv;
   varying float vAlpha;
@@ -298,17 +288,10 @@ const PIECE_VERT = /* glsl */ `
     float grp = mix(groupFactor(uGroup), 1.0, uFocused);
     float grow = 1.0 + ${HOVER_GROW.toFixed(3)} * uIsHover * (1.0 - uFocused);
 
-    // Las piezas que viajan en el morph se promocionan a mesh propia para que
-    // se vean a resolución completa, así que este shader interpola igual que el
-    // de la nube. Fuera del morph uMorph vale 1 y todo esto es la identidad.
-    float m = clamp((uMorph - uDelay) / max(0.0001, 1.0 - uDelay), 0.0, 1.0);
-    m = m * m * (3.0 - 2.0 * m);
     vec3 target = modelMatrix[3].xyz;
-    vec3 basePos = mix(uFrom, target, m);
-    vec3 disp = motionOf(target, uSeed, uIsHover) * (1.0 - uFocused) * m;
-    vec2 baseSize = mix(uFromSize, uSize, m);
-    vec4 mvCenter = viewMatrix * vec4(basePos + disp, 1.0);
-    vec4 mvPos    = mvCenter + vec4(position.xy * baseSize * grp * grow, 0.0, 0.0);
+    vec3 disp = motionOf(target, uSeed, uIsHover) * (1.0 - uFocused);
+    vec4 mvCenter = viewMatrix * vec4(target + disp, 1.0);
+    vec4 mvPos    = mvCenter + vec4(position.xy * uSize * grp * grow, 0.0, 0.0);
     gl_Position   = projectionMatrix * mvPos;
 
     float env = mix(depthFade(-mvCenter.z), 1.0, uFocused);
@@ -427,8 +410,15 @@ export default function NewSpace3dFocus_2({ damping = 0.085, active = true, view
     // pequeña, así que se decide por puntero.
     const coarsePointer = window.matchMedia?.("(hover: none) and (pointer: coarse)")?.matches ?? false;
     const dprCap = coarsePointer ? 1.5 : 2;
-    const POOL_SIZE = isMobile ? 6 : 14;
-    const MAX_ACTIVE_VIDEOS = isMobile ? 1 : 3;
+    // Escritorio: más celda de atlas y más ranuras full-res a la vez. Móvil se
+    // mantiene en el baseline para proteger VRAM y batería.
+    const ATLAS_CELL = isMobile ? ATLAS_CELL_MOBILE : ATLAS_CELL_DESKTOP;
+    const ATLAS_SIZE = ATLAS_COLS * ATLAS_CELL;
+    const HIRES_PX = ATLAS_CELL * HIRES_K;
+    const POOL_SIZE = isMobile ? 6 : 18;
+    // Decodificar vídeo es lo más caro (CPU/GPU) de la vista. 2 simultáneos en
+    // escritorio se nota poco frente a 3 y ahorra bastante.
+    const MAX_ACTIVE_VIDEOS = isMobile ? 1 : 2;
 
     // ── Media ────────────────────────────────────────────────────────────────
     const imageSrc = new Map();   // name → { field, hi, hiFb }
@@ -602,7 +592,6 @@ export default function NewSpace3dFocus_2({ damping = 0.085, active = true, view
       uBg:           { value: bgColor },
     };
     const cloudMaster = { value: 1 };
-    const morph = { value: 1 };   // 1 = la galaxia en su sitio
 
     // ── Siembra ──────────────────────────────────────────────────────────────
     const centers = [];
@@ -690,9 +679,6 @@ export default function NewSpace3dFocus_2({ damping = 0.085, active = true, view
     const gIdx = new Float32Array(n);
     const seeds = new Float32Array(n);
     const idx = new Float32Array(n);
-    const froms = new Float32Array(n * 3);
-    const fromSizes = new Float32Array(n * 2);
-    const delays = new Float32Array(n);
 
     pieces.forEach((p, i) => {
       p.index = i;
@@ -718,12 +704,6 @@ export default function NewSpace3dFocus_2({ damping = 0.085, active = true, view
     cloudGeo.setAttribute("iGroup", new THREE.InstancedBufferAttribute(gIdx, 1));
     cloudGeo.setAttribute("iSeed", new THREE.InstancedBufferAttribute(seeds, 1));
     cloudGeo.setAttribute("iIndex", new THREE.InstancedBufferAttribute(idx, 1));
-    const fromAttr = new THREE.InstancedBufferAttribute(froms, 3);
-    const fromSizeAttr = new THREE.InstancedBufferAttribute(fromSizes, 2);
-    const delayAttr = new THREE.InstancedBufferAttribute(delays, 1);
-    cloudGeo.setAttribute("iFrom", fromAttr);
-    cloudGeo.setAttribute("iFromSize", fromSizeAttr);
-    cloudGeo.setAttribute("iDelay", delayAttr);
     cloudGeo.instanceCount = n;
 
     const cloudMat = new THREE.ShaderMaterial({
@@ -733,7 +713,6 @@ export default function NewSpace3dFocus_2({ damping = 0.085, active = true, view
         uAtlas:      { value: atlasTex },
         uCloud:      cloudMaster,
         uHoverIndex: { value: -1 },
-        uMorph:      morph,
         uActive:       shared.uActive,
         uFilterMix:    shared.uFilterMix,
         uFogNear:      shared.uFogNear,
@@ -832,10 +811,6 @@ export default function NewSpace3dFocus_2({ damping = 0.085, active = true, view
           uExpandRange: { value: 0 },
           uSeed:        { value: 0 },
           uIsHover:     { value: 0 },
-          uFrom:        { value: new THREE.Vector3() },
-          uFromSize:    { value: new THREE.Vector2() },
-          uDelay:       { value: 0 },
-          uMorph:       morph,
           uActive:       shared.uActive,
           uFilterMix:    shared.uFilterMix,
           uFogNear:      shared.uFogNear,
@@ -921,20 +896,32 @@ export default function NewSpace3dFocus_2({ damping = 0.085, active = true, view
       slot.mat.uniforms.uExpandRange.value = 0;
     };
 
+    // Un play() cuyo src se sustituye por otro justo después se rechaza con
+    // AbortError. Sin este guardado, ese rechazo tardío apagaba `wantsVideo` del
+    // vídeo que SÍ queríamos (p. ej. al enfocar: thumb → fuente de foco), y la
+    // textura se quedaba en el póster hasta el segundo intento.
+    const playGuarded = (piece) => {
+      const vid = piece.video;
+      const token = vid.src;
+      vid.play().catch(() => {
+        if (piece.video === vid && vid.src === token) piece.wantsVideo = false;
+      });
+    };
+
     const playSrc = (piece, src) => {
       if (!piece.video || !src) return;
       let current = piece.video.src || "";
       try { current = decodeURI(current); } catch { /* ok */ }
       if (current.endsWith(src)) {
         piece.wantsVideo = true;
-        if (piece.video.paused) piece.video.play().catch(() => { piece.wantsVideo = false; });
+        if (piece.video.paused) playGuarded(piece);
         return;
       }
       // Al cambiar de archivo el texture se vacía: el póster del atlas tapa el hueco.
       holdPoster(piece);
       piece.wantsVideo = true;
       piece.video.src = encodeURI(src);
-      piece.video.play().catch(() => { piece.wantsVideo = false; });
+      playGuarded(piece);
     };
 
     const startVideo = (slot, piece) => {
@@ -973,7 +960,7 @@ export default function NewSpace3dFocus_2({ damping = 0.085, active = true, view
       playSrc(piece, fieldSrcOf(piece.name));
     };
 
-    const promote = (slot, piece, fieldFirst = false) => {
+    const promote = (slot, piece) => {
       slot.piece = piece;
       piece.slot = slot;
       slot.token += 1;
@@ -993,13 +980,6 @@ export default function NewSpace3dFocus_2({ damping = 0.085, active = true, view
       slot.mat.uniforms.uFocused.value = 0;
       slot.mat.uniforms.uFlipV.value = 0;
       slot.mat.uniforms.uExpandRange.value = 0;
-      // Hereda el morph de su instancia: así se puede promocionar a mitad de
-      // transición —que es justo cuando la pieza es grande y necesita su
-      // textura— sin que dé un salto.
-      const k = piece.index;
-      slot.mat.uniforms.uFrom.value.set(froms[k * 3], froms[k * 3 + 1], froms[k * 3 + 2]);
-      slot.mat.uniforms.uFromSize.value.set(fromSizes[k * 2], fromSizes[k * 2 + 1]);
-      slot.mat.uniforms.uDelay.value = delays[k];
       writeInstance(piece);
 
       if (piece.type === "video") {
@@ -1008,20 +988,11 @@ export default function NewSpace3dFocus_2({ damping = 0.085, active = true, view
       }
       const src = imageSrc.get(piece.name);
       if (!src) return;
-      // En el morph la pieza es enorme desde el primer frame, así que se ata
-      // primero el derivado que el slider ya tiene en caché —aparece sin espera—
-      // y por detrás se pide el grande, que la reemplaza al llegar.
-      const upgrade = () => {
-        if (!fieldFirst || src.hi === src.field) return;
-        loader.load(src.hi, (tex) => {
-          if (slot.token === token && slot.piece === piece) bindHiRes(slot, piece, tex);
-          else tex.dispose();
-        });
-      };
+      // La pieza promocionada va siempre a resolución completa.
       loader.load(
-        fieldFirst ? src.field : src.hi,
+        src.hi,
         (tex) => {
-          if (slot.token === token && slot.piece === piece) { bindHiRes(slot, piece, tex); upgrade(); }
+          if (slot.token === token && slot.piece === piece) bindHiRes(slot, piece, tex);
           else tex.dispose();
         },
         undefined,
@@ -1058,36 +1029,13 @@ export default function NewSpace3dFocus_2({ damping = 0.085, active = true, view
     const visibleGroup = (g) =>
       shared.uFilterMix.value < 0.5 || Math.abs(g - shared.uActive.value) < 0.5;
 
-    // Tamaño y posición efectivos: durante la transición la pieza no está en su
-    // sitio de galaxia sino a medio camino, y es ahí donde se pone grande. Sin
-    // esto, la promoción mediría el tamaño de destino y dejaría en 186px del
-    // atlas justo a las piezas que más resolución necesitan.
-    const effPos = new THREE.Vector3();
-    const effSize = { w: 0, h: 0 };
-    const effectiveOf = (p) => {
-      if (!morphing) { effPos.copy(p.pos); effSize.w = p.w; effSize.h = p.h; return effSize; }
-      const k = p.index;
-      const d = delays[k];
-      let m = THREE.MathUtils.clamp((morph.value - d) / Math.max(0.0001, 1 - d), 0, 1);
-      m = m * m * (3 - 2 * m);
-      effPos.set(
-        froms[k * 3] + (p.pos.x - froms[k * 3]) * m,
-        froms[k * 3 + 1] + (p.pos.y - froms[k * 3 + 1]) * m,
-        froms[k * 3 + 2] + (p.pos.z - froms[k * 3 + 2]) * m,
-      );
-      effSize.w = fromSizes[k * 2] + (p.w - fromSizes[k * 2]) * m;
-      effSize.h = fromSizes[k * 2 + 1] + (p.h - fromSizes[k * 2 + 1]) * m;
-      return effSize;
-    };
-
     const updatePool = () => {
       if (focus.piece) return;
       const camPos = camera.position;
       const focal = (renderer.domElement.clientHeight / 2) / Math.tan((camera.fov * Math.PI) / 360);
       for (const p of pieces) {
-        const eff = effectiveOf(p);
-        p.d = camPos.distanceTo(effPos);
-        p.px = (focal * Math.max(eff.w, eff.h)) / Math.max(0.001, p.d);
+        p.d = camPos.distanceTo(p.pos);
+        p.px = (focal * Math.max(p.w, p.h)) / Math.max(0.001, p.d);
       }
 
       const wanted = new Set();
@@ -1283,6 +1231,13 @@ export default function NewSpace3dFocus_2({ damping = 0.085, active = true, view
       }
       gsap.to(cloudMaster, { value: 0, duration: 0.45, ease: "power2.out" });
 
+      // El resto de la escena queda invisible (opacidad 0, nube oculta), pero sus
+      // vídeos seguirían decodificando. Se pausan: durante el foco solo trabaja el
+      // vídeo enfocado. `wantsVideo` se conserva para reanudarlos al salir.
+      for (const s of pool) {
+        if (s !== slot) s.piece?.video?.pause();
+      }
+
       placeFocus(piece, fitDistFor(piece));
       if (piece.type === "video") playSrc(piece, focusSrcOf(piece.name));
       canvas.style.cursor = "default";
@@ -1299,6 +1254,12 @@ export default function NewSpace3dFocus_2({ damping = 0.085, active = true, view
         gsap.killTweensOf(s.mat.uniforms.uOpacity);
         gsap.killTweensOf(s.mat.uniforms.uFocused);
       });
+
+      // Se reanudan los vídeos de fondo que se pausaron al entrar en foco, para
+      // que vuelvan a moverse mientras la escena se descubre.
+      for (const s of pool) {
+        if (s !== slot && s.piece?.wantsVideo && s.piece.video?.paused) playGuarded(s.piece);
+      }
 
       gsap.to(slot.mat.uniforms.uFocused, { value: 0, duration: 1.2, ease: "power3.inOut" });
       gsap.to(slot.mesh.position, {
@@ -1416,7 +1377,15 @@ export default function NewSpace3dFocus_2({ damping = 0.085, active = true, view
     // ── Interacción ──────────────────────────────────────────────────────────
     const drag = { active: false, x: 0, y: 0, sx: 0, sy: 0, moved: false };
 
+    // Última interacción del usuario: el throttle en reposo (ver el loop) vuelve a
+    // tasa completa mientras haya actividad reciente. El movimiento del puntero
+    // desplaza el campo magnético sin mover la cámara ni lanzar un tween, así que
+    // no basta con mirar la cámara: hay que marcar el tiempo aquí.
+    let lastInteractT = -1e9;
+    const bumpInteract = () => { lastInteractT = performance.now(); };
+
     const onPointerDown = (e) => {
+      bumpInteract();
       if (e.button !== undefined && e.button !== 0) return;
       refreshRect();
       drag.active = true;
@@ -1429,6 +1398,7 @@ export default function NewSpace3dFocus_2({ damping = 0.085, active = true, view
     };
 
     const onPointerMove = (e) => {
+      bumpInteract();
       cursorNdc.set(
         ((e.clientX - canvasRect.left) / canvasRect.width) * 2 - 1,
         -((((e.clientY - canvasRect.top) / canvasRect.height) * 2) - 1),
@@ -1470,6 +1440,7 @@ export default function NewSpace3dFocus_2({ damping = 0.085, active = true, view
     };
 
     const onWheel = (e) => {
+      bumpInteract();
       e.preventDefault();
       const dy = e.deltaMode === 1 ? e.deltaY * 16 : e.deltaY;
       zoomBy(dy * 0.018);
@@ -1478,6 +1449,7 @@ export default function NewSpace3dFocus_2({ damping = 0.085, active = true, view
     let pinchStart = 0;
     let pinchDist = 0;
     const onTouchStart = (e) => {
+      bumpInteract();
       if (e.touches.length === 2) {
         const dx = e.touches[0].clientX - e.touches[1].clientX;
         const dy = e.touches[0].clientY - e.touches[1].clientY;
@@ -1487,6 +1459,7 @@ export default function NewSpace3dFocus_2({ damping = 0.085, active = true, view
       }
     };
     const onTouchMove = (e) => {
+      bumpInteract();
       if (e.touches.length === 2 && pinchStart > 0) {
         e.preventDefault();
         const dx = e.touches[0].clientX - e.touches[1].clientX;
@@ -1539,101 +1512,6 @@ export default function NewSpace3dFocus_2({ damping = 0.085, active = true, view
     };
     document.addEventListener("visibilitychange", onVisibility);
 
-    // ── Morph entre vistas ───────────────────────────────────────────────────
-    // El puente es puramente geométrico: un rectángulo de pantalla del slider se
-    // convierte en posición y tamaño de mundo a una profundidad fija, la pieza
-    // arranca ahí y el shader interpola hasta su sitio en la galaxia. No hay
-    // captura, ni fundido cruzado, ni doble render: es la misma pieza moviéndose.
-    const MORPH_DEPTH = 13;
-    const morphTmp = { pos: new THREE.Vector3(), w: 0, h: 0 };
-    const mRight = new THREE.Vector3();
-    const mUp = new THREE.Vector3();
-    let morphTween = null;
-    let morphing = false;
-
-    const rectToWorld = (rect, out) => {
-      const vw = renderer.domElement.clientWidth || window.innerWidth;
-      const vh = renderer.domElement.clientHeight || window.innerHeight;
-      const tanV = Math.tan((camera.fov * Math.PI) / 360);
-      const perPx = (2 * MORPH_DEPTH * tanV) / vh;
-      const ndcX = ((rect.x + rect.w / 2) / vw) * 2 - 1;
-      const ndcY = -(((rect.y + rect.h / 2) / vh) * 2 - 1);
-
-      forwardOf(tmpV, state.yaw, state.pitch);
-      mRight.crossVectors(tmpV, UP_AXIS).normalize();
-      mUp.crossVectors(mRight, tmpV);
-
-      out.pos.copy(camera.position)
-        .addScaledVector(tmpV, MORPH_DEPTH)
-        .addScaledVector(mRight, ndcX * tanV * camera.aspect * MORPH_DEPTH)
-        .addScaledVector(mUp, ndcY * tanV * MORPH_DEPTH);
-      out.w = rect.w * perPx;
-      out.h = rect.h * perPx;
-      return out;
-    };
-
-    // Rellena el estado "de donde viene / a donde va" de cada pieza. Las que el
-    // slider tiene en pantalla llevan su rectángulo y van primero; el resto nace
-    // en su propio sitio con tamaño cero, escalonado de dentro a fuera, así la
-    // galaxia florece alrededor de las que sí viajan.
-    const setMorphSource = (rects) => {
-      let maxR = 1;
-      for (const p of pieces) maxR = Math.max(maxR, p.pos.length());
-      for (const p of pieces) {
-        const i = p.index;
-        const rect = rects?.get?.(p.canonical);
-        if (rect) {
-          rectToWorld(rect, morphTmp);
-          froms[i * 3] = morphTmp.pos.x;
-          froms[i * 3 + 1] = morphTmp.pos.y;
-          froms[i * 3 + 2] = morphTmp.pos.z;
-          fromSizes[i * 2] = morphTmp.w;
-          fromSizes[i * 2 + 1] = morphTmp.h;
-          delays[i] = 0;
-        } else {
-          froms[i * 3] = p.pos.x;
-          froms[i * 3 + 1] = p.pos.y;
-          froms[i * 3 + 2] = p.pos.z;
-          fromSizes[i * 2] = 0;
-          fromSizes[i * 2 + 1] = 0;
-          delays[i] = 0.06 + 0.46 * (p.pos.length() / maxR);
-        }
-      }
-      fromAttr.needsUpdate = true;
-      fromSizeAttr.needsUpdate = true;
-      delayAttr.needsUpdate = true;
-    };
-
-    // Durante la transición todo vuelve a la nube instanciada: las piezas
-    // promocionadas tienen mesh propia y no seguirían la interpolación.
-    const beginMorph = (rects) => {
-      // La escena puede venir de dormir: sin esto, la cámara que usa el puente
-      // de coordenadas sería la de la última vez que se pintó.
-      applyCamera();
-      camera.updateMatrixWorld(true);
-      if (focus.piece) exitFocus();
-      morphTween?.kill();
-      morphing = true;
-      setHoverPiece(null);
-      for (const slot of pool) release(slot);
-
-      // Las piezas que viajan se sacan de la nube: ahí se verían a la
-      // resolución del atlas (186px) y a tamaño de slider eso se nota.
-      // `setMorphSource` ya ha escrito el estado de partida de cada pieza, así
-      // que promote lo hereda solo.
-      for (const piece of pieces) {
-        if (!rects?.get?.(piece.canonical)) continue;
-        const slot = pool.find((s) => !s.piece);
-        if (!slot) break;
-        promote(slot, piece, true);
-      }
-    };
-
-    const endMorph = () => {
-      morphing = false;
-      morph.value = 1;
-    };
-
     // ── API: las pills la usan por dentro y el escenario por fuera ──────────
     apiRef.current = {
       view: "galaxy",
@@ -1655,59 +1533,10 @@ export default function NewSpace3dFocus_2({ damping = 0.085, active = true, view
         setFilter(null);
         flyTo(new THREE.Vector3(), fitGalaxyDist(state.yaw, state.pitch));
       },
-      // Entrada desde el slider: las piezas visibles arrancan en sus
-      // rectángulos y el resto florece alrededor.
-      morphIn(rects, duration = 1.35) {
-        setMorphSource(rects);
-        morph.value = 0;
-        beginMorph(rects);
-        morphTween = gsap.to(morph, {
-          value: 1, duration, ease: "power3.inOut", onComplete: endMorph,
-        });
-        return duration;
-      },
-      // Salida hacia el slider: mismas piezas, camino inverso. Devuelve una
-      // promesa para que el escenario no cambie de capa antes de tiempo.
-      morphOut(rects, duration = 1.05) {
-        setMorphSource(rects);
-        morph.value = 1;
-        beginMorph(rects);
-        return new Promise((resolve) => {
-          morphTween = gsap.to(morph, {
-            value: 0, duration, ease: "power3.inOut",
-            onComplete: () => { morphing = false; resolve(); },
-          });
-        });
-      },
-      // Rectángulos en pantalla de cada pieza, por índice: el equivalente al
-      // `getRects` del slider, para que el traspaso funcione en los dos sentidos.
-      getRects() {
-        const out = new Map();
-        applyCamera();
-        camera.updateMatrixWorld(true);
-        const r = canvas.getBoundingClientRect();
-        const v = new THREE.Vector3();
-        const tanHalf = Math.tan((camera.fov * Math.PI) / 360);
-        for (const p of pieces) {
-          v.copy(p.pos).project(camera);
-          if (v.z < -1 || v.z > 1) continue;
-          const d = camera.position.distanceTo(p.pos);
-          const perPx = (2 * d * tanHalf) / r.height;
-          const w = p.w / perPx;
-          const h = p.h / perPx;
-          out.set(p.canonical, {
-            x: (v.x * 0.5 + 0.5) * r.width - w / 2,
-            y: (-v.y * 0.5 + 0.5) * r.height - h / 2,
-            w, h, name: p.name,
-          });
-        }
-        return out;
-      },
       // Dormir en vez de desmontar: la escena se queda entera —texturas, atlas,
       // contexto— para que volver a ella sea instantáneo.
       setActive(on) {
         sceneActive = on;
-        if (on && !morphing) morph.value = 1;
         for (const slot of pool) {
           const piece = slot.piece;
           if (!piece || piece.type !== "video" || !piece.video) continue;
@@ -1724,9 +1553,44 @@ export default function NewSpace3dFocus_2({ damping = 0.085, active = true, view
     let readyDispatched = false;
     const t0 = performance.now();
 
+    // Throttle en reposo: cuando nada se mueve se refresca a ~30fps en vez de a la
+    // tasa del monitor (60/120). La respiración tiene periodos de decenas de
+    // segundos, así que a 30fps es indistinguible mientras estás quieto, y el
+    // sistema deja de trabajar de más (batería, ventiladores). Cualquier
+    // interacción, inercia de cámara, hover, vídeo o transición vuelve a tasa
+    // completa al instante.
+    const IDLE_INTERVAL = 1000 / 30;
+    let lastRenderT = 0;
+
     const tick = () => {
       raf = requestAnimationFrame(tick);
       if (document.hidden || !sceneActive) return;
+
+      const now = performance.now();
+      let videoPlaying = false;
+      for (const s of pool) {
+        const vp = s.piece;
+        if (vp && vp.type === "video" && vp.video && !vp.video.paused) { videoPlaying = true; break; }
+      }
+      const camStill =
+        Math.abs(state.targetYaw - state.yaw) < 2e-4 &&
+        Math.abs(state.targetPitch - state.pitch) < 2e-4 &&
+        Math.abs(state.targetDist - state.dist) < 2e-3 &&
+        state.pivot.distanceToSquared(state.targetPivot) < 1e-6;
+      const transitioning =
+        gsap.isTweening(cloudMaster) ||
+        gsap.isTweening(shared.uFilterMix) ||
+        gsap.isTweening(shared.uCursorPush) ||
+        (focus.slot && (
+          gsap.isTweening(focus.slot.mesh.position) ||
+          gsap.isTweening(focus.slot.mat.uniforms.uFocused)
+        ));
+      const idle =
+        camStill && !nav.animating && !hoverPiece &&
+        !videoPlaying && !transitioning && !atlasDirty &&
+        now - lastInteractT > 350;
+      if (idle && now - lastRenderT < IDLE_INTERVAL) return;
+      lastRenderT = now;
 
       if (!focus.locked && !nav.animating) {
         state.yaw += (state.targetYaw - state.yaw) * damping;
@@ -1749,7 +1613,7 @@ export default function NewSpace3dFocus_2({ damping = 0.085, active = true, view
         atlasStamp = performance.now();
       }
 
-      if (morphing || frame % 12 === 0) updatePool();
+      if (frame % 12 === 0) updatePool();
       for (const p of pieces) {
         if (!p.slot || !p.videoTex || !p.video || !p.wantsVideo) continue;
         if (p.video.readyState < 2) continue;
@@ -1905,10 +1769,10 @@ export default function NewSpace3dFocus_2({ damping = 0.085, active = true, view
       </div>
 
       <style>{`
-        /* --cst-pill replica --bcn-pill del navbar: misma altura y colocada
-           justo debajo de él en cada punto de ruptura. */
+        /* Misma cápsula que el navbar: hueco en claro, anillo y cortes en oscuro. */
         .cst {
           --cst-pill: 1.5em;
+          --cst-cut: 2px;
           --cst-ring: color-mix(in srgb, var(--atj-ink) 36%, transparent);
           position: fixed;
           top: calc(16px + var(--cst-pill) + 4px);
@@ -1929,31 +1793,29 @@ export default function NewSpace3dFocus_2({ damping = 0.085, active = true, view
           display: flex;
           align-items: stretch;
           height: var(--cst-pill);
-          gap: 0;
+          gap: var(--cst-cut);
           max-width: min(94vw, 1040px);
           border-radius: 999px;
           overflow-x: auto;
           overflow-y: hidden;
+          box-sizing: border-box;
           scrollbar-width: none;
           pointer-events: auto;
-          background: var(--atj-veil);
-          backdrop-filter: blur(20px);
-          -webkit-backdrop-filter: blur(20px);
-          transform: translateZ(0);
-          box-shadow: inset 0 0 0 1px var(--cst-ring);
         }
         .cst-bar::-webkit-scrollbar { display: none; }
 
         .cst-pill {
           flex: 0 0 auto;
-          position: relative;
-          height: var(--cst-pill);
+          height: 100%;
           display: flex;
           align-items: center;
           padding: 0 0.7em;
           border: 0;
           border-radius: 0;
           background: var(--atj-hairline);
+          backdrop-filter: blur(20px);
+          -webkit-backdrop-filter: blur(20px);
+          transform: translateZ(0);
           color: color-mix(in srgb, var(--atj-ink) 72%, transparent);
           font: inherit;
           letter-spacing: inherit;
@@ -1963,15 +1825,20 @@ export default function NewSpace3dFocus_2({ damping = 0.085, active = true, view
           opacity: 1;
           transition: color 180ms ease;
         }
-        .cst-bar > .cst-pill + .cst-pill {
-          border-left: 1px solid var(--cst-ring);
-        }
         .cst-pill:hover,
         .cst-pill:focus-visible {
           color: var(--atj-ink);
           outline: none;
         }
         .cst-pill.is-active { color: var(--atj-ink); }
+
+        .dark .cst-bar {
+          gap: 0;
+          border: 1px solid var(--cst-ring);
+        }
+        .dark .cst-bar > .cst-pill + .cst-pill {
+          border-left: 1px solid var(--cst-ring);
+        }
 
         @media (max-width: 768px), (pointer: coarse) {
           .cst { --cst-pill: 1.8em; top: calc(16px + var(--cst-pill) + 6px); }

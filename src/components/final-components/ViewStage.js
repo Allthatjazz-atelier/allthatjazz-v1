@@ -4,7 +4,8 @@ import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/router";
 import ATJ_Slider from "@/components/final-components/ATJ_Slider";
 import ATJ_Grid from "@/components/final-components/ATJ_Grid";
-import NewSpace3dFocus_3 from "@/components/final-components/NewSpace3dFocus_3";
+import NewSpace3dFocus_2 from "@/components/final-components/NewSpace3dFocus_2";
+import { useViewPrefs } from "@/components/final-components/viewPrefs";
 import {
   afterLayout,
   MORPH_MS,
@@ -23,33 +24,27 @@ import {
  *
  * Las tres vistas comparten la lista canónica de `@/data/pieces`, así que la
  * pieza N es la misma en todas y sus APIs (`viewRef`) publican el rectángulo en
- * pantalla de cada una. Slider ↔ rejilla es un morph de dos fases (se recogen
- * al fondo y florecen). Slider ↔ galaxia sigue en fundido.
- */
-
-export const STAGE_VIEWS = { "/": "slider", "/space": "galaxy", "/grid": "grid" };
-
-const MORPH_IN_MS = 1350;    // entrada: la tira se abre en galaxia
-const MORPH_OUT_MS = 1050;   // salida: la galaxia se recoge en la tira
-
-/**
- * Morph slider↔galaxia: apagado.
+ * pantalla de cada una.
  *
- * Las piezas que viajan pasan por el atlas de la galaxia mientras dura la
- * transición, y con muchas piezas grandes a la vez el pool de texturas a
- * resolución completa no da para todas: se ve un bajón de nitidez en el tramo
- * intermedio. El relevo entre vistas es un fundido hasta que el morph sea
- * DOM↔DOM (slider↔rejilla), donde el problema no existe. El camino de código
- * sigue aquí y se enciende con esta constante.
+ * Rutas: solo dos. Slider y rejilla viven juntas en "/" y alternan por estado
+ * (`homeView` en viewPrefs), no por navegación: su relevo es un morph DOM↔DOM de
+ * dos fases (se recogen al fondo y florecen) que no cruza el router. La galaxia
+ * es su propia ruta ("/space") por su contexto WebGL pesado, y su relevo con "/"
+ * es un fundido.
  */
-const ENABLE_GALAXY_MORPH = false;
+
+export const STAGE_VIEWS = { "/": "home", "/space": "galaxy" };
 
 export const isStageRoute = (path) =>
   Object.prototype.hasOwnProperty.call(STAGE_VIEWS, path || "");
 
 export default function ViewStage() {
   const router = useRouter();
-  const view = STAGE_VIEWS[router.pathname] ?? null;
+  const { homeView } = useViewPrefs();
+  const routeView = STAGE_VIEWS[router.pathname] ?? null;
+  // "/" resuelve a slider o rejilla según el estado compartido; "/space" a
+  // galaxia. Fuera de las rutas del escenario, nada.
+  const view = routeView === "home" ? homeView : routeView;
 
   const sliderRef = useRef(null);
   const galaxyRef = useRef(null);
@@ -92,7 +87,6 @@ export default function ViewStage() {
   const [instant, setInstant] = useState(false);
   const prevView = useRef(view);
   const sessionRef = useRef(null);
-  const beginRef = useRef(null);
 
   const isDomPair = (a, b) =>
     (a === "slider" && b === "grid") || (a === "grid" && b === "slider");
@@ -173,40 +167,17 @@ export default function ViewStage() {
       },
     };
   };
-  beginRef.current = beginDomMorph;
-
-  // La pastilla dispara el morph al click, 620 ms antes del router.push.
-  useEffect(() => {
-    const onWill = (e) => {
-      const href = (e.detail?.href || "").replace(/\/$/, "") || "/";
-      const next = STAGE_VIEWS[href];
-      if (next === "grid") setGridReady(true);
-      if (next === "galaxy") setGalaxyReady(true);
-      const from = prevView.current;
-      if (!isDomPair(from, next) || prefersReduce()) return;
-      if (sessionRef.current?.key === `${from}>${next}`) return;
-      sessionRef.current?.cancel();
-      prevView.current = next;
-      sessionRef.current = beginRef.current(from, next);
-    };
-    window.addEventListener("atj:view-will-change", onWill);
-    return () => window.removeEventListener("atj:view-will-change", onWill);
-  }, []);
 
   useEffect(() => {
     const from = prevView.current;
     if (!view || from === view) { setShown(view); return undefined; }
 
-    // Slider ↔ rejilla ya puede ir en marcha (click de la pastilla).
-    const key = `${from}>${view}`;
-    if (sessionRef.current?.key === key) {
-      prevView.current = view;
-      return undefined;
-    }
-
     prevView.current = view;
 
+    // Slider ↔ rejilla: morph DOM↔DOM. Lo dispara el cambio de `homeView` (la
+    // pastilla escribe el store), sin pasar por el router.
     if (isDomPair(from, view) && !prefersReduce()) {
+      const key = `${from}>${view}`;
       sessionRef.current?.cancel();
       sessionRef.current = beginDomMorph(from, view);
       return () => {
@@ -217,44 +188,7 @@ export default function ViewStage() {
       };
     }
 
-    if (ENABLE_GALAXY_MORPH) {
-      const galaxy = galaxyRef.current;
-      const slider = sliderRef.current;
-      const rects = slider?.getRects?.();
-
-      // Galaxia → slider: la galaxia lleva las piezas a los rectángulos del
-      // slider y solo entonces se cambia de capa.
-      if (from === "galaxy" && view === "slider" && galaxy?.morphOut && rects?.size) {
-        let cancelled = false;
-        setInstant(true);
-        const done = () => {
-          if (cancelled) return;
-          cancelled = true;
-          setShown("slider");
-          setInstant(false);
-        };
-        // Carrera contra un plazo: la promesa depende del tween, y el tween del
-        // rAF. Con la pestaña de fondo el reloj se para y la vista se quedaría
-        // colgada en la galaxia con la ruta ya en el slider.
-        const guard = setTimeout(done, MORPH_OUT_MS + 400);
-        galaxy.morphOut(rects, MORPH_OUT_MS / 1000).then(() => {
-          clearTimeout(guard);
-          done();
-        });
-        return () => { cancelled = true; clearTimeout(guard); };
-      }
-
-      // Slider → galaxia: se cede la capa ya, y la galaxia continúa el
-      // movimiento desde donde el slider lo dejó.
-      if (from === "slider" && view === "galaxy" && galaxy?.morphIn && rects?.size) {
-        setInstant(true);
-        setShown("galaxy");
-        galaxy.morphIn(rects, MORPH_IN_MS / 1000);
-        const t = setTimeout(() => setInstant(false), MORPH_IN_MS + 300);
-        return () => clearTimeout(t);
-      }
-    }
-
+    // Hacia/desde galaxia: fundido (lo hace la opacidad de las capas).
     setShown(view);
     return undefined;
   }, [view]);
@@ -272,7 +206,7 @@ export default function ViewStage() {
 
       <div className="stage__layer" data-on={shown === "galaxy" ? "true" : "false"}>
         {galaxyReady && (
-          <NewSpace3dFocus_3 viewRef={galaxyRef} active={shown === "galaxy"} />
+          <NewSpace3dFocus_2 viewRef={galaxyRef} active={shown === "galaxy"} />
         )}
       </div>
 

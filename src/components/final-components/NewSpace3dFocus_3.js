@@ -440,7 +440,7 @@ export default function NewSpace3dFocus_2({ damping = 0.085, active = true, view
     const ATLAS_SIZE = ATLAS_COLS * ATLAS_CELL;
     const HIRES_PX = ATLAS_CELL * HIRES_K;
     const POOL_SIZE = isMobile ? 6 : 18;
-    const MAX_ACTIVE_VIDEOS = isMobile ? 1 : 3;
+    const MAX_ACTIVE_VIDEOS = isMobile ? 1 : 2;
 
     // ── Media ────────────────────────────────────────────────────────────────
     const imageSrc = new Map();   // name → { field, hi, hiFb }

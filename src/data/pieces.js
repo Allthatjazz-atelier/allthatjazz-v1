@@ -7,8 +7,8 @@
  * identidad. Si cada vista construyera su propia lista, la transición tendría
  * que emparejar por nombre y cualquier discrepancia se vería como un salto.
  *
- * Total: TARGET_PIECES. Mientras no haya 120 originales, se rellena ciclando el
- * catálogo — nunca la misma pieza dos veces dentro de una galería, así que las
+ * Total: TARGET_PIECES. Mientras no haya tantos originales, se rellena ciclando
+ * el catálogo — nunca la misma pieza dos veces dentro de una galería, así que las
  * copias quedan separadas por al menos un tramo entero. Por eso la identidad de
  * una pieza es su `index`, no su `name`: con relleno hay nombres repetidos, y el
  * morph empareja por posición en la lista.
@@ -25,8 +25,14 @@ import { SPACE_IMAGES, ALL_VIDEOS, VIDEO_LABEL_BY_NAME } from "./mediaCatalog";
 
 export const ORDER_SEED = 20260923;
 
-/** Piezas totales. Con 120 originales en el manifiesto, el relleno desaparece solo. */
-export const TARGET_PIECES = 120;
+/**
+ * Piezas totales, iguales y en el mismo orden en las tres vistas (slider, grid,
+ * galaxia): esa identidad compartida por índice es lo que hace consistentes el
+ * contenido y el morph slider↔grid. Hoy hay 63 originales en el manifiesto (43
+ * imágenes + 20 vídeos); el resto se rellena con duplicados de imagen. Cuando
+ * haya ≥100 originales el relleno desaparece solo.
+ */
+export const TARGET_PIECES = 100;
 
 /**
  * Galerías del portfolio. `shape` es la silueta del cúmulo en la galaxia y tiene

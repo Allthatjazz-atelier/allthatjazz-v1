@@ -4,38 +4,40 @@ import { useEffect, useLayoutEffect, useCallback, useRef, useState, memo } from 
 import { useRouter } from "next/router";
 import { useGSAP } from "@gsap/react";
 import gsap from "gsap";
-import { setDensityLevel, useViewPrefs } from "@/components/final-components/viewPrefs";
+import { setDensityLevel, setHomeView, useViewPrefs } from "@/components/final-components/viewPrefs";
 import { useTheme } from "@/hooks/useTheme";
 
-// A Slider · B Grid · C Galaxy
+// A Slider · B Grid · C Galaxy. Slider y rejilla comparten la ruta "/" y se
+// alternan por estado (`homeView`); la galaxia es su propia ruta.
 const NAV_ITEMS = [
-  { key: "A", label: "Slider", href: "/" },
-  { key: "B", label: "Grid", href: "/grid" },
-  { key: "C", label: "Galaxy", href: "/space" },
+  { key: "A", label: "Slider", view: "slider" },
+  { key: "B", label: "Grid", view: "grid" },
+  { key: "C", label: "Galaxy", route: "/space" },
 ];
 
 const PILL_DUR = 0.62;
 const PILL_EASE = "power2.inOut";
 const NAV_PUSH_DELAY = PILL_DUR * 1000;
 
-function activeIndexFromPath(pathname) {
-  const i = NAV_ITEMS.findIndex((item) => item.href === pathname);
-  return i === -1 ? 0 : i;
+function activeIndexOf(pathname, homeView) {
+  if (pathname === "/space") return 2;
+  return homeView === "grid" ? 1 : 0;
 }
 
 export default function NavAndClock() {
   const router = useRouter();
   const routerRef = useRef(router);
   routerRef.current = router;
-  const routeIndex = activeIndexFromPath(router.pathname);
+  const { homeView } = useViewPrefs();
+  const routeIndex = activeIndexOf(router.pathname, homeView);
+  // Estado local para que la pastilla se estire al click, no al llegar la ruta:
+  // en galaxia el push va 620 ms detrás y ese margen absorbe el compile.
   const [activeIndex, setActiveIndex] = useState(routeIndex);
   const pushTimer = useRef(null);
   const lagTimer = useRef(null);
 
   useEffect(() => {
-    NAV_ITEMS.forEach((item) => {
-      if (item.href?.startsWith("/")) router.prefetch(item.href);
-    });
+    router.prefetch("/space");
     // Calienta el JS de Galaxy en idle. Los shaders GPU siguen
     // compilándose al montar; esto evita el parse de chunk en el click.
     const warm = () => {
@@ -59,22 +61,29 @@ export default function NavAndClock() {
   // activeIndex ya coincide y React no re-renderiza.
   useEffect(() => { setActiveIndex(routeIndex); }, [routeIndex]);
 
-  const handleNavigate = useCallback((href, i) => {
+  const handleNavigate = useCallback((item, i) => {
     const r = routerRef.current;
-    if (!href || i === activeIndex) return;
+    if (i === activeIndex) return;
     setActiveIndex(i);
-    if (pushTimer.current) clearTimeout(pushTimer.current);
-    if (lagTimer.current) clearTimeout(lagTimer.current);
-    // El escenario arranca el morph en este instante: si esperáramos al
-    // router.push (tras la pastilla) las imágenes se quedarían quietas 620 ms.
-    window.dispatchEvent(new CustomEvent("atj:view-will-change", { detail: { href } }));
-    // Sin lagSmoothing, un frame largo (compile de shaders) hace que GSAP
-    // salte el playhead → tripón en pill. 0 = no saltar.
-    gsap.ticker.lagSmoothing(0);
-    pushTimer.current = setTimeout(() => {
-      if (href !== r.pathname) r.push(href);
-      lagTimer.current = setTimeout(() => gsap.ticker.lagSmoothing(500, 33), 1100);
-    }, NAV_PUSH_DELAY);
+
+    // Galaxia: sigue siendo una ruta. La cápsula anima y, al acabar, se navega
+    // (el margen absorbe el compile de shaders sin tirón de pill).
+    if (item.route) {
+      if (pushTimer.current) clearTimeout(pushTimer.current);
+      if (lagTimer.current) clearTimeout(lagTimer.current);
+      gsap.ticker.lagSmoothing(0);
+      pushTimer.current = setTimeout(() => {
+        if (item.route !== r.pathname) r.push(item.route);
+        lagTimer.current = setTimeout(() => gsap.ticker.lagSmoothing(500, 33), 1100);
+      }, NAV_PUSH_DELAY);
+      return;
+    }
+
+    // Slider ↔ rejilla: solo estado. El escenario reacciona al cambio y arranca
+    // el morph al instante, sin router de por medio. Si venimos de galaxia,
+    // volvemos a "/" primero (fundido) y allí queda la vista elegida.
+    setHomeView(item.view);
+    if (r.pathname !== "/") r.push("/");
   }, [activeIndex]);
 
   return (
@@ -95,7 +104,7 @@ export default function NavAndClock() {
 
         {/* Segunda fila, solo en la rejilla: densidad. Mismo idioma de cápsula
             que las de vista; el stack comparte ancho con la barra superior. */}
-        {router.pathname === "/grid" && <DensityPills />}
+        {activeIndex === 1 && <DensityPills />}
       </div>
 
       <style>{`
@@ -110,26 +119,20 @@ export default function NavAndClock() {
           isolation: isolate;
         }
 
-        /* Una cápsula; los huecos blancos la cortan en minipills. */
+        /* Una cápsula: el radio y el recorte viven en la barra. El velo+blur
+           es el del about y va en cada tramo, así el hueco deja ver detrás. */
         .bcn-bar {
           display: flex;
           align-items: stretch;
           height: var(--bcn-pill);
-          gap: 0;
+          gap: var(--bcn-cut);
           border-radius: 999px;
           overflow: hidden;
-          background: var(--atj-veil);
-          backdrop-filter: blur(20px);
-          -webkit-backdrop-filter: blur(20px);
-          transform: translateZ(0);
-          box-shadow: inset 0 0 0 1px var(--bcn-ring);
+          box-sizing: border-box;
         }
 
         .bcn-nav {
-          display: flex;
-          align-items: stretch;
-          height: 100%;
-          min-width: 0;
+          display: contents;
         }
 
         /* Misma caja que .bcn-bar: la fila de densidad estira al mismo ancho. */
@@ -157,11 +160,7 @@ export default function NavAndClock() {
           height: var(--bcn-pill);
           border-radius: 999px;
           overflow: hidden;
-          background: var(--atj-veil);
-          backdrop-filter: blur(20px);
-          -webkit-backdrop-filter: blur(20px);
-          transform: translateZ(0);
-          box-shadow: inset 0 0 0 1px var(--bcn-ring);
+          box-sizing: border-box;
         }
         /* Interruptor: la bolita toma --atj-ink, así que es negra en claro y
            blanca en oscuro sin lógica aparte. */
@@ -204,12 +203,15 @@ export default function NavAndClock() {
           position: relative;
           display: flex;
           align-items: center;
-          height: var(--bcn-pill);
+          height: 100%;
           min-width: var(--bcn-pill);
           padding: 0;
           border: 0;
           border-radius: 0;
           background: var(--atj-hairline);
+          backdrop-filter: blur(20px);
+          -webkit-backdrop-filter: blur(20px);
+          transform: translateZ(0);
           color: color-mix(in srgb, var(--atj-ink) 72%, transparent);
           font: inherit;
           letter-spacing: inherit;
@@ -226,11 +228,15 @@ export default function NavAndClock() {
         }
         .bcn-pill.is-active { color: var(--atj-ink); }
 
-        /* Tras .bcn-pill: border:0 en la pill anulaba el split si iba arriba. */
-        .bcn-bar > * + * {
-          border-left: 1px solid var(--bcn-ring);
+        /* Oscuro: un solo trazo de 1px — perímetro de la cápsula y cortes.
+           Sin sombra interior: sumaba otra línea arriba y abajo. */
+        .dark .bcn-bar,
+        .dark .bcn-theme {
+          gap: 0;
+          border: 1px solid var(--bcn-ring);
         }
-        .bcn-nav > .bcn-pill + .bcn-pill {
+        .dark .bcn-nav > .bcn-pill,
+        .dark .bcn-bar--dens > .bcn-pill + .bcn-pill {
           border-left: 1px solid var(--bcn-ring);
         }
 
@@ -410,7 +416,7 @@ const NavPills = memo(function NavPills({ activeIndex, onNavigate }) {
             type="button"
             aria-current={active ? "page" : undefined}
             aria-label={`${item.key} ${item.label}`}
-            onClick={() => onNavigate(item.href, i)}
+            onClick={() => onNavigate(item, i)}
             className={`bcn-pill${active ? " is-active" : ""}`}
           >
             <span className="bcn-pill__key">{item.key}</span>

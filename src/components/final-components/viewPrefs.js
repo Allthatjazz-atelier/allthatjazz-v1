@@ -20,7 +20,12 @@ const DEFAULT_LADDER = [12, 8, 6, 3];
 /** Nivel de arranque: 8 columnas, el segundo escalón. */
 const DEFAULT_LEVEL = 1;
 
-let snapshot = { level: DEFAULT_LEVEL, ladder: DEFAULT_LADDER };
+// Slider y rejilla viven en la misma ruta ("/") y alternan por estado, no por
+// navegación: la pieza no cambia de página, solo de disposición. Este es el
+// estado compartido que el navbar escribe (pills A/B) y el escenario lee.
+const DEFAULT_HOME_VIEW = "slider";
+
+let snapshot = { level: DEFAULT_LEVEL, ladder: DEFAULT_LADDER, homeView: DEFAULT_HOME_VIEW };
 const subscribers = new Set();
 
 const emit = () => {
@@ -48,12 +53,22 @@ export const setDensityLadder = (ladder) => {
   if (ladder.length === snapshot.ladder.length && ladder.every((c, i) => c === snapshot.ladder[i])) return;
   // El nivel se conserva por posición: cambiar de punto de ruptura no debe
   // saltar de densidad, solo traducir 12·8·6·3 a lo que quepa en esa pantalla.
-  snapshot = { ladder, level: Math.min(snapshot.level, ladder.length - 1) };
+  snapshot = { ...snapshot, ladder, level: Math.min(snapshot.level, ladder.length - 1) };
   emit();
 };
 
 /** Columnas que toca pintar ahora mismo. */
 export const getColumns = () => snapshot.ladder[snapshot.level] ?? DEFAULT_LADDER[DEFAULT_LEVEL];
+
+/** Vista activa dentro de "/": "slider" o "grid". */
+export const getHomeView = () => snapshot.homeView;
+
+export const setHomeView = (next) => {
+  const homeView = next === "grid" ? "grid" : "slider";
+  if (homeView === snapshot.homeView) return;
+  snapshot = { ...snapshot, homeView };
+  emit();
+};
 
 // El snapshot es el mismo objeto hasta que algo cambia: useSyncExternalStore
 // compara por identidad y devolver un literal nuevo en cada lectura lo dejaría
