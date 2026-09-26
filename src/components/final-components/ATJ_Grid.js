@@ -131,6 +131,11 @@ export default function ATJ_Grid({ viewRef, active = true, onSelect } = {}) {
   // 100vw y se trae el fichero de 1920 para una celda de 174.
   const cellPx = Math.max(1, Math.round((vw - gutter * 2 - gap * (cols - 1)) / cols));
   const sizes = `${cellPx}px`;
+  // Alto del pie: margen de 6 más una línea de --cap a 1.2 (10px en los niveles
+  // densos, 11 en el resto). Entra en el tamaño que la celda reserva mientras
+  // está fuera de pantalla, así que tiene que cuadrar al decimal con el CSS de
+  // más abajo: 0,8 px de más por celda son 18 de deriva en el alto total.
+  const capH = cols >= 10 ? 6 + 12 : 6 + 13.2;
   const cellDevicePx = cellPx * (typeof window === "undefined" ? 1 : window.devicePixelRatio || 1);
 
   const pieces = useMemo(() => {
@@ -225,28 +230,117 @@ export default function ATJ_Grid({ viewRef, active = true, onSelect } = {}) {
   const detailIRef = useRef(null);
   detailIRef.current = detail?.i ?? null;
 
+  // En un ref con listener y no consultado por frame: `matchMedia` asigna un
+  // MediaQueryList nuevo en cada llamada y esta preferencia cambia casi nunca.
+  const lastSyncTopRef = useRef(-1e9);
+  const reduceRef = useRef(false);
+  useEffect(() => {
+    const mq = window.matchMedia("(prefers-reduced-motion: reduce)");
+    const apply = () => { reduceRef.current = mq.matches; };
+    apply();
+    mq.addEventListener("change", apply);
+    return () => mq.removeEventListener("change", apply);
+  }, []);
+
+  // Solo los índices con vídeo: son ~20 de 100 y el reparto no tiene nada que
+  // mirar en el resto.
+  const videoIdx = useMemo(() => {
+    const out = [];
+    pieces.forEach((p, i) => { if (p.videoThumb || p.videoFull) out.push(i); });
+    return out;
+  }, [pieces]);
+
+  // ── Geometría de la rejilla, en coordenadas del contenido ─────────────────
+  // Las posiciones dentro del contenido no cambian al hacer scroll: solo cambian
+  // al cambiar la disposición. Leerlas una vez y guardarlas deja el trabajo por
+  // frame en pura aritmética. Antes el reparto hacía un getBoundingClientRect
+  // por vídeo visible EN CADA FRAME del gesto, intercalado con escrituras de
+  // estilo: un layout forzado a mitad de scroll, que es lo que se nota.
+  //
+  // Se miden las celdas y no el medio a propósito: con `content-visibility` la
+  // celda fuera de pantalla conserva su caja (la da `contain-intrinsic-size`),
+  // pero preguntar por un descendiente suyo obliga al navegador a maquetar ese
+  // subárbol. La caja de la celda es barata; la de su contenido, no.
+  const geomRef = useRef(null);
+
+  const geometry = useCallback(() => {
+    if (geomRef.current) return geomRef.current;
+    const scroller = rootRef.current;
+    if (!scroller || !pieces.length) return null;
+    // Un elemento pasa de coordenadas de viewport a las del contenido sumando
+    // esto, que se lee una sola vez por pasada.
+    const base = scroller.scrollTop - scroller.getBoundingClientRect().top;
+    const out = new Array(pieces.length);
+    for (let i = 0; i < pieces.length; i += 1) {
+      const el = itemRefs.current[i];
+      if (!el) continue;
+      const r = el.getBoundingClientRect();
+      out[i] = { top: r.top + base, h: r.height };
+    }
+    geomRef.current = out;
+    return out;
+  }, [pieces]);
+
+  const dropGeometry = useCallback(() => { geomRef.current = null; }, []);
+
+  // La disposición cambia por densidad, por reajuste de un HEIC y por cualquier
+  // reflujo: el observador es quien sabe de todos, así que la caché se invalida
+  // sola sin tener que enumerar las causas.
+  //
+  // Con tolerancia, eso sí. `contain-intrinsic-size: auto` hace que el navegador
+  // sustituya el tamaño reservado por el real en cuanto pinta una celda, y esas
+  // diferencias de subpíxel mueven el alto del contenido unos pocos px mientras
+  // se recorre la rejilla: sin umbral, un recorrido completo invalidaba la caché
+  // trece veces. Nada que dependa de esta caché —ordenar vídeos por cercanía al
+  // centro y cribar lo que se ve— nota cuatro píxeles; un cambio de disposición
+  // de verdad mueve decenas.
+  const innerHRef = useRef(0);
+  useEffect(() => {
+    const inner = innerRef.current;
+    if (!inner || typeof ResizeObserver === "undefined") return undefined;
+    const ro = new ResizeObserver(([entry]) => {
+      const h = entry.contentRect.height;
+      if (Math.abs(h - innerHRef.current) < 8) return;
+      innerHRef.current = h;
+      dropGeometry();
+    });
+    ro.observe(inner);
+    return () => ro.disconnect();
+  }, [dropGeometry, pieces]);
+
+  useEffect(() => {
+    innerHRef.current = 0;
+    dropGeometry();
+  }, [cols, vw, dropGeometry]);
+
   const syncVideos = useCallback(() => {
-    const reduce = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
-    const cap = MAX_PLAYING[breakpointOf(window.innerWidth)];
-    const mid = window.innerHeight / 2;
+    const scroller = rootRef.current;
+    if (!scroller) return;
+    const cap = MAX_PLAYING[bp];
+    const top = scroller.scrollTop;
+    const mid = top + scroller.clientHeight / 2;
+    lastSyncTopRef.current = top;
+    const geom = geometry();
 
     // Prioridad por cercanía al centro: si hay más vídeos a la vista que cupo,
-    // se mueven los del medio, que son los que se están mirando.
+    // se mueven los del medio, que son los que se están mirando. La distancia
+    // sale de la caché, sin tocar el DOM.
     const want = new Set();
-    if (activeRef.current && !document.hidden && !reduce) {
+    if (activeRef.current && !document.hidden && !reduceRef.current) {
       [...visibleRef.current]
         .map((i) => {
-          const r = mediaRefs.current[i]?.getBoundingClientRect();
-          return { i, d: r ? Math.abs(r.top + r.height / 2 - mid) : Infinity };
+          const g = geom?.[i];
+          return { i, d: g ? Math.abs(g.top + g.h / 2 - mid) : Infinity };
         })
         .sort((a, b) => a.d - b.d)
         .slice(0, cap)
         .forEach(({ i }) => want.add(i));
     }
 
-    pieces.forEach((p, i) => {
+    videoIdx.forEach((i) => {
+      const p = pieces[i];
       const v = videoRefs.current[i];
-      if (!v || !(p.videoThumb || p.videoFull)) return;
+      if (!v) return;
       // La pieza abierta en detalle se reproduce en la caja, no en su celda.
       if (want.has(i) && i !== detailIRef.current) {
         const src = videoSrcFor(p);
@@ -263,7 +357,7 @@ export default function ATJ_Grid({ viewRef, active = true, onSelect } = {}) {
         v.style.opacity = "0";
       }
     });
-  }, [pieces, videoSrcFor]);
+  }, [pieces, videoIdx, videoSrcFor, geometry, bp]);
 
   const scheduleSync = useCallback(() => {
     cancelAnimationFrame(syncRaf.current);
@@ -293,14 +387,21 @@ export default function ATJ_Grid({ viewRef, active = true, onSelect } = {}) {
   }, [pieces, scheduleSync]);
 
   // El observador solo avisa al cruzar el borde: un scroll dentro de la banda
-  // no dispara nada y el reparto por cercanía se quedaría viejo.
+  // no dispara nada y el reparto por cercanía se quedaría viejo. Pero tampoco
+  // hace falta rehacerlo en cada frame: mientras el scroll no haya recorrido un
+  // cuarto de pantalla, el reparto que hay sigue siendo el bueno. Así la inmensa
+  // mayoría de los frames de un gesto no hacen absolutamente nada.
   useEffect(() => {
     const root = rootRef.current;
     if (!root) return undefined;
-    root.addEventListener("scroll", scheduleSync, { passive: true });
+    const onScroll = () => {
+      if (Math.abs(root.scrollTop - lastSyncTopRef.current) < root.clientHeight * 0.25) return;
+      scheduleSync();
+    };
+    root.addEventListener("scroll", onScroll, { passive: true });
     document.addEventListener("visibilitychange", scheduleSync);
     return () => {
-      root.removeEventListener("scroll", scheduleSync);
+      root.removeEventListener("scroll", onScroll);
       document.removeEventListener("visibilitychange", scheduleSync);
     };
   }, [scheduleSync]);
@@ -527,10 +628,23 @@ export default function ATJ_Grid({ viewRef, active = true, onSelect } = {}) {
         });
         return out;
       },
+      // Solo las piezas que se ven. El morph descarta todo lo que llegue con
+      // `visible: false` (ver morphSliderGrid), así que medir las otras ochenta
+      // era trabajo tirado —y con `content-visibility` es peor que tirado:
+      // preguntar por la caja de un descendiente fuera de pantalla obliga a
+      // maquetar ese subárbol, ochenta veces, en el frame en que arranca el
+      // gesto. La criba sale de la caché de geometría y no toca el DOM.
       getFlyers() {
         const out = new Map();
-        const h = window.innerHeight;
+        const scroller = rootRef.current;
+        const geom = geometry();
+        if (!scroller) return out;
+        const h = scroller.clientHeight;
+        const top = scroller.scrollTop;
+        const bottom = top + h;
         pieces.forEach((p, i) => {
+          const g = geom?.[i];
+          if (g && (g.top + g.h <= top || g.top >= bottom)) return;
           const el = mediaRefs.current[i];
           if (!el) return;
           const r = el.getBoundingClientRect();
@@ -589,7 +703,7 @@ export default function ATJ_Grid({ viewRef, active = true, onSelect } = {}) {
       },
     };
     return () => { viewRef.current = null; };
-  }, [pieces, viewRef, videoSrcFor]);
+  }, [pieces, viewRef, videoSrcFor, geometry]);
 
   // El fundido de entrada no puede depender solo de `onLoad`: si la imagen ya
   // estaba en caché el evento pudo dispararse antes de que React engancahara el
@@ -641,6 +755,18 @@ export default function ATJ_Grid({ viewRef, active = true, onSelect } = {}) {
           if (mark) lastGallery = p.galleryLabel;
           const ar = p.w && p.h ? p.w / p.h : FALLBACK_AR;
           const isVideo = Boolean(p.videoThumb || p.videoFull);
+          // Caja completa de la celda: el medio en su proporción más el pie. Es
+          // lo que la rejilla reserva mientras la celda está fuera de pantalla.
+          // Sale del ancho de columna y de la proporción de la pieza, las dos
+          // conocidas, así que es exacta y la retícula no se mueve al entrar y
+          // salir de render.
+          //
+          // Sin `auto` a propósito. `auto` significa «usa el tamaño que recuerdo
+          // de la última vez que la pinté», y ese recuerdo NO se invalida al
+          // cambiar de densidad: una celda vista a 12 columnas seguía reservando
+          // su alto de 12 columnas estando ya a 3, y el contenido se quedaba un
+          // 43% corto. La cifra calculada sí sigue a la densidad.
+          const cellH = +(cellPx / ar + capH).toFixed(2);
           const still = isVideo ? posterFor(p) : { src: p.src, srcSet: p.srcSet };
           return (
             <Fragment key={p.index}>
@@ -654,6 +780,7 @@ export default function ATJ_Grid({ viewRef, active = true, onSelect } = {}) {
                 className="atj-grid__cell"
                 ref={(el) => setItemRef(el, i)}
                 onClick={() => { onSelect?.(p); openDetail(i); }}
+                style={{ containIntrinsicSize: `${cellPx}px ${cellH}px` }}
               >
                 <div
                   className="atj-grid__media"
@@ -798,11 +925,18 @@ export default function ATJ_Grid({ viewRef, active = true, onSelect } = {}) {
           padding: var(--top) var(--gutter) var(--bottom);
         }
 
+        /* La celda fuera de pantalla no se maqueta ni se pinta: con cien en el
+           documento, esa es la diferencia entre recalcular la rejilla entera en
+           cada invalidación y recalcular lo que se ve. El tamaño reservado lo da
+           contain-intrinsic-size desde el style inline, con las cifras exactas
+           —ancho de columna y proporción de la pieza—, así que no hay salto.
+           Safari <18 lo ignora y se comporta como antes. */
         .atj-grid__cell {
           position: relative;
           margin: 0;
           min-width: 0;   /* deja que el pie recorte en vez de empujar */
           cursor: var(--cell-cursor, pointer);
+          content-visibility: auto;
         }
         /* Longhands y no el shorthand background: el color y el LQIP los pone el
            style inline de cada celda, y un shorthand aquí le reiniciaría el

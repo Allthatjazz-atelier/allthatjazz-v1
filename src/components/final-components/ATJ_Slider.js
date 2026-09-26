@@ -231,6 +231,12 @@ export default function ATJ_Slider({ viewRef, active = true } = {}) {
 
     const centered = { current: -1 };
 
+    // Lo último escrito en cada slide. `layout()` corre en cada frame y hasta
+    // ahora escribía transform y visibility en las cien, cambiaran o no: son
+    // doscientas invalidaciones de estilo por frame para mover tres piezas.
+    const lastTr = new Array(n);
+    const lastVis = new Array(n);
+
     // Las proporciones llegan asíncronas: al recalcular la tira, la pieza del
     // centro se queda donde está y el resto se reacomoda alrededor.
     let dirty = false;
@@ -259,8 +265,20 @@ export default function ATJ_Slider({ viewRef, active = true } = {}) {
         if (dist < bestDist) { bestDist = dist; best = i; }
         // Fuera de pantalla con margen de una pieza: se aparca, no se pinta.
         const visible = dist < metrics.vw / 2 + metrics.unit;
-        el.style.transform = `translate3d(${(left + x).toFixed(2)}px,0,0)`;
-        el.style.visibility = visible ? "visible" : "hidden";
+        const tr = `translate3d(${(left + x).toFixed(2)}px,0,0)`;
+        if (lastTr[i] !== tr) {
+          el.style.transform = tr;
+          lastTr[i] = tr;
+        }
+        if (lastVis[i] !== visible) {
+          el.style.visibility = visible ? "visible" : "hidden";
+          // `will-change` solo mientras la pieza está en pantalla. En la regla
+          // base promocionaba las cien a capa de composición propia, y esas
+          // capas seguían vivas —y ocupando memoria de GPU— con el slider
+          // apagado detrás de la rejilla. Aquí son las tres o cuatro que se ven.
+          el.style.willChange = visible ? "transform" : "auto";
+          lastVis[i] = visible;
+        }
       }
       if (best !== centered.current) {
         const prev = centered.current;
@@ -697,6 +715,9 @@ export default function ATJ_Slider({ viewRef, active = true } = {}) {
           width: 100%;
           height: 0;
         }
+        /* Sin will-change en la regla base: promocionaba las cien piezas a capa
+           propia de forma permanente, también con el slider apagado detrás de
+           la rejilla. Lo pone y lo quita el motor sobre las que se ven. */
         .atj-slide {
           position: absolute;
           top: 0;
@@ -704,7 +725,6 @@ export default function ATJ_Slider({ viewRef, active = true } = {}) {
           width: var(--slide-w, 0px);
           height: var(--slide-h, 0px);
           margin: calc(var(--slide-h, 0px) / -2) 0 0 0;
-          will-change: transform;
           backface-visibility: hidden;
         }
         .atj-slide__fit {
