@@ -79,9 +79,18 @@ export default function NavAndClock() {
       return;
     }
 
-    // Slider ↔ rejilla: solo estado. El escenario reacciona al cambio y arranca
-    // el morph al instante, sin router de por medio. Si venimos de galaxia,
-    // volvemos a "/" primero (fundido) y allí queda la vista elegida.
+    // Slider ↔ rejilla: solo estado, sin router de por medio. Si venimos de
+    // galaxia, volvemos a "/" primero (fundido) y allí queda la vista elegida.
+    //
+    // El aviso va POR DELANTE del store, igual que en la densidad: el escenario
+    // mide el origen y lanza la recogida en este mismo frame, mientras React
+    // todavía no ha reconciliado nada. Escrito al revés, entre el dedo y el
+    // primer píxel en movimiento cabe toda la cadena de render.
+    if (r.pathname === "/") {
+      window.dispatchEvent(new CustomEvent("atj:view-will-change", {
+        detail: { to: item.view },
+      }));
+    }
     setHomeView(item.view);
     if (r.pathname !== "/") r.push("/");
   }, [activeIndex]);

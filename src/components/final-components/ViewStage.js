@@ -8,9 +8,9 @@ import NewSpace3dFocus_2 from "@/components/final-components/NewSpace3dFocus_2";
 import { useViewPrefs } from "@/components/final-components/viewPrefs";
 import {
   afterLayout,
+  beginMorph,
   MORPH_MS,
   prefersReduce,
-  runMorph,
   waitFor,
 } from "@/components/final-components/morphSliderGrid";
 
@@ -87,18 +87,93 @@ export default function ViewStage() {
   const [instant, setInstant] = useState(false);
   const prevView = useRef(view);
   const sessionRef = useRef(null);
+  // Recogida ya arrancada en el click, a la espera de que el efecto de `view`
+  // la reclame y le enganche el destino.
+  const pendingRef = useRef(null);
 
   const isDomPair = (a, b) =>
     (a === "slider" && b === "grid") || (a === "grid" && b === "slider");
 
-  const beginDomMorph = (from, to) => {
+  // ── Pre-arranque: la mitad del gesto que ya se puede empezar ───────────────
+  // La pastilla avisa ANTES de escribir el store, así que aquí el origen sigue
+  // montado, medible y sin tocar, y estamos en el frame del dedo. Se mide y se
+  // lanza la recogida ya; el destino —que es lo lento: montar la rejilla,
+  // desplazarla a la pieza activa y volver a medir— se engancha después.
+  // Mismo patrón que `atj:density-will-change` usa para el FLIP de densidad.
+  useEffect(() => {
+    const onWill = (e) => {
+      const to = e.detail?.to === "grid" ? "grid" : e.detail?.to === "slider" ? "slider" : null;
+      const from = prevView.current;
+      if (!to || !isDomPair(from, to) || prefersReduce()) return;
+      // Con un morph vivo o uno ya pre-arrancado, el relevo lo resuelve el
+      // efecto (que sabe cancelar el anterior); adelantarse aquí dejaría dos
+      // sesiones fantasma peleando por el mismo `ghost`.
+      if (pendingRef.current || sessionRef.current) return;
+
+      const src = (from === "slider" ? sliderRef : gridRef).current;
+      if (!src?.getFlyers) return;
+      if (to === "grid") setGridReady(true);
+
+      const fromFlyers = src.getFlyers();
+      if (!fromFlyers?.size) return;
+
+      // La pieza activa se apunta ahora: después de esconder el origen, la
+      // rejilla la busca midiendo cajas y el slider ya podría haberse movido.
+      const active = src.getActive?.() || null;
+
+      // Y el destino se alinea YA, en este mismo frame. Es trabajo adelantado,
+      // pero sobre todo es lo que hace utilizable la pista: sus rectángulos
+      // dicen qué piezas van a verse, y sin alinearlo primero dicen las que se
+      // ven AHORA —otras— y la pista no sirve para nada.
+      const dst = (to === "slider" ? sliderRef : gridRef).current;
+      if (active && dst?.goTo) dst.goTo(active.index, { duration: 0, behavior: "auto" });
+
+      const handle = beginMorph({
+        fromFlyers,
+        toHint: dst?.getFlyers?.() || null,
+        layer: flyRef.current,
+      });
+      if (!handle) return;
+
+      src.setGhost?.(true);
+      setInstant(true);
+
+      const key = `${from}>${to}`;
+      // Red de seguridad por si el cambio de estado no llegara nunca (un
+      // `setHomeView` que resulta ser un no-op): esto se quedaría volando sobre
+      // un escenario escondido. Holgada a propósito —el efecto tarda un frame—
+      // porque los dos fallos no cuestan lo mismo: quedarse corto aborta un
+      // gesto bueno y se ve reiniciar, y el caso que cubre no llega por la
+      // interfaz (las pastillas ya ignoran el click en la vista activa).
+      const claim = setTimeout(() => {
+        if (pendingRef.current?.key !== key) return;
+        pendingRef.current = null;
+        handle.kill();
+        src.setGhost?.(false);
+        setInstant(false);
+      }, 800);
+
+      pendingRef.current = { key, handle, fromFlyers, active, claim };
+    };
+    window.addEventListener("atj:view-will-change", onWill);
+    return () => window.removeEventListener("atj:view-will-change", onWill);
+  }, []);
+
+  const beginDomMorph = (from, to, seed) => {
     if (to === "grid") setGridReady(true);
 
     let cancelled = false;
-    let handle = null;
     const srcRef = from === "slider" ? sliderRef : gridRef;
     const dstRef = to === "slider" ? sliderRef : gridRef;
     const key = `${from}>${to}`;
+
+    // La pastilla pudo arrancar ya la recogida. Si es así se continúa esa; si no
+    // —cambio programático, o el aviso no llegó— se arranca aquí y lo único que
+    // se pierde es la ventaja de haber empezado antes.
+    const pre = pendingRef.current?.key === key ? pendingRef.current : null;
+    if (pre) clearTimeout(pre.claim);
+    pendingRef.current = null;
+    let handle = pre?.handle || null;
 
     const finish = () => {
       srcRef.current?.setGhost?.(false);
@@ -122,43 +197,63 @@ export default function ViewStage() {
       if (cancelled) return;
       if (!ready) { fallback(); return; }
 
-      const active = srcRef.current.getActive?.();
+      // Sin pre-arranque hay que medir el origen aquí — y antes de tocar el
+      // destino, porque moverlo puede reflotar la maquetación de los dos. Si
+      // venimos de un relevo en caliente, el origen son las piezas donde las
+      // dejó el gesto anterior, no la vista.
+      if (!handle) {
+        const fromFlyers = seed?.fromFlyers || srcRef.current.getFlyers();
+        if (!fromFlyers?.size) { fallback(); return; }
+        handle = beginMorph({
+          fromFlyers,
+          toHint: dstRef.current.getFlyers?.() || null,
+          layer: flyRef.current,
+        });
+        if (!handle) { fallback(); return; }
+        srcRef.current.setGhost?.(true);
+      }
+
+      const active = pre?.active || srcRef.current.getActive?.();
       if (active && dstRef.current.goTo) {
         dstRef.current.goTo(active.index, { duration: 0, behavior: "auto" });
       }
       await afterLayout();
       if (cancelled) return;
 
-      const fromFlyers = srcRef.current.getFlyers();
       const toFlyers = dstRef.current.getFlyers();
-      if (!fromFlyers?.size && !toFlyers?.size) { fallback(); return; }
-
-      srcRef.current.setGhost?.(true);
       dstRef.current.setGhost?.(true);
       setShown(to);
 
-      handle = runMorph({
-        fromFlyers,
-        toFlyers,
-        layer: flyRef.current,
-        onComplete: () => {
-          if (cancelled) return;
-          cancelled = true;
-          clearTimeout(guard);
-          dstRef.current?.setGhost?.(false);
-          requestAnimationFrame(() => {
-            handle?.kill();
-            srcRef.current?.setGhost?.(false);
-            setInstant(false);
-            if (sessionRef.current?.key === key) sessionRef.current = null;
-          });
-        },
+      handle.land(toFlyers, () => {
+        if (cancelled) return;
+        cancelled = true;
+        clearTimeout(guard);
+        dstRef.current?.setGhost?.(false);
+        requestAnimationFrame(() => {
+          handle?.kill();
+          srcRef.current?.setGhost?.(false);
+          setInstant(false);
+          if (sessionRef.current?.key === key) sessionRef.current = null;
+        });
       });
     })();
 
     const guard = setTimeout(fallback, MORPH_MS + 500);
     return {
       key,
+      // Relevo en caliente: se fotografía lo que va en vuelo y se cede. A
+      // diferencia de `cancel()`, aquí NO se levantan los fantasmas — eso es lo
+      // que hace que no parpadee: el escenario sigue escondido y el gesto nuevo
+      // recrea los clones exactamente donde estaban los viejos.
+      handover() {
+        if (cancelled) return null;
+        const snap = handle?.snapshot?.();
+        cancelled = true;
+        clearTimeout(guard);
+        handle?.kill();
+        if (sessionRef.current?.key === key) sessionRef.current = null;
+        return snap?.size ? { fromFlyers: snap } : null;
+      },
       cancel() {
         cancelled = true;
         clearTimeout(guard);
@@ -174,12 +269,19 @@ export default function ViewStage() {
 
     prevView.current = view;
 
-    // Slider ↔ rejilla: morph DOM↔DOM. Lo dispara el cambio de `homeView` (la
-    // pastilla escribe el store), sin pasar por el router.
+    // Slider ↔ rejilla: morph DOM↔DOM, sin pasar por el router. Su recogida
+    // suele venir ya lanzada desde el click (ver el pre-arranque de arriba);
+    // aquí se le engancha el destino, o se hace el gesto entero si no la hubo.
     if (isDomPair(from, view) && !prefersReduce()) {
       const key = `${from}>${view}`;
+      // Cambiar de idea a media transición no tira lo que hay volando: se hereda
+      // donde está y el gesto nuevo sale de ahí. Antes se cancelaba —los clones
+      // desaparecían, la vista de destino asomaba un instante y el morph
+      // arrancaba de cero—, y ese parpadeo es justo lo que delata que son dos
+      // animaciones y no una.
+      const seed = sessionRef.current?.handover?.() || null;
       sessionRef.current?.cancel();
-      sessionRef.current = beginDomMorph(from, view);
+      sessionRef.current = beginDomMorph(from, view, seed);
       return () => {
         if (sessionRef.current?.key === key) {
           sessionRef.current.cancel();

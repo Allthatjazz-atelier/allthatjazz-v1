@@ -18,7 +18,7 @@ export default function Tests() {
         {/* <GooeyMorph /> */}
         {/* <NewSpace3dFocus_2 /> */}
         {/* <HorizontalSlider /> */}
-       
+       <DynamicGallery3 />
       </HeaderFooter17>
     </div>
   );
