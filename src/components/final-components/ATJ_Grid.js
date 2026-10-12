@@ -964,7 +964,10 @@ export default function ATJ_Grid({ viewRef, active = true, onSelect } = {}) {
              viewport y se comía el margen lateral. */
           grid-template-columns: repeat(var(--cols), minmax(0, 1fr));
           gap: var(--gap);
-          align-items: start;
+          /* El pie cierra la fila. La celda mide su contenido y se apoya en el
+             borde inferior, así que los nombres quedan en una sola línea aunque
+             las piezas tengan distinta proporción. El hueco queda arriba. */
+          align-items: end;
           /* El aire de entrada es padding, no un recorte: al hacer scroll las
              piezas siguen subiendo y se meten bajo el navbar. */
           padding: var(--top) var(--gutter) var(--bottom);

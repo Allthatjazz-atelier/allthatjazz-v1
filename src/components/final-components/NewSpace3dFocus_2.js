@@ -1889,7 +1889,7 @@ export default function NewSpace3dFocus_2({ damping = 0.085, active = true, view
         <div className="cst-bar" role="group" aria-label="Constelaciones">
           <button
             type="button"
-            className={`cst-pill${lockedId === null ? " is-active" : ""}`}
+            className={`cst-link${lockedId === null ? " is-active" : ""}`}
             onMouseEnter={handleLeave}
             onClick={handleAll}
           >
@@ -1900,7 +1900,7 @@ export default function NewSpace3dFocus_2({ damping = 0.085, active = true, view
               key={g.id}
               type="button"
               aria-pressed={lockedId === g.id}
-              className={`cst-pill${marked === g.id ? " is-active" : ""}`}
+              className={`cst-link${marked === g.id ? " is-active" : ""}`}
               onMouseEnter={() => handleEnter(g.id)}
               onMouseLeave={handleLeave}
               onFocus={() => handleEnter(g.id)}
@@ -1914,13 +1914,10 @@ export default function NewSpace3dFocus_2({ damping = 0.085, active = true, view
       </div>
 
       <style>{`
-        /* Misma cápsula que el navbar: hueco en claro, anillo y cortes en oscuro. */
+        /* Segunda fila de la nav, mismo idioma de texto: bajo el reloj/vistas. */
         .cst {
-          --cst-pill: 1.5em;
-          --cst-cut: 2px;
-          --cst-ring: color-mix(in srgb, var(--atj-ink) 36%, transparent);
           position: fixed;
-          top: calc(16px + var(--cst-pill) + 4px);
+          top: calc(16px + 1.15em + 8px);
           left: 0;
           width: 100%;
           display: flex;
@@ -1936,11 +1933,9 @@ export default function NewSpace3dFocus_2({ damping = 0.085, active = true, view
 
         .cst-bar {
           display: flex;
-          align-items: stretch;
-          height: var(--cst-pill);
-          gap: var(--cst-cut);
+          align-items: center;
+          gap: 0.85em;
           max-width: min(94vw, 1040px);
-          border-radius: 999px;
           overflow-x: auto;
           overflow-y: hidden;
           box-sizing: border-box;
@@ -1949,49 +1944,34 @@ export default function NewSpace3dFocus_2({ damping = 0.085, active = true, view
         }
         .cst-bar::-webkit-scrollbar { display: none; }
 
-        .cst-pill {
+        .cst-link {
           flex: 0 0 auto;
-          height: 100%;
-          display: flex;
-          align-items: center;
-          padding: 0 0.7em;
+          padding: 0;
           border: 0;
-          border-radius: 0;
-          background: var(--atj-hairline);
-          backdrop-filter: blur(20px);
-          -webkit-backdrop-filter: blur(20px);
-          transform: translateZ(0);
-          color: color-mix(in srgb, var(--atj-ink) 72%, transparent);
+          background: transparent;
+          color: color-mix(in srgb, var(--atj-ink) 40%, transparent);
           font: inherit;
           letter-spacing: inherit;
           line-height: 1;
           white-space: nowrap;
           cursor: pointer;
-          opacity: 1;
           transition: color 180ms ease;
         }
-        .cst-pill:hover,
-        .cst-pill:focus-visible {
+        .cst-link:hover,
+        .cst-link:focus-visible {
           color: var(--atj-ink);
           outline: none;
         }
-        .cst-pill.is-active { color: var(--atj-ink); }
-
-        .dark .cst-bar {
-          gap: 0;
-          border: 1px solid var(--cst-ring);
-        }
-        .dark .cst-bar > .cst-pill + .cst-pill {
-          border-left: 1px solid var(--cst-ring);
-        }
+        .cst-link.is-active { color: var(--atj-ink); }
 
         @media (max-width: 768px), (pointer: coarse) {
-          .cst { --cst-pill: 1.8em; top: calc(16px + var(--cst-pill) + 6px); }
-          .cst-pill { padding: 0 0.85em; }
+          .cst { top: calc(16px + 1.35em + 10px); }
+          .cst-bar { gap: 0.7em; }
+          .cst-link { padding: 0.25em 0; }
         }
 
         @media (prefers-reduced-motion: reduce) {
-          .cst, .cst-pill { transition: none; }
+          .cst, .cst-link { transition: none; }
         }
       `}</style>
     </div>
